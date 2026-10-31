@@ -224,7 +224,9 @@ private fun PlanCard(state: CoachUiState, onToggleCancelled: (LocalDate) -> Unit
 @Composable
 private fun DayRow(d: WeekDay, today: Boolean, past: Boolean) {
     val c = Rytm.colors
-    val done = d.activities.isNotEmpty()
+    // Spacery z psem zegarek zapisuje jako treningi; liczą się do obciążenia, ale nie „zaliczają” dnia z planu.
+    val sessions = d.activities.filter { it.type != ActivityType.WALK }
+    val done = sessions.isNotEmpty()
     Row(
         Modifier
             .fillMaxWidth()
@@ -242,17 +244,17 @@ private fun DayRow(d: WeekDay, today: Boolean, past: Boolean) {
                 Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(c.forKind(d.plan.kind)))
                 Text("  ", style = Rytm.type.bodyStrong)
                 val title = when {
-                    done -> d.activities.joinToString(" + ") { it.notes?.takeIf { n -> it.type == ActivityType.OTHER && n.isNotBlank() } ?: Format.activity(it.type) }
+                    done -> sessions.joinToString(" + ") { it.notes?.takeIf { n -> it.type == ActivityType.OTHER && n.isNotBlank() } ?: Format.activity(it.type) }
                     else -> d.plan.title
                 }
                 Text(
                     title,
                     style = Rytm.type.bodyStrong,
                     color = if (past && !done) c.muted else c.ink,
-                    textDecoration = if (past && !done && d.plan.kind != DayKind.REST) TextDecoration.LineThrough else null,
+                    textDecoration = if (past && !done && d.plan.kind != DayKind.REST && d.plan.kind != DayKind.FLEX) TextDecoration.LineThrough else null,
                 )
             }
-            SmallText(subtitle(d, past))
+            SmallText(subtitle(d, sessions, past))
         }
         Column(horizontalAlignment = Alignment.End) {
             when {
@@ -266,18 +268,20 @@ private fun DayRow(d: WeekDay, today: Boolean, past: Boolean) {
     }
 }
 
-private fun subtitle(d: WeekDay, past: Boolean): String {
-    if (d.activities.isNotEmpty()) {
-        return d.activities.joinToString(" · ") { a ->
-            Format.minutes(a.durationMin) + (a.rpe?.let { " · RPE $it" } ?: " · bez RPE")
-        }
+private fun subtitle(d: WeekDay, sessions: List<com.zacco.rytm.domain.model.Activity>, past: Boolean): String {
+    val walkMin = d.activities.filter { it.type == ActivityType.WALK }.sumOf { it.durationMin }
+    val walks = if (walkMin > 0) "spacery ${Format.minutes(walkMin)}" else null
+    if (sessions.isNotEmpty()) {
+        return (sessions.map { a -> Format.minutes(a.durationMin) + (a.rpe?.let { " · RPE $it" } ?: " · bez RPE") } + listOfNotNull(walks))
+            .joinToString(" · ")
     }
     val why = d.rationale()
-    return when {
+    val main = when {
         d.cancelled -> "odwołane" + (why?.let { " · $it" } ?: "")
-        past -> "nie odnotowano"
+        past -> if (d.plan.kind == DayKind.REST || d.plan.kind == DayKind.FLEX) "bez treningu" else "nie odnotowano"
         else -> "plan · " + Format.intensity(d.plan.intensity).lowercase() + (why?.let { " · $it" } ?: "")
     }
+    return listOfNotNull(main, walks).joinToString(" · ")
 }
 
 private fun WeekDay.rationale(): String? = plan.rationale.firstOrNull()?.trimEnd('.')?.replaceFirstChar { it.lowercase() }

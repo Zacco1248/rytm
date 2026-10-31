@@ -211,7 +211,7 @@ class HealthConnectSync(
             db.activities().upsertFromHealthConnect(
                 ActivityEntity(
                     id = s.metadata.id,
-                    type = ExerciseTypes.toActivityType(s.exerciseType),
+                    type = ExerciseTypes.toActivityType(s.exerciseType, date),
                     start = s.startTime,
                     date = date,
                     durationMin = Duration.between(s.startTime, s.endTime).toMinutes().toInt().coerceAtLeast(0),
