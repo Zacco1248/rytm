@@ -26,6 +26,7 @@ import com.zacco.rytm.data.db.SyncStateEntity
 import com.zacco.rytm.data.db.WeighInEntity
 import com.zacco.rytm.domain.heart.HrSample
 import com.zacco.rytm.domain.heart.DayRestingHr
+import com.zacco.rytm.domain.planner.PlannerConfig
 import com.zacco.rytm.domain.heart.NightRestingHr
 import com.zacco.rytm.domain.ingest.Ingest
 import com.zacco.rytm.domain.ingest.SleepSession
@@ -47,6 +48,8 @@ class HealthConnectSync(
     private val client: HealthConnectClient,
     private val db: RytmDatabase,
     private val now: () -> Instant = Instant::now,
+    /** Tydzień z profilu: w dzień treningu personalnego ogólny trening z zegarka liczymy jako personalny. */
+    private val planner: PlannerConfig = PlannerConfig(personalTrainingDay = null),
 ) {
 
     data class Result(val daysUpdated: Int, val fullImport: Boolean)
@@ -229,7 +232,7 @@ class HealthConnectSync(
             db.activities().upsertFromHealthConnect(
                 ActivityEntity(
                     id = s.metadata.id,
-                    type = ExerciseTypes.toActivityType(s.exerciseType, date),
+                    type = ExerciseTypes.toActivityType(s.exerciseType, date, planner),
                     start = s.startTime,
                     date = date,
                     durationMin = Duration.between(s.startTime, s.endTime).toMinutes().toInt().coerceAtLeast(0),

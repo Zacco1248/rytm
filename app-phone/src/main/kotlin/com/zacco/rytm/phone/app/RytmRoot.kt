@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zacco.rytm.phone.body.BodyScreen
 import com.zacco.rytm.phone.diagnostics.DiagnosticsScreen
+import com.zacco.rytm.phone.profile.ProfileScreen
 import com.zacco.rytm.phone.today.AlcoholSheet
 import com.zacco.rytm.phone.today.CheckInSheet
 import com.zacco.rytm.phone.today.HabitsCard
@@ -76,11 +77,14 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     var tab by rememberSaveable { mutableStateOf(Tab.TODAY) }
     var sheet by rememberSaveable { mutableStateOf(Sheet.NONE) }
     var diagnostics by rememberSaveable { mutableStateOf(false) }
+    var profileOpen by rememberSaveable { mutableStateOf(false) }
     var rpeDate by rememberSaveable { mutableStateOf<String?>(null) }
 
     val state by vm.state.collectAsStateWithLifecycle()
     val hc by vm.hc.collectAsStateWithLifecycle()
     val sync by vm.sync.collectAsStateWithLifecycle()
+    val profile by vm.profile.collectAsStateWithLifecycle()
+    val profileReady by vm.profileReady.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
         vm.refreshHealthConnect()
@@ -95,6 +99,33 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     if (diagnostics) {
         BackHandler { diagnostics = false }
         Box(Modifier.fillMaxSize().background(c.bg)) { DiagnosticsScreen() }
+        return
+    }
+    // Kreator przy pierwszym uruchomieniu albo edycja profilu.
+    val onboarding = profileReady && profile == null
+    if (onboarding || profileOpen) {
+        if (profileOpen) BackHandler { profileOpen = false }
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(c.bg)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ProfileScreen(
+                initial = profile,
+                onboarding = onboarding,
+                onSave = {
+                    vm.saveProfile(it)
+                    profileOpen = false
+                },
+                onDiagnostics = if (onboarding) null else ({ profileOpen = false; diagnostics = true }),
+            )
+        }
         return
     }
 
@@ -125,7 +156,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         sync = sync,
                         onConnect = { permissionLauncher.launch(vm.permissions) },
                         onSync = vm::syncNow,
-                        onProfile = { diagnostics = true },
+                        onProfile = { profileOpen = true },
                         onToggleHabit = { vm.toggleHabit(it.habit, it.done) },
                         onCheckIn = { sheet = Sheet.CHECK_IN },
                         onOtherActivity = { sheet = Sheet.OTHER_ACTIVITY },

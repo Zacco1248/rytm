@@ -24,7 +24,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         if (HealthConnectClient.getSdkStatus(applicationContext) != HealthConnectClient.SDK_AVAILABLE) return Result.success()
         return try {
             val data = RytmData.get(applicationContext)
-            val result = HealthConnectSync(HealthConnectClient.getOrCreate(applicationContext), data.db).sync()
+            data.profiles.ensureLoaded()
+            val result = HealthConnectSync(HealthConnectClient.getOrCreate(applicationContext), data.db, planner = data.plannerConfig()).sync()
             Log.i(TAG, "Synchronizacja: ${result.daysUpdated} dni, pełny import: ${result.fullImport}")
             // Przy każdej synchronizacji odświeżamy też zegarek (m.in. nowy dzień po północy).
             WatchBridge.publish(applicationContext)

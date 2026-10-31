@@ -29,6 +29,8 @@ class RytmApplication : Application() {
 
         // Póki proces żyje, każda zmiana danych (wpis, synchronizacja) od razu trafia na zegarek.
         val data = RytmData.get(this)
+        // Aktualizacja z wersji bez profilu: wgrywa dotychczasowe ustawienia, zanim cokolwiek policzy plan.
+        scope.launch { data.profiles.ensureLoaded() }
         scope.launch {
             flow {
                 while (true) {

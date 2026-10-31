@@ -10,6 +10,7 @@ import com.zacco.rytm.data.db.RytmDatabase
 import com.zacco.rytm.data.db.originForDedup
 import com.zacco.rytm.data.db.toDomain
 import com.zacco.rytm.data.db.toEntity
+import com.zacco.rytm.data.profile.ProfileStore
 import com.zacco.rytm.data.sync.HealthConnectSync
 import com.zacco.rytm.domain.coach.CoachData
 import com.zacco.rytm.domain.ingest.Ingest
@@ -18,6 +19,7 @@ import com.zacco.rytm.domain.model.BodyComposition
 import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.LoadedArea
 import com.zacco.rytm.domain.model.Source
+import com.zacco.rytm.domain.profile.PersonalProfile
 import com.zacco.rytm.domain.time.RytmTime
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -26,7 +28,7 @@ import java.time.LocalDate
 import java.util.UUID
 
 /** Zbiera dane z bazy w [CoachData] i zapisuje ręczne wpisy użytkownika. */
-class CoachRepository(private val db: RytmDatabase) {
+class CoachRepository(private val db: RytmDatabase, private val profiles: ProfileStore) {
 
     /** Okno danych: 28 dni na obciążenie przewlekłe + bieżący tydzień + zapas na średnie wagi. */
     fun observe(today: LocalDate): Flow<CoachData> {
@@ -59,7 +61,15 @@ class CoachRepository(private val db: RytmDatabase) {
                 lastSync = sync?.toLongOrNull()?.let(Instant::ofEpochMilli),
             )
         }
-        return combine(part2, dayNotes) { base, notes -> base.copy(dayNotes = notes.map { it.toDomain() }) }
+        return combine(part2, dayNotes, profiles.profile) { base, notes, profile ->
+            // Bez profilu (przed kreatorem) silnik liczy na wartościach domyślnych; ekran i tak pokazuje kreator.
+            val p = profile ?: PersonalProfile()
+            base.copy(
+                dayNotes = notes.map { it.toDomain() },
+                profile = p.toUserProfile(today),
+                habits = p.habits(),
+            )
+        }
     }
 
     suspend fun setHabit(habitId: String, date: LocalDate, value: Int?) {

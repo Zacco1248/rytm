@@ -19,7 +19,7 @@ import com.zacco.rytm.domain.model.BodyComposition
 import com.zacco.rytm.domain.model.NutritionDay
 import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.LoadedArea
-import com.zacco.rytm.domain.planner.PlannerConfig
+import com.zacco.rytm.domain.profile.PersonalProfile
 import com.zacco.rytm.domain.time.RytmTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -61,7 +61,9 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
 
     private val data = RytmData.get(app)
     private val engine = CoachEngine()
-    private val planner = PlannerConfig()
+    /** Profil osoby; null przed kreatorem. */
+    val profile: StateFlow<PersonalProfile?> = data.profiles.profile
+    val profileReady: StateFlow<Boolean> = data.profiles.ready
 
     private val _hc = MutableStateFlow(HcStatus.CHECKING)
     val hc: StateFlow<HcStatus> = _hc.asStateFlow()
@@ -80,6 +82,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<CoachUiState?> = today
         .flatMapLatest { day -> data.coach.observe(day) }
         .map { d ->
+            val planner = d.profile.planner
             val upcoming = (0L..6L).map { d.today.plusDays(it) }.filter { it <= d.today.with(java.time.DayOfWeek.SUNDAY) }
             CoachUiState(
                 today = engine.today(d),
@@ -95,6 +98,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {
+        viewModelScope.launch { data.profiles.ensureLoaded() }
         SyncWorker.schedulePeriodic(app)
         refreshHealthConnect()
     }
@@ -119,7 +123,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _sync.update { it.copy(running = true, error = null) }
             val error = runCatching {
-                HealthConnectSync(HealthConnectClient.getOrCreate(getApplication()), data.db).sync()
+                HealthConnectSync(HealthConnectClient.getOrCreate(getApplication()), data.db, planner = data.plannerConfig()).sync()
             }.exceptionOrNull()
             _sync.value = SyncUi(running = false, error = error?.let { "Synchronizacja nieudana: ${it.message ?: it::class.simpleName}" })
         }
@@ -158,6 +162,10 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addWeighIn(kg: Double, bodyFatPct: Double?, time: Instant?, composition: BodyComposition?) {
         viewModelScope.launch { data.coach.addWeighIn(kg, bodyFatPct, time ?: Instant.now(), composition) }
+    }
+
+    fun saveProfile(p: PersonalProfile) {
+        data.profiles.save(p)
     }
 
     fun toggleDayOff() {
