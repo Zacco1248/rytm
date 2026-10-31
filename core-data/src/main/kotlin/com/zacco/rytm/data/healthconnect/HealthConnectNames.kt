@@ -24,7 +24,6 @@ internal fun exerciseTypeName(type: Int): String = when (type) {
     E.EXERCISE_TYPE_STRETCHING -> "STRETCHING"
     E.EXERCISE_TYPE_HIKING -> "HIKING"
     E.EXERCISE_TYPE_SWIMMING_POOL -> "SWIMMING_POOL"
-    E.EXERCISE_TYPE_UNKNOWN -> "UNKNOWN"
     else -> "TYPE_$type"
 }
 

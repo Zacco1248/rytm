@@ -41,7 +41,7 @@ android {
 
     sourceSets {
         getByName("main") {
-            kotlin.srcDir(if (hasSensorSdk) "src/samsung/kotlin" else "src/stub/kotlin")
+            kotlin.directories.add(if (hasSensorSdk) "src/samsung/kotlin" else "src/stub/kotlin")
         }
     }
 }

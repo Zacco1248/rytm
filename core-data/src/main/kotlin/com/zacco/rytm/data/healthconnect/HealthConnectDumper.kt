@@ -1,16 +1,21 @@
 package com.zacco.rytm.data.healthconnect
 
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.BasalMetabolicRateRecord
 import androidx.health.connect.client.records.BodyFatRecord
+import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
-import androidx.health.connect.client.records.InstantaneousRecord
-import androidx.health.connect.client.records.IntervalRecord
+import androidx.health.connect.client.records.HeightRecord
 import androidx.health.connect.client.records.NutritionRecord
+import androidx.health.connect.client.records.OxygenSaturationRecord
 import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SleepSessionRecord
+import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.Vo2MaxRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.metadata.Metadata
@@ -129,9 +134,24 @@ class HealthConnectDumper(private val client: HealthConnectClient) {
 
     private fun Record.origin(): String = metadata.dataOrigin.packageName
 
+    // InstantaneousRecord i IntervalRecord są w Health Connect wewnętrzne, więc wyliczamy typy z HealthConnectPermissions.
     private fun Record.startTime(): Instant? = when (this) {
-        is InstantaneousRecord -> time
-        is IntervalRecord -> startTime
+        is HeartRateRecord -> startTime
+        is SleepSessionRecord -> startTime
+        is ExerciseSessionRecord -> startTime
+        is StepsRecord -> startTime
+        is DistanceRecord -> startTime
+        is TotalCaloriesBurnedRecord -> startTime
+        is ActiveCaloriesBurnedRecord -> startTime
+        is NutritionRecord -> startTime
+        is RestingHeartRateRecord -> time
+        is HeartRateVariabilityRmssdRecord -> time
+        is BasalMetabolicRateRecord -> time
+        is Vo2MaxRecord -> time
+        is OxygenSaturationRecord -> time
+        is WeightRecord -> time
+        is BodyFatRecord -> time
+        is HeightRecord -> time
         else -> null
     }
 
