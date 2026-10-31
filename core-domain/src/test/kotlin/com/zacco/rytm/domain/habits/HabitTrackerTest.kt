@@ -49,4 +49,14 @@ class HabitTrackerTest {
         assertFalse(HabitTracker.isDueOn(habit, today, logs))
         assertEquals(HabitWeekStatus(2, 2), HabitTracker.weekStatus(habit, today, logs))
     }
+
+    @Test
+    fun `general activity is done from steps`() {
+        val activity = DefaultHabits.all.first { it.id == "activity-steps" }
+        val log = HabitTracker.autoLog(activity, today, steps = 6_400)!!
+
+        assertTrue(HabitTracker.isDone(activity, log.value))
+        assertFalse(HabitTracker.isDone(activity, HabitTracker.autoLog(activity, today, 5_200)!!.value))
+        assertEquals(null, HabitTracker.autoLog(mobility, today, 9_000))
+    }
 }

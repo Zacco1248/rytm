@@ -305,7 +305,7 @@ data class LoggedSet(val exercise: String, val reps: Int, val weightKg: Double, 
 Odpowiedzi z 2026-10-31:
 
 1. ~~Model wagi Xiaomi i aplikacja~~: **Xiaomi Home**. Czy waga trafia do Health Connect, sprawdza raport fazy 0.
-2. ~~Lista startowych nawyków~~: sen i zmęczenie mierzymy check-inem i z zegarka; nawyki do odhaczania na start: **„Bez ekranu po 23:30”** (tak/nie, codziennie), **„10 min mobilności”** (minuty, codziennie), **„Ogólna aktywność”**.
+2. ~~Lista startowych nawyków~~: sen i zmęczenie mierzymy check-inem i z zegarka; nawyki do odhaczania na start: **„Bez ekranu po 23:30”** (tak/nie, codziennie), **„10 min mobilności”** (minuty, codziennie), **„Ogólna aktywność”** = kroki z Health Connect, cel 6000 dziennie (odhaczana automatycznie).
 3. ~~Cel snu~~: zaśnięcie **24:00–01:00**, długość **7–8 h**.
 4. ~~Cele żywieniowe~~: z Fitatu (pod rekompozycję): **2300 kcal, białko 161 g, tłuszcz 72 g, węglowodany 253 g**. To domyślne cele w aplikacji, z możliwością edycji.
 5. Ewentualny zakup: gumy oporowe (taśmy z uchwytami + mini bandy); w perspektywie cięższe hantle regulowane, jeśli progresja stanie. *(otwarte)*

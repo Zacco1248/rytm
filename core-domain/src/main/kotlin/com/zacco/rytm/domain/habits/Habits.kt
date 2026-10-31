@@ -11,6 +11,9 @@ sealed interface HabitSchedule {
 
 enum class HabitKind { YES_NO, COUNT, MINUTES }
 
+/** Nawyk odhaczany automatycznie z danych (bez ręcznego wpisu). */
+enum class HabitAutoSource { STEPS }
+
 data class Habit(
     val id: String,
     val name: String,
@@ -18,6 +21,8 @@ data class Habit(
     val kind: HabitKind,
     /** Cel dla COUNT/MINUTES; dla YES_NO pomijany. */
     val target: Int? = null,
+    /** Gdy ustawione, wartość dnia pochodzi z Health Connect, np. liczba kroków. */
+    val autoSource: HabitAutoSource? = null,
 )
 
 data class HabitLog(val habitId: String, val date: LocalDate, val value: Int)
@@ -31,7 +36,8 @@ object DefaultHabits {
     val all = listOf(
         Habit("no-screen-2330", "Bez ekranu po 23:30", HabitSchedule.Daily, HabitKind.YES_NO),
         Habit("mobility-10", "10 min mobilności", HabitSchedule.Daily, HabitKind.MINUTES, target = 10),
-        Habit("activity-30", "Ogólna aktywność", HabitSchedule.Daily, HabitKind.MINUTES, target = 30),
+        // Cel kroków jak w Samsung Health; wartość z Health Connect.
+        Habit("activity-steps", "Ogólna aktywność", HabitSchedule.Daily, HabitKind.COUNT, target = 6_000, autoSource = HabitAutoSource.STEPS),
     )
 }
 
@@ -99,6 +105,12 @@ object HabitTracker {
             checked++
         }
         return count
+    }
+
+    /** Wpis dnia dla nawyku automatycznego (np. kroki z Health Connect); null dla nawyków ręcznych. */
+    fun autoLog(habit: Habit, date: LocalDate, steps: Int?): HabitLog? = when (habit.autoSource) {
+        HabitAutoSource.STEPS -> steps?.let { HabitLog(habit.id, date, it) }
+        null -> null
     }
 
     private fun valueOn(habit: Habit, date: LocalDate, logs: List<HabitLog>): Int? =
