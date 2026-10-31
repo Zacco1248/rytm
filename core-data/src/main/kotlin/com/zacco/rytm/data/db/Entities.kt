@@ -5,6 +5,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.zacco.rytm.domain.model.ActivityType
 import com.zacco.rytm.domain.model.BodyArea
+import com.zacco.rytm.domain.model.BodyComposition
 import com.zacco.rytm.domain.model.LoadedArea
 import com.zacco.rytm.domain.model.Source
 import java.time.Instant
@@ -44,6 +45,8 @@ data class DailyMetricsEntity(
     val steps: Int?,
     val totalKcal: Int?,
     val updatedAt: Instant,
+    /** Wersja 2: zapasowe tętno spoczynkowe z dnia. */
+    val dayRestingHr: Int? = null,
 )
 
 @Entity(tableName = "nutrition_day")
@@ -67,6 +70,8 @@ data class WeighInEntity(
     val weightKg: Double?,
     val bodyFatPct: Double?,
     val origin: String,
+    /** Wersja 2: pełny skład ciała (JSON), np. ze zrzutu ekranu Xiaomi Home. */
+    val composition: BodyComposition? = null,
 )
 
 @Entity(tableName = "check_in")
@@ -84,6 +89,15 @@ data class HabitLogEntity(
     val habitId: String,
     val date: LocalDate,
     val value: Int,
+)
+
+/** „Dziś wolne” i alkohol (wersja 2). */
+@Entity(tableName = "day_note")
+data class DayNoteEntity(
+    @PrimaryKey val date: LocalDate,
+    val dayOff: Boolean,
+    val alcoholDrinks: Int,
+    val updatedAt: Instant,
 )
 
 /** „Mecz odwołany” / „Personalny odwołany” na dany dzień. */

@@ -15,6 +15,8 @@ import com.zacco.rytm.domain.coach.WeekSnapshot
 import com.zacco.rytm.domain.habits.Habit
 import com.zacco.rytm.domain.habits.HabitKind
 import com.zacco.rytm.domain.model.BodyArea
+import com.zacco.rytm.domain.model.BodyComposition
+import com.zacco.rytm.domain.model.NutritionDay
 import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.LoadedArea
 import com.zacco.rytm.domain.planner.PlannerConfig
@@ -49,6 +51,8 @@ data class CoachUiState(
     val nextPersonal: LocalDate?,
     val cancelled: Set<LocalDate>,
     val personalTrainingUntil: LocalDate?,
+    /** Żywienie z ostatnich dni, do wpisu wstecz. */
+    val recentNutrition: List<NutritionDay>,
 )
 
 /** Jeden ViewModel na trzy ekrany: wszystkie liczą się z tych samych danych i tego samego silnika. */
@@ -85,6 +89,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
                 nextPersonal = upcoming.firstOrNull { planner.hasPersonalTraining(it) },
                 cancelled = d.cancelled,
                 personalTrainingUntil = planner.personalTrainingUntil,
+                recentNutrition = d.nutrition.filter { it.date >= d.today.minusDays(13) },
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -147,13 +152,22 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun saveNutrition(kcal: Int, proteinG: Double, fatG: Double?, carbsG: Double?) {
-        val date = LocalDate.now(RytmTime.zone)
+    fun saveNutrition(date: LocalDate, kcal: Int, proteinG: Double, fatG: Double?, carbsG: Double?) {
         viewModelScope.launch { data.coach.saveNutrition(date, kcal, proteinG, fatG, carbsG) }
     }
 
-    fun addWeighIn(kg: Double, bodyFatPct: Double?) {
-        viewModelScope.launch { data.coach.addWeighIn(kg, bodyFatPct) }
+    fun addWeighIn(kg: Double, bodyFatPct: Double?, time: Instant?, composition: BodyComposition?) {
+        viewModelScope.launch { data.coach.addWeighIn(kg, bodyFatPct, time ?: Instant.now(), composition) }
+    }
+
+    fun toggleDayOff() {
+        val date = LocalDate.now(RytmTime.zone)
+        val off = state.value?.today?.dayOff ?: false
+        viewModelScope.launch { data.coach.setDayOff(date, !off) }
+    }
+
+    fun setAlcohol(date: LocalDate, drinks: Int) {
+        viewModelScope.launch { data.coach.setAlcohol(date, drinks) }
     }
 
     fun setRpe(activityId: String, rpe: Int?) {

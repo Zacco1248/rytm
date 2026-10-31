@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.zacco.rytm.domain.coach.WeekDay
 import com.zacco.rytm.domain.coach.WeekSnapshot
@@ -253,7 +252,6 @@ private fun DayRow(d: WeekDay, today: Boolean, past: Boolean, onRate: (WeekDay) 
                     title,
                     style = Rytm.type.bodyStrong,
                     color = if (past && !done) c.muted else c.ink,
-                    textDecoration = if (past && !done && d.plan.kind != DayKind.REST && d.plan.kind != DayKind.FLEX) TextDecoration.LineThrough else null,
                 )
             }
             SmallText(subtitle(d, sessions, past))
@@ -280,7 +278,9 @@ private fun subtitle(d: WeekDay, sessions: List<com.zacco.rytm.domain.model.Acti
     val why = d.rationale()
     val main = when {
         d.cancelled -> "odwołane" + (why?.let { " · $it" } ?: "")
-        past -> if (d.plan.kind == DayKind.REST || d.plan.kind == DayKind.FLEX) "bez treningu" else "nie odnotowano"
+        d.dayOff -> "wolne · trening przesunięty na inne dni"
+        d.missed -> "pominięte · plan tygodnia się dostosował"
+        past -> "bez treningu"
         else -> "plan · " + Format.intensity(d.plan.intensity).lowercase() + (why?.let { " · $it" } ?: "")
     }
     return listOfNotNull(main, walks).joinToString(" · ")

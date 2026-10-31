@@ -139,6 +139,7 @@ class CoachEngine(
             },
             avgKcal = nutrition.takeIf { it.isNotEmpty() }?.map { it.kcal }?.average()?.toInt(),
             latestBodyFatPct = data.weighIns.filter { it.bodyFatPct != null }.maxByOrNull { it.date }?.bodyFatPct,
+            latestComposition = data.weighIns.filter { it.composition?.isEmpty == false }.maxByOrNull { it.date },
             weekReport = NutritionAnalyzer.weekly(
                 weekEnd = data.today,
                 nutrition = data.nutrition,

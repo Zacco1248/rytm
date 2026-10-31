@@ -60,6 +60,8 @@ fun TodayScreen(
     onCheckIn: () -> Unit,
     onOtherActivity: () -> Unit,
     onNutrition: () -> Unit,
+    onDayOff: () -> Unit,
+    onAlcohol: () -> Unit,
 ) {
     ScreenHeader(sub = Format.dayLong(s.date), title = greeting()) {
         Chip("Profil", ChipTone.MUTED, onClick = onProfile)
@@ -69,7 +71,7 @@ fun TodayScreen(
     sync.error?.let { RytmCard { SmallText(it, color = Rytm.colors.bad) } }
 
     ReadinessCard(s, onCheckIn)
-    PlanCard(s)
+    PlanCard(s, onDayOff)
     NutritionCard(s, sync, onSync, onNutrition)
     HabitsCard(s.habits, onToggleHabit)
 
@@ -78,6 +80,10 @@ fun TodayScreen(
         ButtonRow {
             RytmButton("Zaloguj inną aktywność", Modifier.weight(1f), onClick = onOtherActivity)
             RytmButton("Check-in", Modifier.weight(1f), onClick = onCheckIn)
+        }
+        ButtonRow {
+            RytmButton("Żywienie (też wstecz)", Modifier.weight(1f), onClick = onNutrition)
+            RytmButton(if (s.alcoholToday + s.alcoholYesterday > 0) "Alkohol ✓" else "Alkohol", Modifier.weight(1f), onClick = onAlcohol)
         }
     }
 }
@@ -128,7 +134,9 @@ private fun ReadinessCard(s: TodaySnapshot, onCheckIn: () -> Unit) {
                 ComponentRow("Sen", s.night?.sleepMin?.let { Format.minutes(it) } ?: "brak zapisu", comp[ReadinessComponent.SLEEP])
                 ComponentRow(
                     "Tętno spocz.",
-                    s.night?.nightRestingHr?.let { hr -> "$hr" + (s.restingHrAvg?.let { " (śr. ${Format.roundInt(it)})" } ?: "") } ?: "brak",
+                    s.restingHr?.let { hr ->
+                        "$hr" + (if (s.restingHrFromDay) " w dzień" else "") + (s.restingHrAvg?.let { " (śr. ${Format.roundInt(it)})" } ?: "")
+                    } ?: "brak",
                     comp[ReadinessComponent.RESTING_HR],
                 )
                 ComponentRow(
@@ -153,6 +161,13 @@ private fun ReadinessCard(s: TodaySnapshot, onCheckIn: () -> Unit) {
             )
             Chip(if (ci == null) "Zrób check-in" else "Popraw", ChipTone.ACCENT, onClick = onCheckIn)
         }
+        if (s.alcoholYesterday > 0) {
+            SmallText(
+                "Wczoraj alkohol: ${s.alcoholYesterday} porc. (−${com.zacco.rytm.domain.readiness.ReadinessCalculator.alcoholPenalty(s.alcoholYesterday)} pkt).",
+                color = Rytm.colors.warn,
+            )
+        }
+        if (s.restingHrFromDay) SmallText("Brak snu z zegarka, więc tętno spoczynkowe liczę z najspokojniejszych 30 min dnia.")
     }
 }
 
@@ -168,14 +183,17 @@ private fun ComponentRow(name: String, value: String, score: Int?) {
 }
 
 @Composable
-private fun PlanCard(s: TodaySnapshot) {
+private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit) {
     val p = s.plan
     RytmCard {
-        CardHeader("Plan na dziś") { Chip(Format.intensity(p.intensity)) }
-        Text(p.title, style = Rytm.type.planTitle, color = Rytm.colors.ink)
-        p.workout?.let { w ->
-            SmallText("${w.exercises.size} ćwiczeń · ${w.name}")
+        CardHeader("Plan na dziś") {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip(if (s.dayOff) "Cofnij wolne" else "Dziś wolne", ChipTone.MUTED, onClick = onDayOff)
+                Chip(Format.intensity(p.intensity))
+            }
         }
+        Text(p.title, style = Rytm.type.planTitle, color = Rytm.colors.ink)
+        p.workout?.let { w -> WorkoutList(w) }
         p.warnings.forEach { SmallText("⚠ $it", color = Rytm.colors.warn) }
         if (p.rationale.isNotEmpty()) WhyBox(p.rationale.joinToString(" "))
         SmallText("Jutro: ${s.tomorrow.title.lowercase()}. Pora snu dziś: ${s.bedtime.format(hhmm)}.")
@@ -196,6 +214,7 @@ private fun NutritionCard(s: TodaySnapshot, sync: SyncUi, onSync: () -> Unit, on
             }
             Chip(label, ChipTone.MUTED, onClick = onSync)
         }
+        if (s.trainingKcal > 0) SmallText("Cel powiększony o ${Format.int(s.trainingKcal)} kcal z treningu (0,75 × kcal z zegarka), makro proporcjonalnie.")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Macro("Kcal", n?.kcal ?: 0, t.kcal, "", c.accent, Modifier.weight(1f))
             Macro("Białko", Format.roundInt(n?.proteinG ?: 0.0), t.proteinG, " g", c.good, Modifier.weight(1f))
@@ -265,4 +284,33 @@ private fun habitDetail(h: HabitStatus): String = when {
         "${Format.int(h.value ?: 0)} / ${Format.int(h.habit.target ?: 0)} kroków · z Health Connect"
     h.habit.kind == HabitKind.MINUTES -> "${h.habit.target} min dziennie"
     else -> "codziennie"
+}
+
+/** Ćwiczenia sesji: serie × powtórzenia, ciężar, tempo. Ciężar to punkt startu; progresja przyjdzie z dziennikiem serii. */
+@Composable
+private fun WorkoutList(w: com.zacco.rytm.domain.model.StrengthWorkout) {
+    val c = Rytm.colors
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        SmallText(w.name)
+        w.exercises.forEachIndexed { i, e ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("${i + 1}.", style = Rytm.type.small, color = c.muted)
+                Column(Modifier.weight(1f)) {
+                    Text(e.name, style = Rytm.type.small.copy(fontWeight = FontWeight.Medium), color = c.ink)
+                    val reps = if (e.reps.first == e.reps.last) "${e.reps.first}" else "${e.reps.first}–${e.reps.last}"
+                    SmallText(
+                        listOfNotNull(
+                            "${e.sets} × $reps",
+                            e.weightKg?.let { "do ${Format.dec(it, 0)} kg" },
+                            e.tempo?.let { "tempo $it" },
+                            e.restSec.takeIf { it > 0 }?.let { "przerwa ${it}s" },
+                        ).joinToString(" · "),
+                    )
+                }
+            }
+        }
+        if (w.exercises.size > 3 && w.name != "Mobilność") {
+            SmallText("Mało czasu? Zrób 3 pierwsze ćwiczenia po 2 serie (ok. 20 min). Plan tygodnia się dostosuje.")
+        }
+    }
 }

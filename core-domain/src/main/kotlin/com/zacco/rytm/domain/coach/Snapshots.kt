@@ -3,6 +3,7 @@ package com.zacco.rytm.domain.coach
 import com.zacco.rytm.domain.habits.Habit
 import com.zacco.rytm.domain.load.LoadSummary
 import com.zacco.rytm.domain.model.Activity
+import com.zacco.rytm.domain.model.BodyMetrics
 import com.zacco.rytm.domain.model.ActivityType
 import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.DailyMetrics
@@ -94,6 +95,8 @@ data class BodySnapshot(
     val proteinDaysInTarget: Int,
     val avgKcal: Int?,
     val latestBodyFatPct: Double?,
+    /** Ostatni pełny pomiar składu ciała (np. ze zrzutu Xiaomi Home). */
+    val latestComposition: BodyMetrics?,
     val weekReport: NutritionWeekReport,
 )
 

@@ -53,7 +53,7 @@ class WeekPlanner(
 
     internal fun template(date: LocalDate, context: PlanningContext): PlannedDay {
         if (date in context.daysOff) {
-            return rest(date, "Dziś wolne", "Dzień wolny. Brakującą siłę plan przesuwa na kolejne dni tygodnia.")
+            return rest(date, "Wolne", "Dzień wolny. Brakującą siłę plan przesuwa na kolejne dni tygodnia.")
         }
         val cancelled = date in context.cancelled
         config.fixedSports[date.dayOfWeek]?.let { sport ->

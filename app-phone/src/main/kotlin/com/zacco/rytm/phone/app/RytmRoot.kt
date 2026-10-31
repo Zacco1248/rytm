@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zacco.rytm.phone.body.BodyScreen
 import com.zacco.rytm.phone.diagnostics.DiagnosticsScreen
+import com.zacco.rytm.phone.today.AlcoholSheet
 import com.zacco.rytm.phone.today.CheckInSheet
 import com.zacco.rytm.phone.today.HabitsCard
 import com.zacco.rytm.phone.today.NutritionSheet
@@ -65,7 +66,7 @@ enum class Tab(val label: String, val icon: ImageVector) {
     EVENING("Wieczór", RytmIcons.evening),
 }
 
-private enum class Sheet { NONE, CHECK_IN, OTHER_ACTIVITY, NUTRITION, RPE, WEIGH_IN }
+private enum class Sheet { NONE, CHECK_IN, OTHER_ACTIVITY, NUTRITION, RPE, WEIGH_IN, ALCOHOL }
 
 @Composable
 fun RytmRoot(vm: CoachViewModel = viewModel()) {
@@ -121,12 +122,14 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onCheckIn = { sheet = Sheet.CHECK_IN },
                         onOtherActivity = { sheet = Sheet.OTHER_ACTIVITY },
                         onNutrition = { sheet = Sheet.NUTRITION },
+                        onDayOff = vm::toggleDayOff,
+                        onAlcohol = { sheet = Sheet.ALCOHOL },
                     )
                     Tab.WEEK -> WeekScreen(s, vm::toggleCancelled) { day ->
                         rpeDate = day.date.toString()
                         sheet = Sheet.RPE
                     }
-                    Tab.BODY -> BodyScreen(s.body, s.today.nutritionTargets.kcal) { sheet = Sheet.WEIGH_IN }
+                    Tab.BODY -> BodyScreen(s.body, s.today.nutritionTargets.kcal - s.today.trainingKcal) { sheet = Sheet.WEIGH_IN }
                     Tab.HABITS -> HabitsTab(s, onToggle = { vm.toggleHabit(it.habit, it.done) })
                     Tab.EVENING -> EveningTab(s)
                 }
@@ -138,7 +141,12 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     when (sheet) {
         Sheet.CHECK_IN -> CheckInSheet(state?.today?.checkIn, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveCheckIn)
         Sheet.OTHER_ACTIVITY -> OtherActivitySheet(onDismiss = { sheet = Sheet.NONE }, onSave = vm::logOtherActivity)
-        Sheet.NUTRITION -> NutritionSheet(state?.today?.nutrition, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveNutrition)
+        Sheet.NUTRITION -> state?.let { s ->
+            NutritionSheet(s.today.date, s.recentNutrition, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveNutrition)
+        }
+        Sheet.ALCOHOL -> state?.let { s ->
+            AlcoholSheet(s.today.date, s.today.alcoholYesterday, s.today.alcoholToday, onDismiss = { sheet = Sheet.NONE }, onSave = vm::setAlcohol)
+        }
         Sheet.RPE -> {
             val acts = state?.week?.days?.firstOrNull { it.date.toString() == rpeDate }?.activities
                 ?.filter { it.type != com.zacco.rytm.domain.model.ActivityType.WALK }.orEmpty()

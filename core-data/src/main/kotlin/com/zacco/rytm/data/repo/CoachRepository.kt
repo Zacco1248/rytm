@@ -2,6 +2,7 @@ package com.zacco.rytm.data.repo
 
 import com.zacco.rytm.data.db.ActivityEntity
 import com.zacco.rytm.data.db.CancellationEntity
+import com.zacco.rytm.data.db.DayNoteEntity
 import com.zacco.rytm.data.db.HabitLogEntity
 import com.zacco.rytm.data.db.NutritionDayEntity
 import com.zacco.rytm.data.db.WeighInEntity
@@ -13,6 +14,7 @@ import com.zacco.rytm.data.sync.HealthConnectSync
 import com.zacco.rytm.domain.coach.CoachData
 import com.zacco.rytm.domain.ingest.Ingest
 import com.zacco.rytm.domain.model.ActivityType
+import com.zacco.rytm.domain.model.BodyComposition
 import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.LoadedArea
 import com.zacco.rytm.domain.model.Source
@@ -38,6 +40,7 @@ class CoachRepository(private val db: RytmDatabase) {
         val habitLogs = db.habitLogs().observe(from, today)
         val cancelled = db.cancellations().observe(from, to)
         val lastSync = db.syncState().observe(HealthConnectSync.KEY_LAST_SYNC)
+        val dayNotes = db.dayNotes().observe(from, to)
 
         val part1 = combine(activities, metrics, checkIns, nutrition) { a, m, c, n ->
             CoachData(
@@ -48,7 +51,7 @@ class CoachRepository(private val db: RytmDatabase) {
                 nutrition = n.map { it.toDomain() },
             )
         }
-        return combine(part1, weighIns, habitLogs, cancelled, lastSync) { base, w, h, x, sync ->
+        val part2 = combine(part1, weighIns, habitLogs, cancelled, lastSync) { base, w, h, x, sync ->
             base.copy(
                 weighIns = w.map { it.toDomain() },
                 habitLogs = h.map { it.toDomain() },
@@ -56,6 +59,7 @@ class CoachRepository(private val db: RytmDatabase) {
                 lastSync = sync?.toLongOrNull()?.let(Instant::ofEpochMilli),
             )
         }
+        return combine(part2, dayNotes) { base, notes -> base.copy(dayNotes = notes.map { it.toDomain() }) }
     }
 
     suspend fun setHabit(habitId: String, date: LocalDate, value: Int?) {
@@ -75,11 +79,33 @@ class CoachRepository(private val db: RytmDatabase) {
         )
     }
 
-    /** Ręczne ważenie (waga S400 zapisuje tylko do Xiaomi Home). */
-    suspend fun addWeighIn(weightKg: Double, bodyFatPct: Double?, time: Instant = Instant.now()) {
+    /** Ręczne ważenie (waga S400 zapisuje tylko do Xiaomi Home), opcjonalnie z pełnym składem ciała ze zrzutu ekranu. */
+    suspend fun addWeighIn(
+        weightKg: Double,
+        bodyFatPct: Double?,
+        time: Instant = Instant.now(),
+        composition: BodyComposition? = null,
+    ) {
         db.weighIns().upsert(
-            listOf(WeighInEntity("manual-" + UUID.randomUUID(), time, time.atZone(RytmTime.zone).toLocalDate(), weightKg, bodyFatPct, "com.zacco.rytm")),
+            listOf(
+                WeighInEntity(
+                    "manual-" + UUID.randomUUID(), time, time.atZone(RytmTime.zone).toLocalDate(), weightKg, bodyFatPct,
+                    "com.zacco.rytm", composition,
+                ),
+            ),
         )
+    }
+
+    /** „Dziś wolne”: plan przesuwa trening, bez kary. */
+    suspend fun setDayOff(date: LocalDate, off: Boolean) = updateNote(date) { it.copy(dayOff = off) }
+
+    /** Alkohol wypity danego dnia (porcje standardowe); liczy się do gotowości następnego dnia. */
+    suspend fun setAlcohol(date: LocalDate, drinks: Int) = updateNote(date) { it.copy(alcoholDrinks = drinks.coerceIn(0, 20)) }
+
+    private suspend fun updateNote(date: LocalDate, change: (DayNoteEntity) -> DayNoteEntity) {
+        val current = db.dayNotes().get(date) ?: DayNoteEntity(date, dayOff = false, alcoholDrinks = 0, updatedAt = Instant.now())
+        val next = change(current).copy(updatedAt = Instant.now())
+        if (!next.dayOff && next.alcoholDrinks == 0) db.dayNotes().delete(date) else db.dayNotes().upsert(next)
     }
 
     suspend fun setRpe(activityId: String, rpe: Int?) = db.activities().setRpe(activityId, rpe)

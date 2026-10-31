@@ -25,6 +25,7 @@ import com.zacco.rytm.data.db.RytmDatabase
 import com.zacco.rytm.data.db.SyncStateEntity
 import com.zacco.rytm.data.db.WeighInEntity
 import com.zacco.rytm.domain.heart.HrSample
+import com.zacco.rytm.domain.heart.DayRestingHr
 import com.zacco.rytm.domain.heart.NightRestingHr
 import com.zacco.rytm.domain.ingest.Ingest
 import com.zacco.rytm.domain.ingest.SleepSession
@@ -137,6 +138,21 @@ class HealthConnectSync(
         } else {
             null
         }
+        // Zapasowo tętno z dnia: zegarek często ładuje się w nocy. Liczymy zawsze, żeby budował się dzienny baseline.
+        val dayRestingHr = if (HeartRateRecord::class in types) {
+            val samples = read(HeartRateRecord::class, start, end)
+                .flatMap { r -> r.samples.map { HrSample(it.time, it.beatsPerMinute.toInt()) } }
+            val workouts = if (ExerciseSessionRecord::class in types) {
+                read(ExerciseSessionRecord::class, start.minus(Duration.ofHours(3)), end).map { it.startTime to it.endTime }
+            } else {
+                emptyList()
+            }
+            // Sen nie jest „dniem”: jeśli był, wycinamy go jak trening (bez godziny regeneracji ma to małe znaczenie).
+            val excluded = workouts + listOfNotNull(night?.let { it.start to it.end })
+            DayRestingHr.compute(samples, start, end, excluded)
+        } else {
+            null
+        }
         val aggregates = buildSet<AggregateMetric<*>> {
             if (StepsRecord::class in types) add(StepsRecord.COUNT_TOTAL)
             if (TotalCaloriesBurnedRecord::class in types) add(TotalCaloriesBurnedRecord.ENERGY_TOTAL)
@@ -156,6 +172,7 @@ class HealthConnectSync(
                 steps = agg?.get(StepsRecord.COUNT_TOTAL)?.toInt(),
                 totalKcal = agg?.get(TotalCaloriesBurnedRecord.ENERGY_TOTAL)?.inKilocalories?.toInt(),
                 updatedAt = now(),
+                dayRestingHr = dayRestingHr,
             ),
         )
     }

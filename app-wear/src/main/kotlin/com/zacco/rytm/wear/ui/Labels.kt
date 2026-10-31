@@ -19,6 +19,7 @@ object Labels {
     fun body(a: BodyArea): String = when (a) {
         BodyArea.SHOULDERS -> "Barki"
         BodyArea.ELBOW -> "Łokieć"
+        BodyArea.THIGHS -> "Uda"
         BodyArea.KNEES -> "Kolana"
         BodyArea.BACK -> "Plecy"
         BodyArea.CALVES -> "Łydki"
