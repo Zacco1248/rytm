@@ -34,7 +34,12 @@ private val heartRatePermission: String =
     if (Build.VERSION.SDK_INT >= 36) "android.permission.health.READ_HEART_RATE" else Manifest.permission.BODY_SENSORS
 
 @Composable
-fun HrvScreen(viewModel: HrvViewModel = viewModel()) {
+fun HrvScreen(
+    /** Wywoływane przyciskiem „Dodaj do check-inu” po udanym pomiarze. */
+    onUse: ((Double) -> Unit)? = null,
+    onBack: (() -> Unit)? = null,
+    viewModel: HrvViewModel = viewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -68,6 +73,7 @@ fun HrvScreen(viewModel: HrvViewModel = viewModel()) {
                 Title("HRV, 60 s")
                 Body("Usiądź, rozluźnij rękę i oddychaj spokojnie.")
                 Button(onClick = onStart, label = { Text("Start") })
+                onBack?.let { back -> Button(onClick = back, label = { Text("Wróć") }) }
             }
             HrvUiState.Connecting -> Title("Łączę z sensorem…")
             is HrvUiState.WarmingUp -> {
@@ -85,6 +91,10 @@ fun HrvScreen(viewModel: HrvViewModel = viewModel()) {
                 Body("ln ${r.lnRmssd?.fmt(2) ?: "–"} · HR ${r.meanHrBpm?.fmt(0) ?: "–"}")
                 Body("Uderzenia ${r.beatsAccepted}/${r.beatsTotal}, pary ${r.pairsUsed}")
                 Body("Jakość: ${r.quality.label()}")
+                val rmssd = r.rmssdMs
+                if (onUse != null && rmssd != null && r.quality != HrvQuality.POOR) {
+                    Button(onClick = { onUse(rmssd) }, label = { Text("Dodaj do check-inu") })
+                }
                 Button(onClick = viewModel::reset, label = { Text("Jeszcze raz") })
             }
             is HrvUiState.Error -> {
@@ -95,6 +105,7 @@ fun HrvScreen(viewModel: HrvViewModel = viewModel()) {
             is HrvUiState.Unavailable -> {
                 Title("Brak Sensor SDK")
                 Body(s.reason)
+                onBack?.let { back -> Button(onClick = back, label = { Text("Wróć") }) }
             }
         }
     }

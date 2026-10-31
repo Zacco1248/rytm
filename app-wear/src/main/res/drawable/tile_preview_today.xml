@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Podgląd kafelka w selektorze kafelków: pierścień gotowości. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="192dp"
+    android:height="192dp"
+    android:viewportWidth="192"
+    android:viewportHeight="192">
+    <path android:fillColor="#101418" android:pathData="M96,0a96,96 0,1 1,0 192a96,96 0,1 1,0 -192z" />
+    <path
+        android:pathData="M96,36a60,60 0,1 1,-52 30"
+        android:strokeWidth="12"
+        android:strokeColor="#7FD6A8"
+        android:strokeLineCap="round" />
+</vector>

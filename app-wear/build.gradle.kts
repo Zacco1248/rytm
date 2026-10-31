@@ -48,6 +48,7 @@ android {
 
 dependencies {
     implementation(project(":core-domain"))
+    implementation(project(":core-sync"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -61,6 +62,11 @@ dependencies {
     implementation(libs.wear.compose.material3)
     implementation(libs.wear.compose.foundation)
     implementation(libs.compose.ui.tooling.preview)
+
+    implementation(libs.wear.tiles)
+    implementation(libs.wear.protolayout)
+    implementation(libs.wear.protolayout.material3)
+    implementation(libs.wear.complications.data.source.ktx)
     debugImplementation(libs.compose.ui.tooling)
 
     if (hasSensorSdk) {

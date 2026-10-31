@@ -11,6 +11,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.zacco.rytm.data.RytmData
+import com.zacco.rytm.data.watch.WatchBridge
 import java.util.concurrent.TimeUnit
 
 /**
@@ -25,6 +26,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             val data = RytmData.get(applicationContext)
             val result = HealthConnectSync(HealthConnectClient.getOrCreate(applicationContext), data.db).sync()
             Log.i(TAG, "Synchronizacja: ${result.daysUpdated} dni, pełny import: ${result.fullImport}")
+            // Co godzinę także odświeżamy zegarek (m.in. nowy dzień po północy).
+            WatchBridge.publish(applicationContext)
             Result.success()
         } catch (e: SecurityException) {
             // Brak uprawnień (np. do odczytu w tle): nie ponawiamy, poczekamy na otwarcie aplikacji.
