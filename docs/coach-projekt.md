@@ -249,11 +249,20 @@ data class LoggedSet(val exercise: String, val reps: Int, val weightKg: Double, 
 
 ## 10. Integracja LLM
 
-- Dostawca: **Claude API**, model konfigurowalny (mniejszy do codziennych podsumowań, mocniejszy do raportu tygodniowego).
+- Dostawca: **Claude API** albo **OpenAI**, do wyboru w ustawieniach. Trzy poziomy modeli (wybór z 2026-10-31):
+
+  | Poziom | Claude | OpenAI |
+  |---|---|---|
+  | Codziennie (wieczór, rano) | `claude-haiku-5-5` | `gpt-6.1-terra` |
+  | Raport tygodniowy | `claude-opus-5-5` | `gpt-6.1-sol` |
+  | Analiza długoterminowa (raz w miesiącu) | `claude-fable-5-1` | `gpt-6-astra` |
+
+- Szacunek kosztu na miesiąc przy Claude: dzienne ok. 0,07 USD, tygodniowe ok. 0,90 USD, miesięczna analiza ok. 1,15 USD, razem ok. 2,1 USD. Dlatego domyślny budżet to **3 USD**. Przy OpenAI podobnie (ok. 2,3 USD), bo dzienny model jest droższy.
 - Wywołania:
   - **wieczorem (najważniejsze)**: analiza dnia + rekomendacja na jutro,
   - **rano**: krótkie uzasadnienie planu dnia po check-inie,
-  - **niedziela**: raport tygodniowy + propozycja korekt planu i żywienia.
+  - **niedziela**: raport tygodniowy + propozycja korekt planu i żywienia,
+  - **raz w miesiącu**: analiza długoterminowa (trendy wagi, siły, snu i obciążenia z kilku miesięcy).
 - Input: **zagregowane metryki** (dzienne i tygodniowe), nie surowe próbki tętna.
 - **Wyjście w JSON** z określonym schematem, walidowane. Przy błędzie fallback do tekstu z silnika reguł.
 - **LLM nie decyduje o obciążeniu samodzielnie**: planer regułowy jest źródłem prawdy, a LLM tłumaczy i sugeruje. Sugestie zmian planu wymagają akceptacji.
