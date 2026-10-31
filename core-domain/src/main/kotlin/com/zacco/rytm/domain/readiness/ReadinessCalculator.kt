@@ -23,6 +23,12 @@ data class ReadinessInput(
     val hrvBaseline: List<Double>,
     val checkIn: DailyCheckIn?,
     val load: LoadSummary?,
+    /** Zapasowe tętno spoczynkowe z dnia, gdy brak nocy (zegarek na ładowarce). */
+    val dayRestingHr: Int? = null,
+    /** Dzienne tętno spoczynkowe z poprzednich (do 7) dni. */
+    val dayRestingHrBaseline: List<Int> = emptyList(),
+    /** Porcje alkoholu wypite poprzedniego dnia. */
+    val alcoholDrinks: Int = 0,
 )
 
 data class ReadinessConfig(
@@ -48,13 +54,25 @@ object ReadinessCalculator {
         loadScore(input, flags)?.let { components[ReadinessComponent.LOAD] = it }
 
         val totalWeight = components.keys.sumOf { config.weights.of(it) }
-        val score = if (totalWeight > 0) {
+        var score = if (totalWeight > 0) {
             (components.entries.sumOf { (c, v) -> config.weights.of(c) * v } / totalWeight).roundToInt()
         } else {
             DEFAULT_SCORE
         }
 
-        val calibrating = input.restingHrBaseline.size < config.minBaselineDays ||
+        // Alkohol obniża regenerację niezależnie od tego, czy złapały to tętno i HRV (często brak nocy z zegarka).
+        val alcoholPenalty = alcoholPenalty(input.alcoholDrinks)
+        if (alcoholPenalty > 0) {
+            score -= alcoholPenalty
+            flags += ReadinessFlag.ALCOHOL
+        }
+
+        val rhrBaselineDays = if (input.nightRestingHr == null && input.dayRestingHr != null) {
+            input.dayRestingHrBaseline.size
+        } else {
+            input.restingHrBaseline.size
+        }
+        val calibrating = rhrBaselineDays < config.minBaselineDays ||
             (input.hrvRmssd != null && input.hrvBaseline.size < config.minBaselineDays) ||
             input.load?.reliable == false
 
@@ -105,9 +123,15 @@ object ReadinessCalculator {
     }
 
     internal fun restingHrScore(input: ReadinessInput, config: ReadinessConfig, flags: MutableList<ReadinessFlag>): Int? {
-        val rhr = input.nightRestingHr ?: return null
-        if (input.restingHrBaseline.size < config.minBaselinePoints) return null
-        val delta = rhr - input.restingHrBaseline.average()
+        // Noc ma pierwszeństwo; wartość z dnia porównujemy tylko z innymi wartościami z dnia.
+        val (rhr, baseline) = when {
+            input.nightRestingHr != null && input.restingHrBaseline.size >= config.minBaselinePoints ->
+                input.nightRestingHr to input.restingHrBaseline
+            input.dayRestingHr != null && input.dayRestingHrBaseline.size >= config.minBaselinePoints ->
+                input.dayRestingHr to input.dayRestingHrBaseline
+            else -> return null
+        }
+        val delta = rhr - baseline.average()
         if (delta >= 5) flags += ReadinessFlag.RESTING_HR_ELEVATED
         // 75 przy baseline, -10 pkt za każde uderzenie powyżej
         return (75 - 10 * delta).roundToInt().coerceIn(0, 100)
@@ -147,6 +171,15 @@ object ReadinessCalculator {
             else -> Unit
         }
         return score.roundToInt().coerceIn(0, 100)
+    }
+
+    /** 1 porcja: −3, 2: −7, 3: −12, 4 i więcej: −18 punktów. */
+    fun alcoholPenalty(drinks: Int): Int = when {
+        drinks <= 0 -> 0
+        drinks == 1 -> 3
+        drinks == 2 -> 7
+        drinks == 3 -> 12
+        else -> 18
     }
 
     private const val DEFAULT_SCORE = 60

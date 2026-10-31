@@ -24,12 +24,17 @@ data class PlanningContext(
     val activities: List<Activity> = emptyList(),
     /** Dni, w które stały sport lub trening personalny wypadł („mecz odwołany”). */
     val cancelled: Set<LocalDate> = emptySet(),
+    /** Dni oznaczone „dziś wolne”: odpoczynek, a brakujące sesje siłowe przechodzą na kolejne dni tygodnia. */
+    val daysOff: Set<LocalDate> = emptySet(),
 )
 
 /**
  * Regułowy planer tygodnia (sekcje 3.1 i 3.2). Źródło prawdy dla planu; LLM tylko go tłumaczy.
  */
-class WeekPlanner(private val config: PlannerConfig = PlannerConfig()) {
+class WeekPlanner(
+    private val config: PlannerConfig = PlannerConfig(),
+    private val exercises: ExerciseLibrary = ExerciseLibrary(),
+) {
 
     fun planWeek(anyDayOfWeek: LocalDate, context: PlanningContext): List<PlannedDay> {
         val monday = anyDayOfWeek.with(DayOfWeek.MONDAY)
@@ -38,7 +43,8 @@ class WeekPlanner(private val config: PlannerConfig = PlannerConfig()) {
         var days = dates.map { template(it, context) }
         days = ensureStrengthMinimum(days, context)
         days = days.map { adjust(it, days, context) }
-        return ensureRestDay(days)
+        // Ćwiczenia na końcu, gdy znany jest ostateczny rodzaj, nacisk i intensywność dnia.
+        return ensureRestDay(days).map { it.copy(workout = exercises.workoutFor(it)) }
     }
 
     fun planDay(date: LocalDate, context: PlanningContext): PlannedDay = planWeek(date, context).first { it.date == date }
@@ -46,6 +52,9 @@ class WeekPlanner(private val config: PlannerConfig = PlannerConfig()) {
     // --- szablon (3.1) ---
 
     internal fun template(date: LocalDate, context: PlanningContext): PlannedDay {
+        if (date in context.daysOff) {
+            return rest(date, "Dziś wolne", "Dzień wolny. Brakującą siłę plan przesuwa na kolejne dni tygodnia.")
+        }
         val cancelled = date in context.cancelled
         config.fixedSports[date.dayOfWeek]?.let { sport ->
             return if (cancelled) replacement(date, "${sport.pl()} odwołana") else

@@ -24,6 +24,7 @@ import com.zacco.rytm.domain.sleep.BedtimeAdvisor
 import com.zacco.rytm.domain.time.RytmTime
 import java.time.DayOfWeek
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 /**
  * Składa ekrany z surowych danych: gotowość, obciążenie, plan, nawyki, sylwetka.
@@ -45,6 +46,9 @@ class CoachEngine(
         val night = data.metrics.firstOrNull { it.date == data.today }
         val steps = night?.steps
         val week = data.today.minusDays(BASELINE_DAYS)..data.today.minusDays(1)
+        val previous = data.metrics.filter { it.date in week }
+        val fromDay = night?.nightRestingHr == null && night?.dayRestingHr != null
+        val trainingKcal = trainingKcal(data, data.today)
 
         return TodaySnapshot(
             date = data.today,
@@ -52,14 +56,21 @@ class CoachEngine(
             baselineDays = restingHrHistory(data).size.coerceAtMost(CALIBRATION_DAYS),
             checkIn = data.checkIns.firstOrNull { it.date == data.today },
             night = night,
-            restingHrAvg = data.metrics.filter { it.date in week }.mapNotNull { it.nightRestingHr }.takeIf { it.isNotEmpty() }?.average(),
+            restingHrAvg = previous.mapNotNull { if (fromDay) it.dayRestingHr else it.nightRestingHr }
+                .takeIf { it.isNotEmpty() }?.average(),
+            restingHr = night?.nightRestingHr ?: night?.dayRestingHr,
+            restingHrFromDay = fromDay,
             hrvAvg = data.checkIns.filter { it.date in week }.mapNotNull { it.hrvRmssd }.takeIf { it.isNotEmpty() }?.average(),
             plan = plan,
             tomorrow = tomorrow,
             load = load,
             bedtime = BedtimeAdvisor.suggest(data.profile.sleep, readiness.level, tomorrow.intensity, heavyToday),
             nutrition = data.nutrition.firstOrNull { it.date == data.today },
-            nutritionTargets = data.profile.nutrition,
+            nutritionTargets = data.profile.nutrition.withTraining(trainingKcal),
+            trainingKcal = trainingKcal,
+            dayOff = data.dayNotes.any { it.date == data.today && it.dayOff },
+            alcoholYesterday = alcoholOn(data, data.today.minusDays(1)),
+            alcoholToday = alcoholOn(data, data.today),
             habits = habits(data, steps),
             steps = steps,
             lastSync = data.lastSync,
@@ -86,6 +97,9 @@ class CoachEngine(
                 plannedLoad = if (day.date >= data.today) estimatePlannedLoad(day) else 0,
                 loadByType = byType,
                 cancelled = day.date in data.cancelled,
+                dayOff = data.dayNotes.any { it.date == day.date && it.dayOff },
+                missed = day.date < data.today && acts.isEmpty() && day.kind in PLANNED_TRAINING &&
+                    day.date !in data.cancelled,
             )
         }
         val strengthDone = data.activities.count {
@@ -120,7 +134,9 @@ class CoachEngine(
             pace = paceOf(kgPerWeek),
             protein = nutrition.map { it.date to it.proteinG },
             proteinTargetG = target,
-            proteinDaysInTarget = nutrition.count { it.proteinG >= target * PROTEIN_IN_TARGET },
+            proteinDaysInTarget = nutrition.count { n ->
+                n.proteinG >= data.profile.nutrition.withTraining(trainingKcal(data, n.date)).proteinG * PROTEIN_IN_TARGET
+            },
             avgKcal = nutrition.takeIf { it.isNotEmpty() }?.map { it.kcal }?.average()?.toInt(),
             latestBodyFatPct = data.weighIns.filter { it.bodyFatPct != null }.maxByOrNull { it.date }?.bodyFatPct,
             weekReport = NutritionAnalyzer.weekly(
@@ -153,6 +169,9 @@ class CoachEngine(
             previousSleepStarts = previous.mapNotNull { it.sleepStart },
             nightRestingHr = night?.nightRestingHr,
             restingHrBaseline = previous.mapNotNull { it.nightRestingHr },
+            dayRestingHr = night?.dayRestingHr,
+            dayRestingHrBaseline = previous.mapNotNull { it.dayRestingHr },
+            alcoholDrinks = alcoholOn(data, data.today.minusDays(1)),
             hrvRmssd = checkIn?.hrvRmssd,
             hrvBaseline = hrvHistory,
             checkIn = checkIn,
@@ -167,7 +186,16 @@ class CoachEngine(
         load = load,
         activities = data.activities.filter { it.localDate() >= data.today.with(DayOfWeek.MONDAY).minusWeeks(1) },
         cancelled = data.cancelled,
+        daysOff = data.dayNotes.filter { it.dayOff }.map { it.date }.toSet(),
     )
+
+    /** Kcal z treningów dnia doliczane do celu: [UserProfile.trainingKcalFactor] × kcal z zegarka, bez spacerów. */
+    fun trainingKcal(data: CoachData, date: LocalDate): Int =
+        (data.activities.filter { it.localDate() == date && it.type != ActivityType.WALK }.sumOf { it.kcal ?: 0 } *
+            data.profile.trainingKcalFactor).roundToInt()
+
+    private fun alcoholOn(data: CoachData, date: LocalDate): Int =
+        data.dayNotes.filter { it.date == date }.sumOf { it.alcoholDrinks }
 
     private fun habits(data: CoachData, steps: Int?): List<HabitStatus> {
         // Wpisy automatyczne (kroki) wyliczamy z metryk, żeby nie dublować ich w bazie.
@@ -184,7 +212,7 @@ class CoachEngine(
 
     private fun restingHrHistory(data: CoachData): List<Int> =
         data.metrics.filter { it.date < data.today && it.date >= data.today.minusDays(CALIBRATION_DAYS.toLong()) }
-            .mapNotNull { it.nightRestingHr }
+            .mapNotNull { it.nightRestingHr ?: it.dayRestingHr }
 
     private fun hrProfile(data: CoachData): HrProfile {
         val rest = data.metrics.mapNotNull { it.nightRestingHr }.sorted()
@@ -201,6 +229,7 @@ class CoachEngine(
         private const val HEAVY_DAY_MIN_LOAD = 300
         private const val HEAVY_DAY_FACTOR = 1.5
         private const val PROTEIN_IN_TARGET = 0.95
+        private val PLANNED_TRAINING = setOf(DayKind.STRENGTH, DayKind.PERSONAL_TRAINING, DayKind.FIXED_SPORT)
 
         /** Przybliżone sRPE dnia z planu: typowy czas × typowe RPE dla intensywności. */
         fun estimatePlannedLoad(day: PlannedDay): Int {
