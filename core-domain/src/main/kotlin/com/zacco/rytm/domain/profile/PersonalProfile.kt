@@ -51,6 +51,8 @@ data class PersonalProfile(
     val dumbbellSingleMaxKg: Double = 14.0,
     val bands: Boolean = false,
     val sessionMinutes: Int = 45,
+    /** Skok ciężaru hantli/sztangi; null: 1 kg w domu, 2,5 kg na siłowni. */
+    val weightStepKg: Double? = null,
     /** Dni, w które możesz trenować siłowo (1–7), w kolejności preferencji. Nacisk sesji dobiera Rytm. */
     val strengthDays: List<Int> = listOf(1, 3, 5),
     /** Ile sesji siłowych w tygodniu (bez treningu personalnego). */
@@ -86,7 +88,7 @@ data class PersonalProfile(
         maxHr = maxHr ?: age(today)?.let { (208 - 0.7 * it).roundToInt() } ?: 190,
         trainingKcalFactor = trainingKcalFactor,
         planner = plannerConfig(),
-        equipment = Equipment(equipment, dumbbellPairMaxKg, dumbbellSingleMaxKg, bands || equipment == EquipmentKind.BANDS, sessionMinutes),
+        equipment = Equipment(equipment, dumbbellPairMaxKg, dumbbellSingleMaxKg, bands || equipment == EquipmentKind.BANDS, sessionMinutes, weightStepKg),
         goal = goal,
         goalNote = goalNote,
         name = name,

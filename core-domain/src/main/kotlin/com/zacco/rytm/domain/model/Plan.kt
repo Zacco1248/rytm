@@ -30,6 +30,6 @@ data class PlannedExercise(
     val weightKg: Double?,
     val tempo: String?,
     val restSec: Int,
+    /** Podpowiedź progresji, np. „Ostatnio 3 × 15 na 6 kg, dziś 7 kg”. */
+    val note: String? = null,
 )
-
-data class LoggedSet(val exercise: String, val reps: Int, val weightKg: Double, val rir: Int?)

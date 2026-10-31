@@ -23,9 +23,16 @@ data class Equipment(
     val bands: Boolean = false,
     /** Ile minut zwykle jest na sesję; krótszy czas to mniej ćwiczeń. */
     val sessionMinutes: Int = 45,
-)
+    /** Najmniejsza zmiana ciężaru; null: 1 kg przy hantlach, 2,5 kg na siłowni. */
+    val stepKgOverride: Double? = null,
+) {
+    val stepKg: Double get() = stepKgOverride ?: if (kind == EquipmentKind.GYM) 2.5 else 1.0
 
-/** Konkretne ćwiczenia do sesji z planu, dobrane do sprzętu i celu. Progresja ciężaru przyjdzie z dziennikiem serii (faza 3). */
+    /** Najlżejsze, co da się ustawić (regulowane hantle zaczynają się od 2 kg). */
+    val minKg: Double get() = if (kind == EquipmentKind.GYM) 2.5 else 2.0
+}
+
+/** Konkretne ćwiczenia do sesji z planu, dobrane do sprzętu i celu. Ciężar jest tu górną granicą sprzętu; dzisiejszy dobiera [com.zacco.rytm.domain.workout.Progression] z dziennika serii. */
 class ExerciseLibrary(
     private val eq: Equipment = Equipment(),
     private val goal: Goal = Goal.RECOMP,

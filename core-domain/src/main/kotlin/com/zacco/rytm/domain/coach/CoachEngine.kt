@@ -14,6 +14,7 @@ import com.zacco.rytm.domain.model.PlannedDay
 import com.zacco.rytm.domain.nutrition.NutritionAnalyzer
 import com.zacco.rytm.domain.nutrition.StrengthTrend
 import com.zacco.rytm.domain.planner.ExerciseLibrary
+import com.zacco.rytm.domain.workout.Progression
 import com.zacco.rytm.domain.planner.PlanningContext
 import com.zacco.rytm.domain.planner.WeekPlanner
 import com.zacco.rytm.domain.readiness.Readiness
@@ -41,8 +42,8 @@ class CoachEngine(
         val load = load(data)
         val readiness = readiness(data, load)
         val context = context(data, readiness, load)
-        val plan = plannerFor(data).planDay(data.today, context)
-        val tomorrow = plannerFor(data).planDay(data.today.plusDays(1), context)
+        val plan = withProgression(data, plannerFor(data).planDay(data.today, context))
+        val tomorrow = withProgression(data, plannerFor(data).planDay(data.today.plusDays(1), context))
         val heavyToday = load.today >= HEAVY_DAY_MIN_LOAD && load.today >= load.chronicDailyAvg * HEAVY_DAY_FACTOR
         val night = data.metrics.firstOrNull { it.date == data.today }
         val steps = night?.steps
@@ -75,7 +76,15 @@ class CoachEngine(
             habits = habits(data, steps),
             steps = steps,
             lastSync = data.lastSync,
+            setsToday = data.sets.filter { it.date == data.today },
         )
+    }
+
+    /** Ciężar i powtórzenia sesji siłowej z dziennika serii (mobilność i obwód zostają bez zmian). */
+    private fun withProgression(data: CoachData, day: PlannedDay): PlannedDay {
+        val w = day.workout ?: return day
+        if (day.kind != DayKind.STRENGTH) return day
+        return day.copy(workout = Progression(data.profile.equipment, day.date).apply(w, data.sets))
     }
 
     fun week(data: CoachData): WeekSnapshot {

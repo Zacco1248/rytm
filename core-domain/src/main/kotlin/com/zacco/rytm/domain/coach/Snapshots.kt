@@ -12,6 +12,7 @@ import com.zacco.rytm.domain.model.PlannedDay
 import com.zacco.rytm.domain.nutrition.NutritionWeekReport
 import com.zacco.rytm.domain.profile.NutritionTargets
 import com.zacco.rytm.domain.readiness.Readiness
+import com.zacco.rytm.domain.workout.SetLog
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -47,6 +48,8 @@ data class TodaySnapshot(
     val habits: List<HabitStatus>,
     val steps: Int?,
     val lastSync: Instant?,
+    /** Serie zapisane dziś (trening z zegarka albo z telefonu). */
+    val setsToday: List<SetLog> = emptyList(),
 )
 
 data class HabitStatus(val habit: Habit, val value: Int?, val done: Boolean, val streak: Int)
