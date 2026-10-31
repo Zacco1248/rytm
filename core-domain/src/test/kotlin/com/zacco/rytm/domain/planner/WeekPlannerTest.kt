@@ -6,6 +6,7 @@ import com.zacco.rytm.domain.model.Activity
 import com.zacco.rytm.domain.model.ActivityType
 import com.zacco.rytm.domain.model.DayKind
 import com.zacco.rytm.domain.model.Intensity
+import com.zacco.rytm.domain.model.LoadedArea
 import com.zacco.rytm.domain.model.Source
 import com.zacco.rytm.domain.model.StrengthFocus
 import com.zacco.rytm.domain.readiness.Readiness
@@ -27,9 +28,16 @@ class WeekPlannerTest {
     private fun readiness(date: LocalDate, score: Int) =
         Readiness(date, score, ReadinessCalculator.levelOf(score), emptyMap(), emptyList(), calibrating = false)
 
-    private fun activity(date: LocalDate, type: ActivityType, minutes: Int, rpe: Int? = null, notes: String? = null) = Activity(
+    private fun activity(
+        date: LocalDate,
+        type: ActivityType,
+        minutes: Int,
+        rpe: Int? = null,
+        notes: String? = null,
+        areas: Set<LoadedArea> = emptySet(),
+    ) = Activity(
         "$date-$type", type, date.atTime(LocalTime.of(10, 0)).atZone(RytmTime.zone).toInstant(),
-        minutes, rpe, null, null, Source.MANUAL, notes,
+        minutes, rpe, null, null, Source.MANUAL, notes, areas,
     )
 
     private fun List<com.zacco.rytm.domain.model.PlannedDay>.on(day: DayOfWeek) = first { it.date.dayOfWeek == day }
@@ -138,5 +146,54 @@ class WeekPlannerTest {
         val week = planner.planWeek(novemberMonday, PlanningContext(today = novemberMonday))
         assertEquals(1, week.count { it.kind == DayKind.REST })
         assertEquals(sunday, week.single { it.kind == DayKind.REST }.date)
+    }
+
+    @Test
+    fun `loaded back moves strength to lower body when no match tomorrow`() {
+        // grudzień: sobota to dzień elastyczny, więc bierzemy poniedziałek po ciężkiej niedzieli
+        val monday = decemberMonday
+        val day = planner.planDay(
+            monday,
+            PlanningContext(today = monday, activities = listOf(activity(monday.minusDays(1), ActivityType.OTHER, 180, 6, "remont", setOf(LoadedArea.BACK)))),
+        )
+        // jutro siatkówka, więc dół odpada: lekka sesja
+        assertEquals(Intensity.LOW, day.intensity)
+        assertTrue(day.warnings.single().contains("odciąż plecy"))
+    }
+
+    @Test
+    fun `loaded legs switch full body to upper`() {
+        val saturday = novemberMonday.plusDays(5)
+        val day = planner.planDay(
+            saturday,
+            PlanningContext(today = saturday, activities = listOf(activity(saturday.minusDays(1), ActivityType.OTHER, 150, 6, "przeprowadzka", setOf(LoadedArea.LEGS)))),
+        )
+        assertEquals(StrengthFocus.UPPER, day.focus)
+    }
+
+    @Test
+    fun `loaded shoulders switch full body to lower when no match tomorrow`() {
+        val saturday = novemberMonday.plusDays(5)
+        val day = planner.planDay(
+            saturday,
+            PlanningContext(today = saturday, activities = listOf(activity(saturday.minusDays(1), ActivityType.OTHER, 150, 6, "malowanie sufitu", setOf(LoadedArea.SHOULDERS)))),
+        )
+        assertEquals(StrengthFocus.LOWER, day.focus)
+    }
+
+    @Test
+    fun `full body load turns strength into mobility`() {
+        val saturday = novemberMonday.plusDays(5)
+        val day = planner.planDay(
+            saturday,
+            PlanningContext(today = saturday, activities = listOf(activity(saturday.minusDays(1), ActivityType.OTHER, 240, 7, "remont", setOf(LoadedArea.FULL_BODY)))),
+        )
+        assertEquals(DayKind.MOBILITY, day.kind)
+    }
+
+    @Test
+    fun `renovation preselects back and shoulders`() {
+        assertEquals(setOf(LoadedArea.BACK, LoadedArea.SHOULDERS), LoadedArea.defaultsFor("Remont łazienki"))
+        assertTrue(LoadedArea.defaultsFor("ogród").isEmpty())
     }
 }

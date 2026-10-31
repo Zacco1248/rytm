@@ -6,6 +6,7 @@ import com.zacco.rytm.domain.model.Activity
 import com.zacco.rytm.domain.model.ActivityType
 import com.zacco.rytm.domain.model.DayKind
 import com.zacco.rytm.domain.model.Intensity
+import com.zacco.rytm.domain.model.LoadedArea
 import com.zacco.rytm.domain.model.PlannedDay
 import com.zacco.rytm.domain.model.StrengthFocus
 import com.zacco.rytm.domain.readiness.Readiness
@@ -136,13 +137,9 @@ class WeekPlanner(private val config: PlannerConfig = PlannerConfig()) {
                 .withRationale("Wczoraj mecz: lżejszy dzień.")
         }
 
-        // Reguła 4: po ciężkiej „innej aktywności” (np. remoncie) bez dużego obciążenia partii, które pracowały.
+        // Reguła 4: po ciężkiej „innej aktywności” (np. remoncie) odciążamy partie z pola „co obciążyło”.
         heavyOtherActivity(day.date.minusDays(1), context)?.let { heavy ->
-            if (d.kind in TRAINING_KINDS) {
-                val what = heavy.notes?.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()
-                d = d.copy(intensity = minOf(d.intensity, Intensity.MODERATE))
-                    .withWarning("Wczoraj ciężka aktywność$what: dziś bez dużego obciążenia partii, które pracowały.")
-            }
+            if (d.kind in TRAINING_KINDS) d = unloadAfter(heavy, d, tomorrow)
         }
 
         if (day.date == context.today) d = applyReadiness(d, context)
@@ -183,6 +180,46 @@ class WeekPlanner(private val config: PlannerConfig = PlannerConfig()) {
         val actual = context.activities.filter { it.start.atZone(RytmTime.zone).toLocalDate() == date }
         if (date < context.today) return actual.any { it.isMatch }
         return planFor(date, week, context)?.kind == DayKind.FIXED_SPORT
+    }
+
+    private fun unloadAfter(heavy: Activity, day: PlannedDay, tomorrow: PlannedDay?): PlannedDay {
+        val what = heavy.notes?.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()
+        val areas = heavy.loadedAreas
+        var d = day.copy(intensity = minOf(day.intensity, Intensity.MODERATE))
+        if (areas.isEmpty()) {
+            return d.withWarning("Wczoraj ciężka aktywność$what: dziś bez dużego obciążenia partii, które pracowały.")
+        }
+        d = d.withWarning("Wczoraj ciężka aktywność$what: odciąż ${areas.joinToString { it.pl() }}.")
+        if (d.kind != DayKind.STRENGTH) {
+            return if (LoadedArea.FULL_BODY in areas) d.copy(intensity = Intensity.LOW) else d
+        }
+        val upperLoaded = LoadedArea.BACK in areas || LoadedArea.SHOULDERS in areas || LoadedArea.ARMS in areas
+        val legsLoaded = LoadedArea.LEGS in areas
+        return when {
+            LoadedArea.FULL_BODY in areas || (upperLoaded && legsLoaded) ->
+                d.copy(kind = DayKind.MOBILITY, title = "Mobilność 30 min", intensity = Intensity.LOW, focus = null)
+                    .withRationale("Wczoraj obciążone całe ciało: zamiast siły mobilność.")
+            legsLoaded && d.focus != StrengthFocus.UPPER ->
+                d.copy(title = strengthTitle(StrengthFocus.UPPER), focus = StrengthFocus.UPPER)
+                    .withRationale("Nogi obciążone wczoraj: dziś góra.")
+            upperLoaded && d.focus != StrengthFocus.LOWER ->
+                if (tomorrow?.kind == DayKind.FIXED_SPORT) {
+                    // Dół odpada przez jutrzejszy mecz, więc zostaje lekka sesja.
+                    d.copy(intensity = Intensity.LOW).withRationale("Góra obciążona, a jutro mecz: lekka sesja.")
+                } else {
+                    d.copy(title = strengthTitle(StrengthFocus.LOWER), focus = StrengthFocus.LOWER)
+                        .withRationale("Góra obciążona wczoraj: dziś dół.")
+                }
+            else -> d
+        }
+    }
+
+    private fun LoadedArea.pl(): String = when (this) {
+        LoadedArea.BACK -> "plecy"
+        LoadedArea.SHOULDERS -> "barki"
+        LoadedArea.LEGS -> "nogi"
+        LoadedArea.ARMS -> "ręce"
+        LoadedArea.FULL_BODY -> "całe ciało"
     }
 
     private fun heavyOtherActivity(date: LocalDate, context: PlanningContext): Activity? =

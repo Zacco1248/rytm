@@ -61,7 +61,7 @@ Priorytet: **zrobić to dobrze**, czyli czysta architektura, testowalna logika i
 1. **Brak ciężkich nóg** dzień przed siatkówką lub squashem.
 2. **Dzień po meczu**: preferowana mobilność lub lekka górna partia.
 3. **Mecz wypadł**: coach proponuje zamiennik (dodatkowa sesja siłowa, interwały z hantlami lub mobilność) z uwzględnieniem tygodniowego obciążenia.
-4. **Ciężka „inna aktywność”** (np. remont; od 2 h lub sRPE ≥ 400) liczy się jak trening. Kolejny dzień: bez dużego obciążenia partii, które pracowały (opis aktywności trafia do ostrzeżenia).
+4. **Ciężka „inna aktywność”** (np. remont; od 2 h lub sRPE ≥ 400) liczy się jak trening. Opcjonalne pole „co obciążyło” (plecy, barki, nogi, ręce, całe ciało; „remont” domyślnie zaznacza plecy i barki) steruje kolejnym dniem: nogi → siła na górę, plecy/barki/ręce → dół (albo lekka sesja, gdy jutro mecz), całe ciało → mobilność. Bez pola: ogólne ostrzeżenie i maks. umiarkowana intensywność.
 5. **Niska gotowość** (patrz 3.4): trening zastępowany lżejszą wersją albo odpoczynkiem. Stałe sporty zostają, ale z ostrzeżeniem.
 6. Min. **1 dzień pełnego odpoczynku** w tygodniu.
 7. **Rekompozycja**: min. 2 sesje siłowe w tygodniu (w tym personalne). Jeśli w tygodniu wypadły, coach priorytetyzuje siłę nad dodatkowym cardio.
@@ -240,7 +240,7 @@ data class LoggedSet(val exercise: String, val reps: Int, val weightKg: Double, 
 3. **Komplikacja**: wynik gotowości (0–100) na tarczy.
 4. **Poranny check-in z HRV**: powiadomienie po przebudzeniu.
 5. **RPE po treningu**: po wykryciu nowego treningu w HC telefon wysyła na zegarek prośbę „Jak ciężko? 1–10”.
-6. **Zaloguj inną aktywność**: czas (1 h / 2 h / 4 h) + RPE + krótki opis, co to było (np. remont). Zastępuje osobny „log remontu” (decyzja 2026-10-31).
+6. **Zaloguj inną aktywność**: czas (1 h / 2 h / 4 h) + RPE + krótki opis, co to było (np. remont) + opcjonalnie „co obciążyło”. Zastępuje osobny „log remontu” (decyzja 2026-10-31).
 7. **Wieczorne podsumowanie**: skrót na zegarku, pełne na telefonie.
 8. **Trening siłowy** (faza 3).
 9. **Wyjątki planu**: „mecz odwołany” lub „trening personalny odwołany”, co uruchamia przeplanowanie.
