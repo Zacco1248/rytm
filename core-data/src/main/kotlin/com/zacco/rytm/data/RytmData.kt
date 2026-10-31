@@ -2,6 +2,9 @@ package com.zacco.rytm.data
 
 import android.content.Context
 import com.zacco.rytm.data.db.RytmDatabase
+import com.zacco.rytm.data.profile.ProfileStore
+import com.zacco.rytm.domain.planner.PlannerConfig
+import com.zacco.rytm.domain.profile.PersonalProfile
 import com.zacco.rytm.data.repo.CoachRepository
 import com.zacco.rytm.data.repo.RoomUsageStore
 
@@ -11,8 +14,12 @@ import com.zacco.rytm.data.repo.RoomUsageStore
  */
 class RytmData private constructor(context: Context) {
     val db: RytmDatabase = RytmDatabase.create(context)
-    val coach = CoachRepository(db)
+    val profiles = ProfileStore(context, db)
+    val coach = CoachRepository(db, profiles)
     val usageStore = RoomUsageStore(db.llmUsage())
+
+    /** Tydzień z profilu (do mapowania treningów z Health Connect). */
+    fun plannerConfig(): PlannerConfig = (profiles.current() ?: PersonalProfile()).plannerConfig()
 
     companion object {
         @Volatile private var instance: RytmData? = null

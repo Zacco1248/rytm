@@ -7,6 +7,7 @@ import com.zacco.rytm.domain.model.Activity
 import com.zacco.rytm.domain.model.BodyMetrics
 import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.DailyMetrics
+import com.zacco.rytm.domain.model.DayNote
 import com.zacco.rytm.domain.model.NutritionDay
 import com.zacco.rytm.domain.profile.UserProfile
 import java.time.Instant
@@ -29,6 +30,8 @@ data class CoachData(
     val habitLogs: List<HabitLog> = emptyList(),
     /** Dni, w które stały sport albo trening personalny został odwołany. */
     val cancelled: Set<LocalDate> = emptySet(),
+    /** „Dziś wolne” i alkohol. */
+    val dayNotes: List<DayNote> = emptyList(),
     val habits: List<Habit> = DefaultHabits.all,
     val profile: UserProfile = UserProfile(),
     /** Kiedy ostatnio udała się synchronizacja z Health Connect. */

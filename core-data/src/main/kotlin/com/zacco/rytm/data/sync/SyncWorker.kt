@@ -11,10 +11,11 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.zacco.rytm.data.RytmData
+import com.zacco.rytm.data.watch.WatchBridge
 import java.util.concurrent.TimeUnit
 
 /**
- * Synchronizacja co godzinę w tle. Wymaga uprawnienia READ_HEALTH_DATA_IN_BACKGROUND;
+ * Synchronizacja co 15 minut w tle. Wymaga uprawnienia READ_HEALTH_DATA_IN_BACKGROUND;
  * bez niego Health Connect odrzuci odczyt, a dane odświeżą się przy otwarciu aplikacji.
  */
 class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -23,8 +24,11 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         if (HealthConnectClient.getSdkStatus(applicationContext) != HealthConnectClient.SDK_AVAILABLE) return Result.success()
         return try {
             val data = RytmData.get(applicationContext)
-            val result = HealthConnectSync(HealthConnectClient.getOrCreate(applicationContext), data.db).sync()
+            data.profiles.ensureLoaded()
+            val result = HealthConnectSync(HealthConnectClient.getOrCreate(applicationContext), data.db, planner = data.plannerConfig()).sync()
             Log.i(TAG, "Synchronizacja: ${result.daysUpdated} dni, pełny import: ${result.fullImport}")
+            // Przy każdej synchronizacji odświeżamy też zegarek (m.in. nowy dzień po północy).
+            WatchBridge.publish(applicationContext)
             Result.success()
         } catch (e: SecurityException) {
             // Brak uprawnień (np. do odczytu w tle): nie ponawiamy, poczekamy na otwarcie aplikacji.
@@ -43,8 +47,9 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         private const val MAX_RETRIES = 3
 
         fun schedulePeriodic(context: Context) {
-            val request = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.HOURS).build()
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.KEEP, request)
+            // 15 min to minimum WorkManagera. UPDATE zmienia okres także w już zainstalowanej aplikacji (wcześniej co godzinę).
+            val request = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES).build()
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.UPDATE, request)
         }
 
         fun syncNow(context: Context) {

@@ -2,7 +2,11 @@ package com.zacco.rytm.sync
 
 /** Ścieżki Wearable Data Layer API. Telefon i zegarek muszą mieć ten sam applicationId. */
 object DataLayerPaths {
-    const val PLAN_TODAY = "/plan/today"
-    const val CHECK_IN = "/check-in"
-    const val RPE_REQUEST = "/rpe/request"
+    /** Telefon → zegarek: stan dnia (DataItem nadpisywany przy każdej zmianie). */
+    const val SNAPSHOT = "/rytm/snapshot"
+
+    /** Zegarek → telefon: wpisy z zegarka, każdy pod własną ścieżką, kasowane po przetworzeniu. */
+    const val EVENT_PREFIX = "/rytm/event/"
+
+    const val KEY_JSON = "json"
 }

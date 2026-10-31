@@ -51,12 +51,21 @@ fun BodyScreen(b: BodySnapshot, kcalTarget: Int, onAddWeighIn: () -> Unit) {
         SmallText("Progresja ćwiczeń pojawi się z dziennikiem serii (faza 3). Wtedy Rytm oceni, czy rekompozycja idzie dobrze: waga stoi albo lekko spada, a powtórzenia rosną.")
     }
     RytmCard {
-        CardHeader("Tkanka tłuszczowa") {
-            if (b.latestBodyFatPct == null) Chip("brak danych w HC", ChipTone.MUTED)
+        CardHeader("Skład ciała") {
+            if (b.latestBodyFatPct == null && b.latestComposition == null) Chip("brak pomiaru", ChipTone.MUTED)
+        }
+        b.latestBodyFatPct?.let { SmallText("Tkanka tłuszczowa: ${Format.dec(it)}%.") }
+        val comp = b.latestComposition
+        val c = comp?.composition
+        if (comp != null && c != null) {
+            SmallText("Pomiar z ${Format.dayMonth(comp.date)}: " + com.zacco.rytm.phone.today.compositionSummary(c) + ".")
         }
         SmallText(
-            b.latestBodyFatPct?.let { "Ostatni pomiar: ${Format.dec(it)}%. Pomiary z wagi łazienkowej mocno się wahają, więc patrzymy na trend z miesięcy." }
-                ?: "Pojawi się, jeśli waga zapisuje tkankę tłuszczową do Health Connect.",
+            if (b.latestBodyFatPct == null && comp == null) {
+                "Dodaj ważenie i wczytaj zrzut ekranu z Xiaomi Home, żeby zapisać mięśnie, wodę, tłuszcz trzewny i resztę pomiarów."
+            } else {
+                "Pomiary z wagi łazienkowej mocno się wahają, więc patrzymy na trend z miesięcy, nie na pojedynczy wynik."
+            },
         )
     }
 }

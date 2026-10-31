@@ -3,6 +3,7 @@ package com.zacco.rytm.domain.coach
 import com.zacco.rytm.domain.habits.Habit
 import com.zacco.rytm.domain.load.LoadSummary
 import com.zacco.rytm.domain.model.Activity
+import com.zacco.rytm.domain.model.BodyMetrics
 import com.zacco.rytm.domain.model.ActivityType
 import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.DailyMetrics
@@ -26,13 +27,23 @@ data class TodaySnapshot(
     val night: DailyMetrics?,
     /** Średnie z poprzednich 7 dni, do porównania „52 (śr. 54)”. */
     val restingHrAvg: Double?,
+    /** Tętno spoczynkowe dnia: z nocy, a gdy jej brak, zapasowe z dnia ([restingHrFromDay]). */
+    val restingHr: Int?,
+    val restingHrFromDay: Boolean,
     val hrvAvg: Double?,
     val plan: PlannedDay,
     val tomorrow: PlannedDay,
     val load: LoadSummary,
     val bedtime: LocalTime,
     val nutrition: NutritionDay?,
+    /** Cel dnia z doliczonym treningiem ([trainingKcal]). */
     val nutritionTargets: NutritionTargets,
+    /** Ile kcal z treningów doliczono do celu (0,75 × kcal z zegarka). */
+    val trainingKcal: Int,
+    val dayOff: Boolean,
+    /** Porcje alkoholu: wczoraj (liczone do dzisiejszej gotowości) i dziś. */
+    val alcoholYesterday: Int,
+    val alcoholToday: Int,
     val habits: List<HabitStatus>,
     val steps: Int?,
     val lastSync: Instant?,
@@ -60,6 +71,9 @@ data class WeekDay(
     /** Obciążenie dnia w podziale na rodzaj, do słupków. */
     val loadByType: Map<ActivityType, Int>,
     val cancelled: Boolean,
+    val dayOff: Boolean = false,
+    /** Dzień minął, był w planie trening, a żadnej aktywności nie ma. Tylko informacja, bez kary. */
+    val missed: Boolean = false,
 ) {
     val date: LocalDate get() = plan.date
 }
@@ -81,6 +95,8 @@ data class BodySnapshot(
     val proteinDaysInTarget: Int,
     val avgKcal: Int?,
     val latestBodyFatPct: Double?,
+    /** Ostatni pełny pomiar składu ciała (np. ze zrzutu Xiaomi Home). */
+    val latestComposition: BodyMetrics?,
     val weekReport: NutritionWeekReport,
 )
 

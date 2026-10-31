@@ -101,6 +101,21 @@ interface HabitLogDao {
 }
 
 @Dao
+interface DayNoteDao {
+    @Query("SELECT * FROM day_note WHERE date BETWEEN :from AND :to")
+    fun observe(from: LocalDate, to: LocalDate): Flow<List<DayNoteEntity>>
+
+    @Query("SELECT * FROM day_note WHERE date = :date")
+    suspend fun get(date: LocalDate): DayNoteEntity?
+
+    @Upsert
+    suspend fun upsert(note: DayNoteEntity)
+
+    @Query("DELETE FROM day_note WHERE date = :date")
+    suspend fun delete(date: LocalDate)
+}
+
+@Dao
 interface CancellationDao {
     @Query("SELECT * FROM cancellation WHERE date BETWEEN :from AND :to")
     fun observe(from: LocalDate, to: LocalDate): Flow<List<CancellationEntity>>

@@ -2,6 +2,7 @@ package com.zacco.rytm.data.repo
 
 import com.zacco.rytm.data.db.ActivityEntity
 import com.zacco.rytm.data.db.CancellationEntity
+import com.zacco.rytm.data.db.DayNoteEntity
 import com.zacco.rytm.data.db.HabitLogEntity
 import com.zacco.rytm.data.db.NutritionDayEntity
 import com.zacco.rytm.data.db.WeighInEntity
@@ -9,13 +10,16 @@ import com.zacco.rytm.data.db.RytmDatabase
 import com.zacco.rytm.data.db.originForDedup
 import com.zacco.rytm.data.db.toDomain
 import com.zacco.rytm.data.db.toEntity
+import com.zacco.rytm.data.profile.ProfileStore
 import com.zacco.rytm.data.sync.HealthConnectSync
 import com.zacco.rytm.domain.coach.CoachData
 import com.zacco.rytm.domain.ingest.Ingest
 import com.zacco.rytm.domain.model.ActivityType
+import com.zacco.rytm.domain.model.BodyComposition
 import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.LoadedArea
 import com.zacco.rytm.domain.model.Source
+import com.zacco.rytm.domain.profile.PersonalProfile
 import com.zacco.rytm.domain.time.RytmTime
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -24,7 +28,7 @@ import java.time.LocalDate
 import java.util.UUID
 
 /** Zbiera dane z bazy w [CoachData] i zapisuje ręczne wpisy użytkownika. */
-class CoachRepository(private val db: RytmDatabase) {
+class CoachRepository(private val db: RytmDatabase, private val profiles: ProfileStore) {
 
     /** Okno danych: 28 dni na obciążenie przewlekłe + bieżący tydzień + zapas na średnie wagi. */
     fun observe(today: LocalDate): Flow<CoachData> {
@@ -38,6 +42,7 @@ class CoachRepository(private val db: RytmDatabase) {
         val habitLogs = db.habitLogs().observe(from, today)
         val cancelled = db.cancellations().observe(from, to)
         val lastSync = db.syncState().observe(HealthConnectSync.KEY_LAST_SYNC)
+        val dayNotes = db.dayNotes().observe(from, to)
 
         val part1 = combine(activities, metrics, checkIns, nutrition) { a, m, c, n ->
             CoachData(
@@ -48,12 +53,21 @@ class CoachRepository(private val db: RytmDatabase) {
                 nutrition = n.map { it.toDomain() },
             )
         }
-        return combine(part1, weighIns, habitLogs, cancelled, lastSync) { base, w, h, x, sync ->
+        val part2 = combine(part1, weighIns, habitLogs, cancelled, lastSync) { base, w, h, x, sync ->
             base.copy(
                 weighIns = w.map { it.toDomain() },
                 habitLogs = h.map { it.toDomain() },
                 cancelled = x.map { it.date }.toSet(),
                 lastSync = sync?.toLongOrNull()?.let(Instant::ofEpochMilli),
+            )
+        }
+        return combine(part2, dayNotes, profiles.profile) { base, notes, profile ->
+            // Bez profilu (przed kreatorem) silnik liczy na wartościach domyślnych; ekran i tak pokazuje kreator.
+            val p = profile ?: PersonalProfile()
+            base.copy(
+                dayNotes = notes.map { it.toDomain() },
+                profile = p.toUserProfile(today),
+                habits = p.habits(),
             )
         }
     }
@@ -75,11 +89,33 @@ class CoachRepository(private val db: RytmDatabase) {
         )
     }
 
-    /** Ręczne ważenie (waga S400 zapisuje tylko do Xiaomi Home). */
-    suspend fun addWeighIn(weightKg: Double, bodyFatPct: Double?, time: Instant = Instant.now()) {
+    /** Ręczne ważenie (waga S400 zapisuje tylko do Xiaomi Home), opcjonalnie z pełnym składem ciała ze zrzutu ekranu. */
+    suspend fun addWeighIn(
+        weightKg: Double,
+        bodyFatPct: Double?,
+        time: Instant = Instant.now(),
+        composition: BodyComposition? = null,
+    ) {
         db.weighIns().upsert(
-            listOf(WeighInEntity("manual-" + UUID.randomUUID(), time, time.atZone(RytmTime.zone).toLocalDate(), weightKg, bodyFatPct, "com.zacco.rytm")),
+            listOf(
+                WeighInEntity(
+                    "manual-" + UUID.randomUUID(), time, time.atZone(RytmTime.zone).toLocalDate(), weightKg, bodyFatPct,
+                    "com.zacco.rytm", composition,
+                ),
+            ),
         )
+    }
+
+    /** „Dziś wolne”: plan przesuwa trening, bez kary. */
+    suspend fun setDayOff(date: LocalDate, off: Boolean) = updateNote(date) { it.copy(dayOff = off) }
+
+    /** Alkohol wypity danego dnia (porcje standardowe); liczy się do gotowości następnego dnia. */
+    suspend fun setAlcohol(date: LocalDate, drinks: Int) = updateNote(date) { it.copy(alcoholDrinks = drinks.coerceIn(0, 20)) }
+
+    private suspend fun updateNote(date: LocalDate, change: (DayNoteEntity) -> DayNoteEntity) {
+        val current = db.dayNotes().get(date) ?: DayNoteEntity(date, dayOff = false, alcoholDrinks = 0, updatedAt = Instant.now())
+        val next = change(current).copy(updatedAt = Instant.now())
+        if (!next.dayOff && next.alcoholDrinks == 0) db.dayNotes().delete(date) else db.dayNotes().upsert(next)
     }
 
     suspend fun setRpe(activityId: String, rpe: Int?) = db.activities().setRpe(activityId, rpe)

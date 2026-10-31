@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,6 +42,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zacco.rytm.phone.body.BodyScreen
 import com.zacco.rytm.phone.diagnostics.DiagnosticsScreen
+import com.zacco.rytm.phone.profile.ProfileScreen
+import com.zacco.rytm.phone.today.AlcoholSheet
 import com.zacco.rytm.phone.today.CheckInSheet
 import com.zacco.rytm.phone.today.HabitsCard
 import com.zacco.rytm.phone.today.NutritionSheet
@@ -65,18 +69,22 @@ enum class Tab(val label: String, val icon: ImageVector) {
     EVENING("Wieczór", RytmIcons.evening),
 }
 
-private enum class Sheet { NONE, CHECK_IN, OTHER_ACTIVITY, NUTRITION, RPE, WEIGH_IN }
+private enum class Sheet { NONE, CHECK_IN, OTHER_ACTIVITY, NUTRITION, RPE, WEIGH_IN, ALCOHOL }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RytmRoot(vm: CoachViewModel = viewModel()) {
     var tab by rememberSaveable { mutableStateOf(Tab.TODAY) }
     var sheet by rememberSaveable { mutableStateOf(Sheet.NONE) }
     var diagnostics by rememberSaveable { mutableStateOf(false) }
+    var profileOpen by rememberSaveable { mutableStateOf(false) }
     var rpeDate by rememberSaveable { mutableStateOf<String?>(null) }
 
     val state by vm.state.collectAsStateWithLifecycle()
     val hc by vm.hc.collectAsStateWithLifecycle()
     val sync by vm.sync.collectAsStateWithLifecycle()
+    val profile by vm.profile.collectAsStateWithLifecycle()
+    val profileReady by vm.profileReady.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
         vm.refreshHealthConnect()
@@ -93,12 +101,44 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
         Box(Modifier.fillMaxSize().background(c.bg)) { DiagnosticsScreen() }
         return
     }
-
-    Column(Modifier.fillMaxSize().background(c.bg)) {
+    // Kreator przy pierwszym uruchomieniu albo edycja profilu.
+    val onboarding = profileReady && profile == null
+    if (onboarding || profileOpen) {
+        if (profileOpen) BackHandler { profileOpen = false }
         Column(
             Modifier
-                .weight(1f)
-                .fillMaxWidth()
+                .fillMaxSize()
+                .background(c.bg)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ProfileScreen(
+                initial = profile,
+                onboarding = onboarding,
+                onSave = {
+                    vm.saveProfile(it)
+                    profileOpen = false
+                },
+                onDiagnostics = if (onboarding) null else ({ profileOpen = false; diagnostics = true }),
+            )
+        }
+        return
+    }
+
+    Column(Modifier.fillMaxSize().background(c.bg)) {
+        // Pociągnij w dół: synchronizacja z Health Connect od razu (np. zaraz po spacerze).
+        PullToRefreshBox(
+            isRefreshing = sync.running,
+            onRefresh = vm::syncNow,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        ) {
+        Column(
+            Modifier
+                .fillMaxSize()
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 6.dp)
@@ -116,21 +156,24 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         sync = sync,
                         onConnect = { permissionLauncher.launch(vm.permissions) },
                         onSync = vm::syncNow,
-                        onProfile = { diagnostics = true },
+                        onProfile = { profileOpen = true },
                         onToggleHabit = { vm.toggleHabit(it.habit, it.done) },
                         onCheckIn = { sheet = Sheet.CHECK_IN },
                         onOtherActivity = { sheet = Sheet.OTHER_ACTIVITY },
                         onNutrition = { sheet = Sheet.NUTRITION },
+                        onDayOff = vm::toggleDayOff,
+                        onAlcohol = { sheet = Sheet.ALCOHOL },
                     )
                     Tab.WEEK -> WeekScreen(s, vm::toggleCancelled) { day ->
                         rpeDate = day.date.toString()
                         sheet = Sheet.RPE
                     }
-                    Tab.BODY -> BodyScreen(s.body, s.today.nutritionTargets.kcal) { sheet = Sheet.WEIGH_IN }
+                    Tab.BODY -> BodyScreen(s.body, s.today.nutritionTargets.kcal - s.today.trainingKcal) { sheet = Sheet.WEIGH_IN }
                     Tab.HABITS -> HabitsTab(s, onToggle = { vm.toggleHabit(it.habit, it.done) })
                     Tab.EVENING -> EveningTab(s)
                 }
             }
+        }
         }
         TabBar(tab) { tab = it }
     }
@@ -138,7 +181,12 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     when (sheet) {
         Sheet.CHECK_IN -> CheckInSheet(state?.today?.checkIn, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveCheckIn)
         Sheet.OTHER_ACTIVITY -> OtherActivitySheet(onDismiss = { sheet = Sheet.NONE }, onSave = vm::logOtherActivity)
-        Sheet.NUTRITION -> NutritionSheet(state?.today?.nutrition, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveNutrition)
+        Sheet.NUTRITION -> state?.let { s ->
+            NutritionSheet(s.today.date, s.recentNutrition, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveNutrition)
+        }
+        Sheet.ALCOHOL -> state?.let { s ->
+            AlcoholSheet(s.today.date, s.today.alcoholYesterday, s.today.alcoholToday, onDismiss = { sheet = Sheet.NONE }, onSave = vm::setAlcohol)
+        }
         Sheet.RPE -> {
             val acts = state?.week?.days?.firstOrNull { it.date.toString() == rpeDate }?.activities
                 ?.filter { it.type != com.zacco.rytm.domain.model.ActivityType.WALK }.orEmpty()
