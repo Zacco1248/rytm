@@ -13,6 +13,9 @@ play-services-wearable = "20.0.1"
 junit-jupiter = "5.13.4"
 anthropic-java = "3.3.0"
 openai-java = "4.95.0"
+room = "2.8.5"
+ksp = "2.3.12"
+work = "2.10.0"
 
 # Wersje SDK wspólne dla modułów Androida
 compileSdk = "37"
@@ -46,6 +49,11 @@ play-services-wearable = { module = "com.google.android.gms:play-services-wearab
 
 anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropic-java" }
 openai-java = { module = "com.openai:openai-java", version.ref = "openai-java" }
+room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
+
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit-jupiter" }
@@ -58,3 +66,4 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

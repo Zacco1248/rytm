@@ -1,4 +1,4 @@
-// UI telefonu, WorkManager, integracje. W fazie 0: ekran diagnostyki Health Connect.
+// UI telefonu: ekrany Dziś, Tydzień, Sylwetka, Nawyki, Wieczór oraz diagnostyka Health Connect z fazy 0.
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -36,6 +36,7 @@ android {
 dependencies {
     implementation(project(":core-domain"))
     implementation(project(":core-data"))
+    implementation(libs.health.connect.client)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

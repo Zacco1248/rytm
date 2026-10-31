@@ -42,14 +42,20 @@ class CoachEngine(
         val plan = planner.planDay(data.today, context)
         val tomorrow = planner.planDay(data.today.plusDays(1), context)
         val heavyToday = load.today >= HEAVY_DAY_MIN_LOAD && load.today >= load.chronicDailyAvg * HEAVY_DAY_FACTOR
-        val steps = data.metrics.firstOrNull { it.date == data.today }?.steps
+        val night = data.metrics.firstOrNull { it.date == data.today }
+        val steps = night?.steps
+        val week = data.today.minusDays(BASELINE_DAYS)..data.today.minusDays(1)
 
         return TodaySnapshot(
             date = data.today,
             readiness = readiness,
             baselineDays = restingHrHistory(data).size.coerceAtMost(CALIBRATION_DAYS),
             checkIn = data.checkIns.firstOrNull { it.date == data.today },
+            night = night,
+            restingHrAvg = data.metrics.filter { it.date in week }.mapNotNull { it.nightRestingHr }.takeIf { it.isNotEmpty() }?.average(),
+            hrvAvg = data.checkIns.filter { it.date in week }.mapNotNull { it.hrvRmssd }.takeIf { it.isNotEmpty() }?.average(),
             plan = plan,
+            tomorrow = tomorrow,
             load = load,
             bedtime = BedtimeAdvisor.suggest(data.profile.sleep, readiness.level, tomorrow.intensity, heavyToday),
             nutrition = data.nutrition.firstOrNull { it.date == data.today },

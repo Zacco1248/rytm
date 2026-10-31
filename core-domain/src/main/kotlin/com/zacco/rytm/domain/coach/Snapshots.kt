@@ -5,6 +5,7 @@ import com.zacco.rytm.domain.load.LoadSummary
 import com.zacco.rytm.domain.model.Activity
 import com.zacco.rytm.domain.model.ActivityType
 import com.zacco.rytm.domain.model.DailyCheckIn
+import com.zacco.rytm.domain.model.DailyMetrics
 import com.zacco.rytm.domain.model.NutritionDay
 import com.zacco.rytm.domain.model.PlannedDay
 import com.zacco.rytm.domain.nutrition.NutritionWeekReport
@@ -21,7 +22,13 @@ data class TodaySnapshot(
     /** Ile dni baseline'u tętna już mamy (do chipa „Kalibracja X/14”). */
     val baselineDays: Int,
     val checkIn: DailyCheckIn?,
+    /** Ostatnia noc (sen, tętno spoczynkowe) i kroki z dziś. */
+    val night: DailyMetrics?,
+    /** Średnie z poprzednich 7 dni, do porównania „52 (śr. 54)”. */
+    val restingHrAvg: Double?,
+    val hrvAvg: Double?,
     val plan: PlannedDay,
+    val tomorrow: PlannedDay,
     val load: LoadSummary,
     val bedtime: LocalTime,
     val nutrition: NutritionDay?,
