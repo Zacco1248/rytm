@@ -13,7 +13,7 @@ import com.zacco.rytm.domain.model.Intensity
 import com.zacco.rytm.domain.model.PlannedDay
 import com.zacco.rytm.domain.nutrition.NutritionAnalyzer
 import com.zacco.rytm.domain.nutrition.StrengthTrend
-import com.zacco.rytm.domain.planner.PlannerConfig
+import com.zacco.rytm.domain.planner.ExerciseLibrary
 import com.zacco.rytm.domain.planner.PlanningContext
 import com.zacco.rytm.domain.planner.WeekPlanner
 import com.zacco.rytm.domain.readiness.Readiness
@@ -31,17 +31,18 @@ import kotlin.math.roundToInt
  * Czysta logika, więc ViewModel tylko mapuje wynik na UI.
  */
 class CoachEngine(
-    private val plannerConfig: PlannerConfig = PlannerConfig(),
     private val readinessConfig: ReadinessConfig = ReadinessConfig(),
 ) {
-    private val planner = WeekPlanner(plannerConfig)
+    /** Plan i ćwiczenia z profilu osoby (stałe sporty, dni siły, sprzęt, cel). */
+    private fun plannerFor(data: CoachData) =
+        WeekPlanner(data.profile.planner, ExerciseLibrary(data.profile.equipment, data.profile.goal))
 
     fun today(data: CoachData): TodaySnapshot {
         val load = load(data)
         val readiness = readiness(data, load)
         val context = context(data, readiness, load)
-        val plan = planner.planDay(data.today, context)
-        val tomorrow = planner.planDay(data.today.plusDays(1), context)
+        val plan = plannerFor(data).planDay(data.today, context)
+        val tomorrow = plannerFor(data).planDay(data.today.plusDays(1), context)
         val heavyToday = load.today >= HEAVY_DAY_MIN_LOAD && load.today >= load.chronicDailyAvg * HEAVY_DAY_FACTOR
         val night = data.metrics.firstOrNull { it.date == data.today }
         val steps = night?.steps
@@ -82,7 +83,7 @@ class CoachEngine(
         val readiness = readiness(data, load)
         val context = context(data, readiness, load)
         val monday = data.today.with(DayOfWeek.MONDAY)
-        val plan = planner.planWeek(data.today, context)
+        val plan = plannerFor(data).planWeek(data.today, context)
         val hr = hrProfile(data)
 
         val days = plan.map { day ->
@@ -106,7 +107,7 @@ class CoachEngine(
             it.localDate() in monday..monday.plusDays(6) &&
                 (it.type == ActivityType.STRENGTH || it.type == ActivityType.PERSONAL_TRAINING)
         }
-        return WeekSnapshot(monday, data.today, days, load, strengthDone, plannerConfig.minStrengthSessionsPerWeek)
+        return WeekSnapshot(monday, data.today, days, load, strengthDone, data.profile.planner.minStrengthSessionsPerWeek)
     }
 
     fun body(data: CoachData, days: Long = 28): BodySnapshot {
