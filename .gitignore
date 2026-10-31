@@ -1,0 +1,18 @@
+# Gradle / IDE
+.gradle/
+build/
+.kotlin/
+.idea/
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Sekrety i lokalna konfiguracja (klucz API trafia tu, nigdy do repo)
+local.properties
+*.keystore
+*.jks
+
+# Samsung Health Sensor SDK: licencja Samsunga, każdy pobiera AAR samodzielnie
+app-wear/libs/*.aar
