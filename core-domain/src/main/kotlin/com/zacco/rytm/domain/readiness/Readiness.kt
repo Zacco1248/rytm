@@ -30,11 +30,14 @@ enum class ReadinessFlag {
     NO_CHECK_IN,
 }
 
-/** Wagi składowych (sekcja 3.4); konfigurowalne, korygowane po fazie 0. */
+/**
+ * Wagi składowych (sekcja 3.4). Korekta po fazie 0 (2026-10-31): tętno z zegarka w nocy jest gęste (ok. 1 próbka/min),
+ * więc tętno spoczynkowe dostaje więcej, a HRV z jednego 60-s pomiaru mniej.
+ */
 data class ReadinessWeights(
     val sleep: Double = 0.30,
-    val restingHr: Double = 0.20,
-    val hrv: Double = 0.20,
+    val restingHr: Double = 0.25,
+    val hrv: Double = 0.15,
     val subjective: Double = 0.20,
     val load: Double = 0.10,
 ) {

@@ -39,7 +39,7 @@ class ClaudeCoachLlm(
             .addUserMessage(request.user)
             .outputConfig(
                 OutputConfig.builder()
-                    .effort(if (request.tier == ModelTier.WEEKLY) OutputConfig.Effort.HIGH else OutputConfig.Effort.MEDIUM)
+                    .effort(effortFor(request.tier))
                     .format(
                         JsonOutputFormat.builder()
                             .schema(
@@ -77,6 +77,12 @@ class ClaudeCoachLlm(
             inputTokens = message.usage().inputTokens(),
             outputTokens = message.usage().outputTokens(),
         )
+    }
+
+    /** Opus 5.5 i Haiku 5.5 mają domyślnie medium, więc ustawiamy jawnie. */
+    private fun effortFor(tier: ModelTier): OutputConfig.Effort = when (tier) {
+        ModelTier.DAILY -> OutputConfig.Effort.MEDIUM
+        ModelTier.WEEKLY, ModelTier.LONG_TERM -> OutputConfig.Effort.HIGH
     }
 
     private fun supportsServerSideFallback(model: String) =

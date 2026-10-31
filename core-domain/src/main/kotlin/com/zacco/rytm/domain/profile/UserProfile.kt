@@ -8,6 +8,8 @@ data class UserProfile(
     val heightCm: Int = 187,
     val nutrition: NutritionTargets = NutritionTargets(),
     val sleep: SleepTarget = SleepTarget(),
+    /** Tętno maksymalne do szacowania RPE z tętna, gdy brak oceny po treningu. Bez wieku i testu: 190. */
+    val maxHr: Int = 190,
 )
 
 /** Cele z Fitatu pod rekompozycję. */

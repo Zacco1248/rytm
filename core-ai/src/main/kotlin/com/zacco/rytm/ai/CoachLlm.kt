@@ -13,8 +13,11 @@ interface CoachLlm {
 
 enum class LlmProvider { CLAUDE, OPENAI }
 
-/** DAILY: codzienne podsumowania (tańszy model), WEEKLY: raport tygodniowy (mocniejszy model). */
-enum class ModelTier { DAILY, WEEKLY }
+/**
+ * DAILY: codzienne podsumowania (tani model), WEEKLY: raport tygodniowy (mocny model),
+ * LONG_TERM: analiza długoterminowa, np. raz w miesiącu (najmocniejszy model).
+ */
+enum class ModelTier { DAILY, WEEKLY, LONG_TERM }
 
 data class LlmRequest(
     val tier: ModelTier,

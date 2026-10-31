@@ -1,6 +1,7 @@
-// Room, repozytoria, Health Connect, synchronizacja. W fazie 0: odczyt i zrzut danych z Health Connect.
+// Room, repozytoria, Health Connect, synchronizacja.
 plugins {
     alias(libs.plugins.android.library)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -17,8 +18,20 @@ android {
     }
 }
 
+ksp {
+    // Schematy bazy w repo: potrzebne do migracji przy kolejnych wersjach.
+    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.generateKotlin", "true")
+}
+
 dependencies {
     api(project(":core-domain"))
+    implementation(project(":core-ai"))
     api(libs.health.connect.client)
     implementation(libs.kotlinx.coroutines.android)
+
+    api(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+    implementation(libs.work.runtime.ktx)
 }
