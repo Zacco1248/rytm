@@ -76,9 +76,9 @@ class CoachRepository(private val db: RytmDatabase) {
     }
 
     /** Ręczne ważenie (waga S400 zapisuje tylko do Xiaomi Home). */
-    suspend fun addWeighIn(weightKg: Double, time: Instant = Instant.now()) {
+    suspend fun addWeighIn(weightKg: Double, bodyFatPct: Double?, time: Instant = Instant.now()) {
         db.weighIns().upsert(
-            listOf(WeighInEntity("manual-" + UUID.randomUUID(), time, time.atZone(RytmTime.zone).toLocalDate(), weightKg, null, "com.zacco.rytm")),
+            listOf(WeighInEntity("manual-" + UUID.randomUUID(), time, time.atZone(RytmTime.zone).toLocalDate(), weightKg, bodyFatPct, "com.zacco.rytm")),
         )
     }
 

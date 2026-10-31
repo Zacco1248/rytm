@@ -222,14 +222,20 @@ fun RpeSheet(activities: List<com.zacco.rytm.domain.model.Activity>, onDismiss: 
 }
 
 @Composable
-fun WeighInSheet(onDismiss: () -> Unit, onSave: (Double) -> Unit) {
+fun WeighInSheet(onDismiss: () -> Unit, onSave: (Double, Double?) -> Unit) {
     var kg by remember { mutableStateOf("") }
+    var fat by remember { mutableStateOf("") }
     val value = kg.replace(',', '.').toDoubleOrNull()?.takeIf { it in 30.0..250.0 }
+    val fatValue = fat.replace(',', '.').toDoubleOrNull()?.takeIf { it in 3.0..60.0 }
     RytmSheet("Dodaj ważenie", onDismiss) {
         SmallText("Wpisz wynik z Xiaomi Home. Najlepiej rano, po toalecie, przed jedzeniem.")
-        NumberField("Waga (kg)", kg, Modifier.fillMaxWidth()) { kg = it }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField("Waga (kg)", kg, Modifier.weight(1f)) { kg = it }
+            NumberField("Tłuszcz (%)", fat, Modifier.weight(1f)) { fat = it }
+        }
+        SmallText("Tłuszcz z wagi łazienkowej mocno się waha: Rytm pokaże trend, nie pojedynczy wynik.")
         RytmButton("Zapisz", Modifier.fillMaxWidth(), primary = true, enabled = value != null) {
-            onSave(value!!)
+            onSave(value!!, fatValue)
             onDismiss()
         }
     }
