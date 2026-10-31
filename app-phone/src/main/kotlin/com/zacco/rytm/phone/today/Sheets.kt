@@ -220,3 +220,17 @@ fun RpeSheet(activities: List<com.zacco.rytm.domain.model.Activity>, onDismiss: 
         }
     }
 }
+
+@Composable
+fun WeighInSheet(onDismiss: () -> Unit, onSave: (Double) -> Unit) {
+    var kg by remember { mutableStateOf("") }
+    val value = kg.replace(',', '.').toDoubleOrNull()?.takeIf { it in 30.0..250.0 }
+    RytmSheet("Dodaj ważenie", onDismiss) {
+        SmallText("Wpisz wynik z Xiaomi Home. Najlepiej rano, po toalecie, przed jedzeniem.")
+        NumberField("Waga (kg)", kg, Modifier.fillMaxWidth()) { kg = it }
+        RytmButton("Zapisz", Modifier.fillMaxWidth(), primary = true, enabled = value != null) {
+            onSave(value!!)
+            onDismiss()
+        }
+    }
+}

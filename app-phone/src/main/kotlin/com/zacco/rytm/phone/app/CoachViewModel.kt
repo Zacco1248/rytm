@@ -152,6 +152,10 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { data.coach.saveNutrition(date, kcal, proteinG, fatG, carbsG) }
     }
 
+    fun addWeighIn(kg: Double) {
+        viewModelScope.launch { data.coach.addWeighIn(kg) }
+    }
+
     fun setRpe(activityId: String, rpe: Int?) {
         viewModelScope.launch { data.coach.setRpe(activityId, rpe) }
     }

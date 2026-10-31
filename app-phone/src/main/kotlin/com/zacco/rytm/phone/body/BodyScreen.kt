@@ -36,7 +36,7 @@ import com.zacco.rytm.phone.ui.theme.Rytm
 import java.time.temporal.ChronoUnit
 
 @Composable
-fun BodyScreen(b: BodySnapshot, kcalTarget: Int) {
+fun BodyScreen(b: BodySnapshot, kcalTarget: Int, onAddWeighIn: () -> Unit) {
     val (paceLabel, paceTone) = when (b.pace) {
         WeightPace.UNKNOWN -> "za mało ważeń" to ChipTone.MUTED
         WeightPace.OK -> "Tempo OK" to ChipTone.GOOD
@@ -44,7 +44,7 @@ fun BodyScreen(b: BodySnapshot, kcalTarget: Int) {
         WeightPace.GAINING -> "Waga rośnie" to ChipTone.WARN
     }
     ScreenHeader(sub = "Rekompozycja · ostatnie 4 tygodnie", title = "Sylwetka") { Chip(paceLabel, paceTone) }
-    WeightCard(b)
+    WeightCard(b, onAddWeighIn)
     ProteinCard(b, kcalTarget)
     RytmCard {
         CardHeader("Siła")
@@ -62,16 +62,16 @@ fun BodyScreen(b: BodySnapshot, kcalTarget: Int) {
 }
 
 @Composable
-private fun WeightCard(b: BodySnapshot) {
+private fun WeightCard(b: BodySnapshot, onAddWeighIn: () -> Unit) {
     val c = Rytm.colors
     RytmCard {
-        CardHeader("Waga · średnia 7 dni")
+        CardHeader("Waga · średnia 7 dni") { Chip("+ Ważenie", ChipTone.ACCENT, onClick = onAddWeighIn) }
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(b.currentAvg7?.let { Format.dec(it) + " kg" } ?: "–", style = Rytm.type.bigNumber, color = c.ink)
             b.kgPerWeek?.let { Chip(Format.signedKg(it) + " kg / tydz.", if (b.pace == WeightPace.OK) ChipTone.GOOD else ChipTone.WARN) }
         }
         if (b.weighIns.isEmpty()) {
-            SmallText("Brak ważeń w Health Connect z ostatnich 4 tygodni.")
+            SmallText("Brak ważeń z ostatnich 4 tygodni. Dodaj wynik z Xiaomi Home przyciskiem „+ Ważenie”.")
             return@RytmCard
         }
         val values = b.weighIns.map { it.second } + b.weightAvg7.map { it.second }

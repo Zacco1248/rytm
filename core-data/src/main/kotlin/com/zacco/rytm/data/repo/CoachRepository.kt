@@ -4,6 +4,7 @@ import com.zacco.rytm.data.db.ActivityEntity
 import com.zacco.rytm.data.db.CancellationEntity
 import com.zacco.rytm.data.db.HabitLogEntity
 import com.zacco.rytm.data.db.NutritionDayEntity
+import com.zacco.rytm.data.db.WeighInEntity
 import com.zacco.rytm.data.db.RytmDatabase
 import com.zacco.rytm.data.db.originForDedup
 import com.zacco.rytm.data.db.toDomain
@@ -71,6 +72,13 @@ class CoachRepository(private val db: RytmDatabase) {
     suspend fun saveNutrition(date: LocalDate, kcal: Int, proteinG: Double, fatG: Double?, carbsG: Double?) {
         db.nutrition().upsert(
             NutritionDayEntity(date, kcal, proteinG, fatG ?: 0.0, carbsG ?: 0.0, Instant.now(), manual = true),
+        )
+    }
+
+    /** Ręczne ważenie (waga S400 zapisuje tylko do Xiaomi Home). */
+    suspend fun addWeighIn(weightKg: Double, time: Instant = Instant.now()) {
+        db.weighIns().upsert(
+            listOf(WeighInEntity("manual-" + UUID.randomUUID(), time, time.atZone(RytmTime.zone).toLocalDate(), weightKg, null, "com.zacco.rytm")),
         )
     }
 

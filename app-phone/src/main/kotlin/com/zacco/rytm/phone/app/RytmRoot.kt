@@ -46,6 +46,7 @@ import com.zacco.rytm.phone.today.NutritionSheet
 import com.zacco.rytm.phone.today.RpeSheet
 import com.zacco.rytm.phone.today.OtherActivitySheet
 import com.zacco.rytm.phone.today.TodayScreen
+import com.zacco.rytm.phone.today.WeighInSheet
 import com.zacco.rytm.phone.ui.components.CardHeader
 import com.zacco.rytm.phone.ui.components.RytmCard
 import com.zacco.rytm.phone.ui.components.RytmIcons
@@ -64,7 +65,7 @@ enum class Tab(val label: String, val icon: ImageVector) {
     EVENING("Wieczór", RytmIcons.evening),
 }
 
-private enum class Sheet { NONE, CHECK_IN, OTHER_ACTIVITY, NUTRITION, RPE }
+private enum class Sheet { NONE, CHECK_IN, OTHER_ACTIVITY, NUTRITION, RPE, WEIGH_IN }
 
 @Composable
 fun RytmRoot(vm: CoachViewModel = viewModel()) {
@@ -125,7 +126,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         rpeDate = day.date.toString()
                         sheet = Sheet.RPE
                     }
-                    Tab.BODY -> BodyScreen(s.body, s.today.nutritionTargets.kcal)
+                    Tab.BODY -> BodyScreen(s.body, s.today.nutritionTargets.kcal) { sheet = Sheet.WEIGH_IN }
                     Tab.HABITS -> HabitsTab(s, onToggle = { vm.toggleHabit(it.habit, it.done) })
                     Tab.EVENING -> EveningTab(s)
                 }
@@ -143,6 +144,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                 ?.filter { it.type != com.zacco.rytm.domain.model.ActivityType.WALK }.orEmpty()
             if (acts.isNotEmpty()) RpeSheet(acts, onDismiss = { sheet = Sheet.NONE }, onSave = vm::setRpe)
         }
+        Sheet.WEIGH_IN -> WeighInSheet(onDismiss = { sheet = Sheet.NONE }, onSave = vm::addWeighIn)
         Sheet.NONE -> Unit
     }
 }

@@ -125,7 +125,7 @@ private fun ReadinessCard(s: TodaySnapshot, onCheckIn: () -> Unit) {
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val comp = r.components
-                ComponentRow("Sen", s.night?.sleepMin?.let { Format.minutes(it) } ?: "brak", comp[ReadinessComponent.SLEEP])
+                ComponentRow("Sen", s.night?.sleepMin?.let { Format.minutes(it) } ?: "brak zapisu", comp[ReadinessComponent.SLEEP])
                 ComponentRow(
                     "Tętno spocz.",
                     s.night?.nightRestingHr?.let { hr -> "$hr" + (s.restingHrAvg?.let { " (śr. ${Format.roundInt(it)})" } ?: "") } ?: "brak",
