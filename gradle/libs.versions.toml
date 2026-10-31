@@ -11,6 +11,8 @@ wear-compose = "1.6.2"
 health-connect = "1.1.0"
 play-services-wearable = "20.0.1"
 junit-jupiter = "5.13.4"
+anthropic-java = "3.3.0"
+openai-java = "4.95.0"
 
 # Wersje SDK wspólne dla modułów Androida
 compileSdk = "37"
@@ -41,6 +43,10 @@ wear-compose-foundation = { module = "androidx.wear.compose:compose-foundation",
 
 health-connect-client = { module = "androidx.health.connect:connect-client", version.ref = "health-connect" }
 play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "play-services-wearable" }
+
+anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropic-java" }
+openai-java = { module = "com.openai:openai-java", version.ref = "openai-java" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit-jupiter" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
