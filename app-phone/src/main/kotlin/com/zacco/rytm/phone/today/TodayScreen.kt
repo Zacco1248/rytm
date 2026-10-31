@@ -64,7 +64,15 @@ fun TodayScreen(
     onAlcohol: () -> Unit,
 ) {
     ScreenHeader(sub = Format.dayLong(s.date), title = greeting()) {
-        Chip("Profil", ChipTone.MUTED, onClick = onProfile)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val syncLabel = when {
+                sync.running -> "↻ …"
+                s.lastSync != null -> "↻ " + s.lastSync!!.atZone(RytmTime.zone).format(hhmm)
+                else -> "↻ synchronizuj"
+            }
+            Chip(syncLabel, ChipTone.MUTED, onClick = onSync)
+            Chip("Profil", ChipTone.MUTED, onClick = onProfile)
+        }
     }
 
     if (hc != HcStatus.READY && hc != HcStatus.CHECKING) HealthConnectCard(hc, onConnect)

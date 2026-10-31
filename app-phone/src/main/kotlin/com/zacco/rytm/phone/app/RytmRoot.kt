@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -68,6 +70,7 @@ enum class Tab(val label: String, val icon: ImageVector) {
 
 private enum class Sheet { NONE, CHECK_IN, OTHER_ACTIVITY, NUTRITION, RPE, WEIGH_IN, ALCOHOL }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RytmRoot(vm: CoachViewModel = viewModel()) {
     var tab by rememberSaveable { mutableStateOf(Tab.TODAY) }
@@ -96,10 +99,15 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     }
 
     Column(Modifier.fillMaxSize().background(c.bg)) {
+        // Pociągnij w dół: synchronizacja z Health Connect od razu (np. zaraz po spacerze).
+        PullToRefreshBox(
+            isRefreshing = sync.running,
+            onRefresh = vm::syncNow,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        ) {
         Column(
             Modifier
-                .weight(1f)
-                .fillMaxWidth()
+                .fillMaxSize()
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 6.dp)
@@ -134,6 +142,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                     Tab.EVENING -> EveningTab(s)
                 }
             }
+        }
         }
         TabBar(tab) { tab = it }
     }
