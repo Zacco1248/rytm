@@ -2,6 +2,7 @@ package com.zacco.rytm.phone.week
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,7 +50,7 @@ import com.zacco.rytm.phone.ui.theme.RytmColors
 import java.time.LocalDate
 
 @Composable
-fun WeekScreen(state: CoachUiState, onToggleCancelled: (LocalDate) -> Unit) {
+fun WeekScreen(state: CoachUiState, onToggleCancelled: (LocalDate) -> Unit, onRate: (WeekDay) -> Unit) {
     val w = state.week
     ScreenHeader(sub = Format.range(w.monday, w.monday.plusDays(6)), title = "Tydzień") {
         Chip("${w.strengthDone} / ${w.strengthRequired} siła" + if (w.strengthDone >= w.strengthRequired) " ✓" else "",
@@ -57,7 +58,7 @@ fun WeekScreen(state: CoachUiState, onToggleCancelled: (LocalDate) -> Unit) {
     }
     LoadCard(w)
     AcwrCard(w)
-    PlanCard(state, onToggleCancelled)
+    PlanCard(state, onToggleCancelled, onRate)
 }
 
 // --- obciążenie ---
@@ -191,14 +192,14 @@ private fun AcwrCard(w: WeekSnapshot) {
 // --- plan ---
 
 @Composable
-private fun PlanCard(state: CoachUiState, onToggleCancelled: (LocalDate) -> Unit) {
+private fun PlanCard(state: CoachUiState, onToggleCancelled: (LocalDate) -> Unit, onRate: (WeekDay) -> Unit) {
     val w = state.week
     RytmCard {
         CardHeader("Plan")
         Column {
             w.days.forEachIndexed { i, d ->
                 if (i > 0 && d.date != w.today && w.days[i - 1].date != w.today) Divider()
-                DayRow(d, d.date == w.today, d.date < w.today)
+                DayRow(d, d.date == w.today, d.date < w.today, onRate)
             }
         }
         ButtonRow {
@@ -222,7 +223,7 @@ private fun PlanCard(state: CoachUiState, onToggleCancelled: (LocalDate) -> Unit
 }
 
 @Composable
-private fun DayRow(d: WeekDay, today: Boolean, past: Boolean) {
+private fun DayRow(d: WeekDay, today: Boolean, past: Boolean, onRate: (WeekDay) -> Unit) {
     val c = Rytm.colors
     // Spacery z psem zegarek zapisuje jako treningi; liczą się do obciążenia, ale nie „zaliczają” dnia z planu.
     val sessions = d.activities.filter { it.type != ActivityType.WALK }
@@ -231,6 +232,7 @@ private fun DayRow(d: WeekDay, today: Boolean, past: Boolean) {
         Modifier
             .fillMaxWidth()
             .then(if (today) Modifier.clip(RoundedCornerShape(12.dp)).background(c.accentSoft) else Modifier)
+            .then(if (done) Modifier.clickable(onClickLabel = "Oceń RPE") { onRate(d) } else Modifier)
             .padding(horizontal = if (today) 10.dp else 0.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),

@@ -147,6 +147,11 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun saveNutrition(kcal: Int, proteinG: Double, fatG: Double?, carbsG: Double?) {
+        val date = LocalDate.now(RytmTime.zone)
+        viewModelScope.launch { data.coach.saveNutrition(date, kcal, proteinG, fatG, carbsG) }
+    }
+
     fun setRpe(activityId: String, rpe: Int?) {
         viewModelScope.launch { data.coach.setRpe(activityId, rpe) }
     }

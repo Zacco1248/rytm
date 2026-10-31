@@ -59,6 +59,7 @@ fun TodayScreen(
     onToggleHabit: (HabitStatus) -> Unit,
     onCheckIn: () -> Unit,
     onOtherActivity: () -> Unit,
+    onNutrition: () -> Unit,
 ) {
     ScreenHeader(sub = Format.dayLong(s.date), title = greeting()) {
         Chip("Profil", ChipTone.MUTED, onClick = onProfile)
@@ -69,7 +70,7 @@ fun TodayScreen(
 
     ReadinessCard(s, onCheckIn)
     PlanCard(s)
-    NutritionCard(s, sync, onSync)
+    NutritionCard(s, sync, onSync, onNutrition)
     HabitsCard(s.habits, onToggleHabit)
 
     RytmCard {
@@ -182,7 +183,7 @@ private fun PlanCard(s: TodaySnapshot) {
 }
 
 @Composable
-private fun NutritionCard(s: TodaySnapshot, sync: SyncUi, onSync: () -> Unit) {
+private fun NutritionCard(s: TodaySnapshot, sync: SyncUi, onSync: () -> Unit, onNutrition: () -> Unit) {
     val c = Rytm.colors
     val n = s.nutrition
     val t = s.nutritionTargets
@@ -201,7 +202,10 @@ private fun NutritionCard(s: TodaySnapshot, sync: SyncUi, onSync: () -> Unit) {
             Macro("Tłuszcz", Format.roundInt(n?.fatG ?: 0.0), t.fatG, " g", c.warn, Modifier.weight(1f))
             Macro("Węgle", Format.roundInt(n?.carbsG ?: 0.0), t.carbsG, " g", c.kindOther, Modifier.weight(1f))
         }
-        if (n == null) SmallText("Brak posiłków z Fitatu na dziś.")
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SmallText(if (n == null) "Brak danych z Fitatu na dziś." else "Zgadza się z Fitatu?", Modifier.weight(1f))
+            Chip(if (n == null) "Wpisz z Fitatu" else "Popraw", ChipTone.ACCENT, onClick = onNutrition)
+        }
     }
 }
 

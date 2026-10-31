@@ -42,6 +42,8 @@ import com.zacco.rytm.phone.body.BodyScreen
 import com.zacco.rytm.phone.diagnostics.DiagnosticsScreen
 import com.zacco.rytm.phone.today.CheckInSheet
 import com.zacco.rytm.phone.today.HabitsCard
+import com.zacco.rytm.phone.today.NutritionSheet
+import com.zacco.rytm.phone.today.RpeSheet
 import com.zacco.rytm.phone.today.OtherActivitySheet
 import com.zacco.rytm.phone.today.TodayScreen
 import com.zacco.rytm.phone.ui.components.CardHeader
@@ -62,13 +64,14 @@ enum class Tab(val label: String, val icon: ImageVector) {
     EVENING("Wieczór", RytmIcons.evening),
 }
 
-private enum class Sheet { NONE, CHECK_IN, OTHER_ACTIVITY }
+private enum class Sheet { NONE, CHECK_IN, OTHER_ACTIVITY, NUTRITION, RPE }
 
 @Composable
 fun RytmRoot(vm: CoachViewModel = viewModel()) {
     var tab by rememberSaveable { mutableStateOf(Tab.TODAY) }
     var sheet by rememberSaveable { mutableStateOf(Sheet.NONE) }
     var diagnostics by rememberSaveable { mutableStateOf(false) }
+    var rpeDate by rememberSaveable { mutableStateOf<String?>(null) }
 
     val state by vm.state.collectAsStateWithLifecycle()
     val hc by vm.hc.collectAsStateWithLifecycle()
@@ -116,8 +119,12 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onToggleHabit = { vm.toggleHabit(it.habit, it.done) },
                         onCheckIn = { sheet = Sheet.CHECK_IN },
                         onOtherActivity = { sheet = Sheet.OTHER_ACTIVITY },
+                        onNutrition = { sheet = Sheet.NUTRITION },
                     )
-                    Tab.WEEK -> WeekScreen(s, vm::toggleCancelled)
+                    Tab.WEEK -> WeekScreen(s, vm::toggleCancelled) { day ->
+                        rpeDate = day.date.toString()
+                        sheet = Sheet.RPE
+                    }
                     Tab.BODY -> BodyScreen(s.body, s.today.nutritionTargets.kcal)
                     Tab.HABITS -> HabitsTab(s, onToggle = { vm.toggleHabit(it.habit, it.done) })
                     Tab.EVENING -> EveningTab(s)
@@ -130,6 +137,12 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     when (sheet) {
         Sheet.CHECK_IN -> CheckInSheet(state?.today?.checkIn, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveCheckIn)
         Sheet.OTHER_ACTIVITY -> OtherActivitySheet(onDismiss = { sheet = Sheet.NONE }, onSave = vm::logOtherActivity)
+        Sheet.NUTRITION -> NutritionSheet(state?.today?.nutrition, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveNutrition)
+        Sheet.RPE -> {
+            val acts = state?.week?.days?.firstOrNull { it.date.toString() == rpeDate }?.activities
+                ?.filter { it.type != com.zacco.rytm.domain.model.ActivityType.WALK }.orEmpty()
+            if (acts.isNotEmpty()) RpeSheet(acts, onDismiss = { sheet = Sheet.NONE }, onSave = vm::setRpe)
+        }
         Sheet.NONE -> Unit
     }
 }

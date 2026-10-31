@@ -161,6 +161,7 @@ class HealthConnectSync(
     }
 
     private suspend fun refreshNutrition(date: LocalDate) {
+        if (db.nutrition().get(date)?.manual == true) return
         val (start, end) = dayBounds(date)
         val agg = client.aggregate(
             AggregateRequest(

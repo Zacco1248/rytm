@@ -164,3 +164,59 @@ fun OtherActivitySheet(onDismiss: () -> Unit, onSave: (String, Int, Int?, Set<Lo
         }
     }
 }
+
+@Composable
+fun NutritionSheet(current: com.zacco.rytm.domain.model.NutritionDay?, onDismiss: () -> Unit, onSave: (Int, Double, Double?, Double?) -> Unit) {
+    var kcal by remember { mutableStateOf(current?.kcal?.toString().orEmpty()) }
+    var protein by remember { mutableStateOf(current?.proteinG?.let { Format.roundInt(it).toString() }.orEmpty()) }
+    var fat by remember { mutableStateOf(current?.fatG?.takeIf { it > 0 }?.let { Format.roundInt(it).toString() }.orEmpty()) }
+    var carbs by remember { mutableStateOf(current?.carbsG?.takeIf { it > 0 }?.let { Format.roundInt(it).toString() }.orEmpty()) }
+    val kcalVal = kcal.toIntOrNull()
+    val proteinVal = protein.replace(',', '.').toDoubleOrNull()
+
+    RytmSheet("Żywienie z Fitatu", onDismiss) {
+        SmallText("Przepisz podsumowanie dnia z Fitatu. Kcal i białko wystarczą.")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField("Kcal", kcal, Modifier.weight(1f)) { kcal = it }
+            NumberField("Białko (g)", protein, Modifier.weight(1f)) { protein = it }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField("Tłuszcz (g)", fat, Modifier.weight(1f)) { fat = it }
+            NumberField("Węgle (g)", carbs, Modifier.weight(1f)) { carbs = it }
+        }
+        RytmButton("Zapisz", Modifier.fillMaxWidth(), primary = true, enabled = kcalVal != null && proteinVal != null) {
+            onSave(kcalVal!!, proteinVal!!, fat.replace(',', '.').toDoubleOrNull(), carbs.replace(',', '.').toDoubleOrNull())
+            onDismiss()
+        }
+    }
+}
+
+@Composable
+private fun NumberField(label: String, value: String, modifier: Modifier, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { v -> onChange(v.filter { it.isDigit() || it == ',' || it == '.' }.take(6)) },
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+        modifier = modifier,
+    )
+}
+
+/** Ocena RPE treningów z danego dnia (zegarek nie zapisuje odczuć, a tętno je zaniża). */
+@Composable
+fun RpeSheet(activities: List<com.zacco.rytm.domain.model.Activity>, onDismiss: () -> Unit, onSave: (String, Int) -> Unit) {
+    var selected by remember { mutableStateOf(activities.associate { it.id to it.rpe }) }
+    RytmSheet("Jak ciężko było? (RPE)", onDismiss) {
+        SmallText("1 = bardzo lekko, 5 = umiarkowanie, 7 = ciężko, 10 = maksimum.")
+        activities.forEach { a ->
+            Label(Format.activity(a.type) + " · " + Format.minutes(a.durationMin))
+            Scale(1..5, selected[a.id]) { v -> selected = selected + (a.id to v) }
+            Scale(6..10, selected[a.id]) { v -> selected = selected + (a.id to v) }
+        }
+        RytmButton("Zapisz", Modifier.fillMaxWidth(), primary = true) {
+            selected.forEach { (id, rpe) -> if (rpe != null) onSave(id, rpe) }
+            onDismiss()
+        }
+    }
+}

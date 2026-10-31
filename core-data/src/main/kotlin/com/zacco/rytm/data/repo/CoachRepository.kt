@@ -3,6 +3,7 @@ package com.zacco.rytm.data.repo
 import com.zacco.rytm.data.db.ActivityEntity
 import com.zacco.rytm.data.db.CancellationEntity
 import com.zacco.rytm.data.db.HabitLogEntity
+import com.zacco.rytm.data.db.NutritionDayEntity
 import com.zacco.rytm.data.db.RytmDatabase
 import com.zacco.rytm.data.db.originForDedup
 import com.zacco.rytm.data.db.toDomain
@@ -64,6 +65,13 @@ class CoachRepository(private val db: RytmDatabase) {
 
     suspend fun setCancelled(date: LocalDate, cancelled: Boolean) {
         if (cancelled) db.cancellations().insert(CancellationEntity(date, Instant.now())) else db.cancellations().delete(date)
+    }
+
+    /** Ręczny wpis dnia z Fitatu: kcal i białko wystarczą, tłuszcz i węgle opcjonalnie. */
+    suspend fun saveNutrition(date: LocalDate, kcal: Int, proteinG: Double, fatG: Double?, carbsG: Double?) {
+        db.nutrition().upsert(
+            NutritionDayEntity(date, kcal, proteinG, fatG ?: 0.0, carbsG ?: 0.0, Instant.now(), manual = true),
+        )
     }
 
     suspend fun setRpe(activityId: String, rpe: Int?) = db.activities().setRpe(activityId, rpe)

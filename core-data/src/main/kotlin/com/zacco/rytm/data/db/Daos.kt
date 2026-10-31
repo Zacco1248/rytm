@@ -57,6 +57,9 @@ interface NutritionDao {
     @Query("SELECT * FROM nutrition_day WHERE date BETWEEN :from AND :to ORDER BY date")
     fun observe(from: LocalDate, to: LocalDate): Flow<List<NutritionDayEntity>>
 
+    @Query("SELECT * FROM nutrition_day WHERE date = :date")
+    suspend fun get(date: LocalDate): NutritionDayEntity?
+
     @Upsert
     suspend fun upsert(day: NutritionDayEntity)
 

@@ -54,6 +54,8 @@ data class NutritionDayEntity(
     val fatG: Double,
     val carbsG: Double,
     val updatedAt: Instant,
+    /** Wpisane ręcznie (Fitatu bez Premium nie wysyła do HC). Synchronizacja nie nadpisuje takich dni. */
+    val manual: Boolean = false,
 )
 
 /** Pojedynczy pomiar z wagi (waga albo tkanka tłuszczowa; HC trzyma je jako osobne rekordy). */
