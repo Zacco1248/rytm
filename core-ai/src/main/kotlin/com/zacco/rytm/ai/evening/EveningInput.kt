@@ -36,4 +36,11 @@ data class EveningInput(
 )
 
 @Serializable
-data class ActivityLine(val type: String, val minutes: Int, val rpe: Int?, val load: Int?)
+data class ActivityLine(
+    val type: String,
+    val minutes: Int,
+    val rpe: Int?,
+    val load: Int?,
+    /** Opis „innej aktywności” wpisany przez użytkownika, np. „remont”. */
+    val note: String? = null,
+)

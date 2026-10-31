@@ -18,13 +18,13 @@ class EveningReviewServiceTest {
 
     private val input = EveningInput(
         date = "2026-11-04", weekday = "środa", plannedToday = "Squash",
-        activities = listOf(ActivityLine("SQUASH", 60, 8, 480), ActivityLine("RENOVATION", 120, 5, 600)),
+        activities = listOf(ActivityLine("SQUASH", 60, 8, 480), ActivityLine("OTHER", 120, 5, 600, note = "remont")),
         loadToday = 1080, acwr = 1.4, readinessToday = 68, readinessFlags = emptyList(),
         sleepLastNightMin = 410, steps = 9400, kcal = 2250, kcalTarget = 2300, proteinG = 128, proteinTarget = 161,
         energy = 3, mood = 4, soreAreas = listOf("SHOULDERS"),
         habitsDone = listOf("Bez ekranu po 23:30"), habitsMissed = listOf("10 min mobilności"),
         reflection = null, tomorrowPlan = "Siatkówka", tomorrowIntensity = "HIGH",
-        tomorrowWarnings = listOf("Wczoraj ciężki remont: bez dużego obciążenia pleców i barków."),
+        tomorrowWarnings = listOf("Wczoraj ciężka aktywność (remont): dziś bez dużego obciążenia partii, które pracowały."),
         suggestedBedtime = "23:30", calibrating = true,
     )
 
@@ -90,7 +90,8 @@ class EveningReviewServiceTest {
         val review = RuleBasedEveningReview.build(input).validate()
 
         assertTrue("128 g z 161 g" in review.summary)
-        assertTrue("pleców i barków" in review.tomorrow)
+        assertTrue("partii, które pracowały" in review.tomorrow)
+        assertTrue("inna aktywność (remont)" in review.summary)
         assertTrue("kalibrują" in review.interpretation)
     }
 

@@ -30,7 +30,7 @@ Priorytet: **zrobić to dobrze**, czyli czysta architektura, testowalna logika i
 
 ### Dodatkowo
 - **Grupowe treningi personalne w piątki, do końca listopada 2026**: typ aktywności `PERSONAL_TRAINING`, stały punkt planu (z datą końca). Od grudnia piątek wraca do planu siłowego.
-- **Remont domu**: nieregularna praca fizyczna (noszenie, praca nad głową, długie stanie). Musi być **logowana jako obciążenie** i wpływać na plan.
+- **Remont domu**: nieregularna praca fizyczna (noszenie, praca nad głową, długie stanie). Musi być **logowana jako obciążenie** i wpływać na plan. Logujemy ją ogólnym „zaloguj inną aktywność” z opisem.
 
 ### Cel sylwetkowy
 - **Rekompozycja**: lekki deficyt kaloryczny, wysokie białko, progresja w treningu siłowym.
@@ -61,7 +61,7 @@ Priorytet: **zrobić to dobrze**, czyli czysta architektura, testowalna logika i
 1. **Brak ciężkich nóg** dzień przed siatkówką lub squashem.
 2. **Dzień po meczu**: preferowana mobilność lub lekka górna partia.
 3. **Mecz wypadł**: coach proponuje zamiennik (dodatkowa sesja siłowa, interwały z hantlami lub mobilność) z uwzględnieniem tygodniowego obciążenia.
-4. **Ciężki dzień remontu** liczy się jak trening. Kolejny dzień: bez dużego obciążenia pleców i barków.
+4. **Ciężka „inna aktywność”** (np. remont; od 2 h lub sRPE ≥ 400) liczy się jak trening. Kolejny dzień: bez dużego obciążenia partii, które pracowały (opis aktywności trafia do ostrzeżenia).
 5. **Niska gotowość** (patrz 3.4): trening zastępowany lżejszą wersją albo odpoczynkiem. Stałe sporty zostają, ale z ostrzeżeniem.
 6. Min. **1 dzień pełnego odpoczynku** w tygodniu.
 7. **Rekompozycja**: min. 2 sesje siłowe w tygodniu (w tym personalne). Jeśli w tygodniu wypadły, coach priorytetyzuje siłę nad dodatkowym cardio.
@@ -154,7 +154,7 @@ Samsung Health **zapisuje** do Health Connect m.in.: ćwiczenia (ExerciseSession
 |---|---|---|
 | Health Connect | sen (+ etapy, jeśli są), tętno, kroki, treningi, kalorie, VO2max, waga, tkanka tłuszczowa, żywienie (Fitatu) | 1 |
 | Własne obliczenia | tętno spoczynkowe w nocy, load, ACWR, readiness | 1 |
-| Własne dane | check-in, RPE, nawyki, remont | 1–2 |
+| Własne dane | check-in, RPE, nawyki, inne aktywności (np. remont) | 1–2 |
 | Sensor SDK (zegarek) | poranne HRV (IBI → RMSSD) | 2 |
 | Health Services (zegarek) | tętno i kalorie podczas treningu siłowego | 3 |
 | Samsung Health Data SDK | ewentualne braki (opcjonalnie) | 5 |
@@ -240,7 +240,7 @@ data class LoggedSet(val exercise: String, val reps: Int, val weightKg: Double, 
 3. **Komplikacja**: wynik gotowości (0–100) na tarczy.
 4. **Poranny check-in z HRV**: powiadomienie po przebudzeniu.
 5. **RPE po treningu**: po wykryciu nowego treningu w HC telefon wysyła na zegarek prośbę „Jak ciężko? 1–10”.
-6. **Szybki log remontu**: „Remont: 1 h / 2 h / 4 h” + RPE.
+6. **Zaloguj inną aktywność**: czas (1 h / 2 h / 4 h) + RPE + krótki opis, co to było (np. remont). Zastępuje osobny „log remontu” (decyzja 2026-10-31).
 7. **Wieczorne podsumowanie**: skrót na zegarku, pełne na telefonie.
 8. **Trening siłowy** (faza 3).
 9. **Wyjątki planu**: „mecz odwołany” lub „trening personalny odwołany”, co uruchamia przeplanowanie.
@@ -272,12 +272,12 @@ data class LoggedSet(val exercise: String, val reps: Int, val weightKg: Double, 
 
 ### Faza 1 – MVP telefon
 - Moduły, Room, synchronizacja z HC (Changes API, WorkManager).
-- Ręczne logowanie: check-in, RPE, remont.
+- Ręczne logowanie: check-in, RPE, inna aktywność (z opisem).
 - `core-domain`: tętno spoczynkowe w nocy, load, ACWR, readiness, planer regułowy, logika żywienia, **z testami**.
 - Ekrany „Dziś”, „Tydzień”, „Sylwetka”.
 
 ### Faza 2 – zegarek
-- Data Layer sync, kafelek „Dziś”, kafelek „Nawyki”, komplikacja, check-in z HRV, RPE, log remontu.
+- Data Layer sync, kafelek „Dziś”, kafelek „Nawyki”, komplikacja, check-in z HRV, RPE, log innej aktywności.
 
 ### Faza 3 – trening siłowy na zegarku
 - Szablony A/B/C, prowadzenie serii, timer, Health Services, progresja.

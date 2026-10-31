@@ -7,7 +7,10 @@ object RuleBasedEveningReview {
         val activities = if (input.activities.isEmpty()) {
             "Dziś bez zarejestrowanych treningów"
         } else {
-            "Dziś: " + input.activities.joinToString { "${it.type.lowercase()} ${it.minutes} min" }
+            "Dziś: " + input.activities.joinToString { a ->
+                val name = if (a.type == "OTHER") "inna aktywność" + (a.note?.let { " ($it)" } ?: "") else a.type.lowercase()
+                "$name ${a.minutes} min"
+            }
         }
         val nutrition = input.proteinG?.let { p ->
             if (p < input.proteinTarget * 0.9) "białko $p g z ${input.proteinTarget} g, warto dobić" else "białko $p g, cel osiągnięty"

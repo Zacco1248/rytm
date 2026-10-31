@@ -15,9 +15,9 @@ data class PlannerConfig(
     /** Grupowe treningi personalne do końca listopada 2026. */
     val personalTrainingUntil: LocalDate? = LocalDate.of(2026, 11, 30),
     val minStrengthSessionsPerWeek: Int = 2,
-    /** Remont od tylu minut (lub od [heavyRenovationLoad] sRPE) liczy się jak ciężki trening. */
-    val heavyRenovationMinutes: Int = 120,
-    val heavyRenovationLoad: Int = 400,
+    /** „Inna aktywność” (np. remont) od tylu minut lub od [heavyOtherActivityLoad] sRPE liczy się jak ciężki trening. */
+    val heavyOtherActivityMinutes: Int = 120,
+    val heavyOtherActivityLoad: Int = 400,
     /** Gotowość poniżej tej wartości: zamiast treningu pełny odpoczynek. */
     val restBelowReadiness: Int = 35,
 ) {

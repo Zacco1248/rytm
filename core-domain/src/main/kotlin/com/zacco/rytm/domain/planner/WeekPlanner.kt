@@ -61,7 +61,7 @@ class WeekPlanner(private val config: PlannerConfig = PlannerConfig()) {
                 if (config.personalTrainingUntil?.let { !date.isAfter(it) } == true) {
                     strength(date, StrengthFocus.FULL_BODY)
                 } else {
-                    PlannedDay(date, DayKind.FLEX, "Dowolna aktywność lub remont", Intensity.MODERATE, rationale = listOf("Dzień elastyczny."))
+                    PlannedDay(date, DayKind.FLEX, "Dowolna aktywność", Intensity.MODERATE, rationale = listOf("Dzień elastyczny."))
                 }
             DayOfWeek.SUNDAY -> rest(date, "Odpoczynek: mobilność 20–30 min i spacer", "Dzień regeneracji.")
             else -> PlannedDay(date, DayKind.FLEX, "Dowolna aktywność", Intensity.LOW)
@@ -136,10 +136,13 @@ class WeekPlanner(private val config: PlannerConfig = PlannerConfig()) {
                 .withRationale("Wczoraj mecz: lżejszy dzień.")
         }
 
-        // Reguła 4: po ciężkim dniu remontu bez dużego obciążenia pleców i barków.
-        if (heavyRenovation(day.date.minusDays(1), context) && d.kind in TRAINING_KINDS) {
-            d = d.copy(intensity = minOf(d.intensity, Intensity.MODERATE))
-                .withWarning("Wczoraj ciężki remont: bez dużego obciążenia pleców i barków.")
+        // Reguła 4: po ciężkiej „innej aktywności” (np. remoncie) bez dużego obciążenia partii, które pracowały.
+        heavyOtherActivity(day.date.minusDays(1), context)?.let { heavy ->
+            if (d.kind in TRAINING_KINDS) {
+                val what = heavy.notes?.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()
+                d = d.copy(intensity = minOf(d.intensity, Intensity.MODERATE))
+                    .withWarning("Wczoraj ciężka aktywność$what: dziś bez dużego obciążenia partii, które pracowały.")
+            }
         }
 
         if (day.date == context.today) d = applyReadiness(d, context)
@@ -182,11 +185,11 @@ class WeekPlanner(private val config: PlannerConfig = PlannerConfig()) {
         return planFor(date, week, context)?.kind == DayKind.FIXED_SPORT
     }
 
-    private fun heavyRenovation(date: LocalDate, context: PlanningContext): Boolean =
-        context.activities.any {
-            it.type == ActivityType.RENOVATION &&
+    private fun heavyOtherActivity(date: LocalDate, context: PlanningContext): Activity? =
+        context.activities.firstOrNull {
+            it.type == ActivityType.OTHER &&
                 it.start.atZone(RytmTime.zone).toLocalDate() == date &&
-                (it.durationMin >= config.heavyRenovationMinutes || (it.load ?: 0) >= config.heavyRenovationLoad)
+                (it.durationMin >= config.heavyOtherActivityMinutes || (it.load ?: 0) >= config.heavyOtherActivityLoad)
         }
 
     private fun strength(date: LocalDate, focus: StrengthFocus) =

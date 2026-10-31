@@ -2,7 +2,7 @@ package com.zacco.rytm.domain.model
 
 import java.time.Instant
 
-enum class ActivityType { VOLLEYBALL, SQUASH, STRENGTH, PERSONAL_TRAINING, MOBILITY, CARDIO, RENOVATION, WALK, OTHER }
+enum class ActivityType { VOLLEYBALL, SQUASH, STRENGTH, PERSONAL_TRAINING, MOBILITY, CARDIO, WALK, OTHER }
 
 enum class Source { HEALTH_CONNECT, WATCH_APP, MANUAL }
 
@@ -16,6 +16,7 @@ data class Activity(
     val avgHr: Int?,
     val kcal: Int?,
     val source: Source,
+    /** Opis, zwłaszcza dla „innej aktywności” logowanej ręcznie (np. „remont: noszenie płyt”). */
     val notes: String? = null,
 ) {
     init {

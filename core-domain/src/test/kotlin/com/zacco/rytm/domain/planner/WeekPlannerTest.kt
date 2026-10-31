@@ -27,9 +27,9 @@ class WeekPlannerTest {
     private fun readiness(date: LocalDate, score: Int) =
         Readiness(date, score, ReadinessCalculator.levelOf(score), emptyMap(), emptyList(), calibrating = false)
 
-    private fun activity(date: LocalDate, type: ActivityType, minutes: Int, rpe: Int? = null) = Activity(
+    private fun activity(date: LocalDate, type: ActivityType, minutes: Int, rpe: Int? = null, notes: String? = null) = Activity(
         "$date-$type", type, date.atTime(LocalTime.of(10, 0)).atZone(RytmTime.zone).toInstant(),
-        minutes, rpe, null, null, Source.MANUAL,
+        minutes, rpe, null, null, Source.MANUAL, notes,
     )
 
     private fun List<com.zacco.rytm.domain.model.PlannedDay>.on(day: DayOfWeek) = first { it.date.dayOfWeek == day }
@@ -113,13 +113,23 @@ class WeekPlannerTest {
     }
 
     @Test
-    fun `heavy renovation yesterday warns about back and shoulders`() {
+    fun `heavy other activity yesterday warns with its description`() {
         val saturday = novemberMonday.plusDays(5)
         val day = planner.planDay(
             saturday,
-            PlanningContext(today = saturday, activities = listOf(activity(saturday.minusDays(1), ActivityType.RENOVATION, 240))),
+            PlanningContext(today = saturday, activities = listOf(activity(saturday.minusDays(1), ActivityType.OTHER, 240, notes = "remont: noszenie płyt"))),
         )
-        assertTrue(day.warnings.any { "plec" in it })
+        assertTrue(day.warnings.any { "remont: noszenie płyt" in it })
+    }
+
+    @Test
+    fun `short other activity does not trigger the rule`() {
+        val saturday = novemberMonday.plusDays(5)
+        val day = planner.planDay(
+            saturday,
+            PlanningContext(today = saturday, activities = listOf(activity(saturday.minusDays(1), ActivityType.OTHER, 30, rpe = 4))),
+        )
+        assertTrue(day.warnings.isEmpty())
     }
 
     @Test
