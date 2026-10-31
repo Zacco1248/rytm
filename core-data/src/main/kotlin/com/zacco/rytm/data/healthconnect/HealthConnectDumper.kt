@@ -49,7 +49,7 @@ class HealthConnectDumper(private val client: HealthConnectClient) {
                 val list = readAll(type, from, to)
                 records[type] = list
                 list.groupBy { it.metadata.dataOrigin.packageName }.forEach { (origin, recs) ->
-                    val times = recs.map { it.startTime() }
+                    val times = recs.mapNotNull { it.startTime() }
                     counts += RecordCount(name, origin, recs.size, times.minOrNull(), times.maxOrNull())
                 }
             } catch (e: SecurityException) {
