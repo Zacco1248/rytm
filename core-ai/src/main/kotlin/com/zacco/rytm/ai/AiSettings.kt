@@ -1,6 +1,8 @@
 package com.zacco.rytm.ai
 
 import com.zacco.rytm.ai.evening.EveningReview
+import com.zacco.rytm.ai.morning.MorningNote
+import com.zacco.rytm.ai.weekly.WeeklyReport
 import kotlinx.serialization.Serializable
 
 /**
@@ -14,6 +16,10 @@ data class AiSettings(
     val eveningEnabled: Boolean = true,
     /** Pora wieczornej analizy, minuty od północy (domyślnie 21:30). */
     val eveningAtMin: Int = 21 * 60 + 30,
+    /** Raport tygodniowy w niedzielę o 20:00 (mocniejszy model, ok. 0,05 USD). */
+    val weeklyEnabled: Boolean = true,
+    /** Krótkie uzasadnienie planu po porannym check-inie (tani model). */
+    val morningEnabled: Boolean = true,
 ) {
     fun toLlmSettings(): LlmSettings = LlmSettings(provider = provider, monthlyBudgetUsd = monthlyBudgetUsd)
 }
@@ -30,4 +36,29 @@ data class SavedEveningReview(
     val error: String? = null,
     val createdAt: Long,
     val reflection: String? = null,
+)
+
+/** Zapisany raport tygodniowy; [weekEnd] to ostatni dzień tygodnia (zwykle niedziela). */
+@Serializable
+data class SavedWeeklyReport(
+    val weekEnd: String,
+    val report: WeeklyReport,
+    /** LLM albo RULES. */
+    val source: String,
+    val model: String? = null,
+    val costUsd: Double = 0.0,
+    val error: String? = null,
+    val createdAt: Long,
+)
+
+/** Zapisana poranna notka; [checkInKey] pozwala nie liczyć jej drugi raz dla tego samego check-inu. */
+@Serializable
+data class SavedMorningNote(
+    val date: String,
+    val note: MorningNote,
+    val source: String,
+    val checkInKey: String,
+    val costUsd: Double = 0.0,
+    val error: String? = null,
+    val createdAt: Long,
 )

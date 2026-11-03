@@ -28,6 +28,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.zacco.rytm.ai.SavedWeeklyReport
+import com.zacco.rytm.phone.ui.components.WhyBox
 import com.zacco.rytm.domain.coach.WeekDay
 import com.zacco.rytm.domain.coach.WeekSnapshot
 import com.zacco.rytm.domain.load.AcwrZone
@@ -49,15 +55,73 @@ import com.zacco.rytm.phone.ui.theme.RytmColors
 import java.time.LocalDate
 
 @Composable
-fun WeekScreen(state: CoachUiState, onToggleCancelled: (LocalDate) -> Unit, onRate: (WeekDay) -> Unit) {
+fun WeekScreen(
+    state: CoachUiState,
+    onToggleCancelled: (LocalDate) -> Unit,
+    weekly: SavedWeeklyReport? = null,
+    weeklyRunning: Boolean = false,
+    onRunWeekly: () -> Unit = {},
+    onRate: (WeekDay) -> Unit,
+) {
     val w = state.week
     ScreenHeader(sub = Format.range(w.monday, w.monday.plusDays(6)), title = "Tydzień") {
         Chip("${w.strengthDone} / ${w.strengthRequired} siła" + if (w.strengthDone >= w.strengthRequired) " ✓" else "",
             if (w.strengthDone >= w.strengthRequired) ChipTone.GOOD else ChipTone.MUTED)
     }
+    WeeklyReportCard(state.today.date, weekly, weeklyRunning, onRunWeekly)
     LoadCard(w)
     AcwrCard(w)
     PlanCard(state, onToggleCancelled, onRate)
+}
+
+// --- raport tygodniowy ---
+
+@Composable
+private fun WeeklyReportCard(today: LocalDate, saved: SavedWeeklyReport?, running: Boolean, onRun: () -> Unit) {
+    val c = Rytm.colors
+    // Raport sprzed ponad tygodnia jest już nieaktualny; zostaje tylko przycisk.
+    val fresh = saved?.takeIf { runCatching { LocalDate.parse(it.weekEnd) }.getOrNull()?.let { d -> !d.isBefore(today.minusDays(6)) } == true }
+    var expanded by remember(fresh?.createdAt) { mutableStateOf(today.dayOfWeek == java.time.DayOfWeek.SUNDAY || today.dayOfWeek == java.time.DayOfWeek.MONDAY) }
+    RytmCard {
+        CardHeader("Raport tygodnia") {
+            if (fresh != null) {
+                Chip(
+                    (if (fresh.source == "LLM") "AI" else "reguły") + " · " + Format.dayShortLabel(LocalDate.parse(fresh.weekEnd), today) + if (expanded) " ▴" else " ▾",
+                    if (fresh.source == "LLM") ChipTone.GOOD else ChipTone.MUTED,
+                ) { expanded = !expanded }
+            }
+        }
+        if (fresh == null) {
+            SmallText("Raport liczy się sam w niedzielę o 20:00: trendy, zależności (np. sen po meczach), sylwetka i 1–3 sugestie na kolejny tydzień.")
+        } else {
+            val r = fresh.report
+            Text(r.summary, style = Rytm.type.small, color = c.ink)
+            if (expanded) {
+                if (r.trends.isNotEmpty()) ReportList("Trendy", r.trends)
+                if (r.correlations.isNotEmpty()) ReportList("Zależności", r.correlations)
+                Text("Sylwetka i siła", style = Rytm.type.bodyStrong, color = c.ink)
+                SmallText(r.body)
+                Text("Na kolejny tydzień", style = Rytm.type.bodyStrong, color = c.ink)
+                r.suggestions.forEachIndexed { i, t -> WhyBox("${i + 1}. $t") }
+                fresh.error?.let { SmallText("AI niedostępne, raport z reguł: $it", color = c.warn) }
+                if (fresh.costUsd > 0) SmallText("Koszt: %.3f USD".format(java.util.Locale.ROOT, fresh.costUsd))
+            }
+        }
+        RytmButton(
+            if (running) "Liczę raport…" else if (fresh == null) "Zrób raport teraz" else "Przelicz raport",
+            Modifier.fillMaxWidth(),
+            enabled = !running,
+            onClick = onRun,
+        )
+    }
+}
+
+@Composable
+private fun ReportList(title: String, items: List<String>) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(title, style = Rytm.type.bodyStrong, color = Rytm.colors.ink)
+        items.forEach { SmallText("• $it") }
+    }
 }
 
 // --- obciążenie ---

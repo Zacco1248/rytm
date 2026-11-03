@@ -44,8 +44,11 @@ object WatchBridge {
     /** Wysyła stan dnia, jeśli zmienił się od ostatniej wysyłki. Bez sparowanego zegarka po prostu nic nie robi. */
     suspend fun publish(context: Context, data: CoachData? = null) {
         val d = data ?: RytmData.get(context).coach.observe(LocalDate.now(RytmTime.zone)).first()
-        val evening = RytmData.get(context).ai.reviewFor(d.today)?.review?.tomorrow
-        val snapshot = snapshotOf(d, CoachEngine().today(d), System.currentTimeMillis()).copy(evening = evening)
+        val ai = RytmData.get(context).ai
+        val evening = ai.reviewFor(d.today)?.review?.tomorrow
+        val base = snapshotOf(d, CoachEngine().today(d), System.currentTimeMillis())
+        val morning = ai.morningFor(d.today)?.note?.why
+        val snapshot = base.copy(evening = evening, planWhy = morning ?: base.planWhy)
         val hash = WatchCodec.encode(snapshot.copy(generatedAt = 0)).contentHashCode()
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (prefs.getInt(KEY_LAST, 0) == hash) return
@@ -80,6 +83,9 @@ object WatchBridge {
                         hrvRmssd = event.hrvRmssd ?: existing?.hrvRmssd,
                     ),
                 )
+                // Poranne uzasadnienie planu; błąd AI nie może zablokować zapisu check-inu.
+                runCatching { RytmData.get(context).ai.morning(date) }
+                    .onFailure { Log.w(TAG, "Poranna notka nieudana", it) }
             }
             is WatchEvent.Rpe -> repo.setRpe(event.activityId, event.rpe.coerceIn(1, 10))
             is WatchEvent.OtherActivity -> {

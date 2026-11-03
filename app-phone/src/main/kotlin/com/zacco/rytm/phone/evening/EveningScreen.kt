@@ -179,6 +179,15 @@ private fun AiSettingsCard(
                     onSaveSettings(st.copy(eveningEnabled = !st.eveningEnabled))
                 }
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip("Rano: " + if (st.morningEnabled) "AI" else "reguły", if (st.morningEnabled) ChipTone.GOOD else ChipTone.MUTED) {
+                    onSaveSettings(st.copy(morningEnabled = !st.morningEnabled))
+                }
+                Chip("Raport niedz. 20:00: " + if (st.weeklyEnabled) "tak" else "nie", if (st.weeklyEnabled) ChipTone.GOOD else ChipTone.MUTED) {
+                    onSaveSettings(st.copy(weeklyEnabled = !st.weeklyEnabled))
+                }
+            }
+            SmallText("Rano po check-inie AI tłumaczy plan dnia (tani model). Raport tygodniowy liczy mocniejszy model, ok. 0,05 USD.")
             RytmButton("Zapisz limit", Modifier.fillMaxWidth()) {
                 budget.replace(',', '.').toDoubleOrNull()?.let { onSaveSettings(st.copy(monthlyBudgetUsd = it)) }
             }
