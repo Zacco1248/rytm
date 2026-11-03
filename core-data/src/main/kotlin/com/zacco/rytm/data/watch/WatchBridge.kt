@@ -10,7 +10,12 @@ import com.zacco.rytm.domain.habits.HabitKind
 import com.zacco.rytm.domain.model.ActivityType
 import com.zacco.rytm.domain.model.BodyArea
 import com.zacco.rytm.domain.model.DailyCheckIn
+import com.zacco.rytm.domain.model.DayKind
 import com.zacco.rytm.domain.model.LoadedArea
+import com.zacco.rytm.domain.model.PlannedDay
+import com.zacco.rytm.domain.model.Source
+import com.zacco.rytm.domain.workout.SetLog
+import com.zacco.rytm.domain.workout.WorkoutLog
 import com.zacco.rytm.domain.time.RytmTime
 import com.zacco.rytm.sync.DataLayer
 import com.zacco.rytm.sync.WatchActivity
@@ -18,6 +23,8 @@ import com.zacco.rytm.sync.WatchCodec
 import com.zacco.rytm.sync.WatchEvent
 import com.zacco.rytm.sync.WatchHabit
 import com.zacco.rytm.sync.WatchSnapshot
+import com.zacco.rytm.sync.WatchExercise
+import com.zacco.rytm.sync.WatchWorkout
 import kotlinx.coroutines.flow.first
 import java.time.Duration
 import java.time.Instant
@@ -85,7 +92,45 @@ object WatchBridge {
                     loadedAreas = event.areas.mapNotNull { name -> LoadedArea.entries.firstOrNull { it.name == name } }.toSet(),
                 )
             }
+            is WatchEvent.WorkoutDone -> repo.saveWorkout(workoutLogOf(event))
         }
+    }
+
+    fun workoutLogOf(e: WatchEvent.WorkoutDone): WorkoutLog {
+        val start = Instant.ofEpochMilli(e.startedAt)
+        val day = start.atZone(RytmTime.zone).toLocalDate()
+        return WorkoutLog(
+            id = e.id,
+            title = e.title,
+            type = ActivityType.entries.firstOrNull { it.name == e.type } ?: ActivityType.STRENGTH,
+            start = start,
+            end = Instant.ofEpochMilli(maxOf(e.endedAt, e.startedAt + 60_000)),
+            sets = e.sets.filter { it.reps > 0 }.map { SetLog(e.id, it.exercise, it.setIndex, it.reps, it.weightKg, it.rir, day) },
+            rpe = e.rpe?.coerceIn(1, 10),
+            avgHr = e.avgHr,
+            kcal = e.kcal,
+            source = Source.WATCH_APP,
+        )
+    }
+
+    /** Typ aktywności, pod jakim zapisze się sesja z planu. */
+    fun workoutType(day: PlannedDay): ActivityType = when (day.kind) {
+        DayKind.STRENGTH -> ActivityType.STRENGTH
+        DayKind.FLEX -> ActivityType.CARDIO
+        else -> ActivityType.MOBILITY
+    }
+
+    private fun watchWorkout(data: CoachData, today: TodaySnapshot): WatchWorkout? {
+        val w = today.plan.workout ?: return null
+        return WatchWorkout(
+            title = w.name,
+            type = workoutType(today.plan).name,
+            exercises = w.exercises.map {
+                WatchExercise(it.name, it.sets, it.reps.first, it.reps.last, it.weightKg, it.tempo, it.restSec, it.note)
+            },
+            stepKg = data.profile.equipment.stepKg,
+            doneToday = today.setsToday.isNotEmpty(),
+        )
     }
 
     fun snapshotOf(data: CoachData, today: TodaySnapshot, now: Long): WatchSnapshot {
@@ -117,6 +162,7 @@ object WatchBridge {
             toRate = toRate,
             checkInDone = today.checkIn != null,
             generatedAt = now,
+            workout = watchWorkout(data, today),
         )
     }
 

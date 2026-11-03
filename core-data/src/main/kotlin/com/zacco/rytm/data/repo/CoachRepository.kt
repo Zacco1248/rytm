@@ -6,6 +6,7 @@ import com.zacco.rytm.data.db.DayNoteEntity
 import com.zacco.rytm.data.db.HabitLogEntity
 import com.zacco.rytm.data.db.NutritionDayEntity
 import com.zacco.rytm.data.db.WeighInEntity
+import com.zacco.rytm.data.db.WorkoutSetEntity
 import com.zacco.rytm.data.db.RytmDatabase
 import com.zacco.rytm.data.db.originForDedup
 import com.zacco.rytm.data.db.toDomain
@@ -21,6 +22,8 @@ import com.zacco.rytm.domain.model.LoadedArea
 import com.zacco.rytm.domain.model.Source
 import com.zacco.rytm.domain.profile.PersonalProfile
 import com.zacco.rytm.domain.time.RytmTime
+import com.zacco.rytm.domain.workout.SetLog
+import com.zacco.rytm.domain.workout.WorkoutLog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.time.Instant
@@ -43,6 +46,7 @@ class CoachRepository(private val db: RytmDatabase, private val profiles: Profil
         val cancelled = db.cancellations().observe(from, to)
         val lastSync = db.syncState().observe(HealthConnectSync.KEY_LAST_SYNC)
         val dayNotes = db.dayNotes().observe(from, to)
+        val sets = db.workoutSets().observe(today.minusDays(SETS_LOOKBACK_DAYS), today)
 
         val part1 = combine(activities, metrics, checkIns, nutrition) { a, m, c, n ->
             CoachData(
@@ -61,13 +65,14 @@ class CoachRepository(private val db: RytmDatabase, private val profiles: Profil
                 lastSync = sync?.toLongOrNull()?.let(Instant::ofEpochMilli),
             )
         }
-        return combine(part2, dayNotes, profiles.profile) { base, notes, profile ->
+        return combine(part2, dayNotes, profiles.profile, sets) { base, notes, profile, s ->
             // Bez profilu (przed kreatorem) silnik liczy na wartościach domyślnych; ekran i tak pokazuje kreator.
             val p = profile ?: PersonalProfile()
             base.copy(
                 dayNotes = notes.map { it.toDomain() },
                 profile = p.toUserProfile(today),
                 habits = p.habits(),
+                sets = s.map { SetLog(it.workoutId, it.exercise, it.setIndex, it.reps, it.weightKg, it.rir, it.date) },
             )
         }
     }
@@ -150,7 +155,28 @@ class CoachRepository(private val db: RytmDatabase, private val profiles: Profil
         return id
     }
 
+    /**
+     * Zapisuje trening z dziennikiem serii (z zegarka albo z telefonu). Ten sam id nadpisuje poprzedni zapis,
+     * a RPE wpisane później ręcznie zostaje.
+     */
+    suspend fun saveWorkout(log: WorkoutLog) {
+        val old = db.activities().get(log.id)
+        val activity = log.toActivity().let { a -> a.copy(rpe = a.rpe ?: old?.rpe) }
+        db.activities().upsert(activity.toEntity(origin = OWN_ORIGIN, title = log.title))
+        db.workoutSets().replace(
+            log.id,
+            log.sets.map { WorkoutSetEntity(log.id, it.exercise, it.setIndex, it.reps, it.weightKg, it.rir, it.date) },
+        )
+    }
+
+    suspend fun deleteWorkout(id: String) {
+        db.workoutSets().deleteFor(id)
+        db.activities().delete(id)
+    }
+
     private companion object {
+        const val OWN_ORIGIN = "com.zacco.rytm"
+        const val SETS_LOOKBACK_DAYS = 120L
         const val LOOKBACK_DAYS = 42L
     }
 }

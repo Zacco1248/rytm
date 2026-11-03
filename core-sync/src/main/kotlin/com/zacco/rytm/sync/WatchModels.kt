@@ -26,6 +26,41 @@ data class WatchSnapshot(
     val toRate: List<WatchActivity>,
     val checkInDone: Boolean,
     val generatedAt: Long,
+    /** Dzisiejsza sesja z ćwiczeniami i ciężarem z progresji; null w dni bez treningu do zrobienia. */
+    val workout: WatchWorkout? = null,
+)
+
+@Serializable
+data class WatchWorkout(
+    val title: String,
+    /** Nazwa ActivityType: STRENGTH, MOBILITY, CARDIO. */
+    val type: String,
+    val exercises: List<WatchExercise>,
+    /** Skok ciężaru przy zmianie na zegarku. */
+    val stepKg: Double = 1.0,
+    /** Dziś już zapisano serie tego dnia. */
+    val doneToday: Boolean = false,
+)
+
+@Serializable
+data class WatchExercise(
+    val name: String,
+    val sets: Int,
+    val repsMin: Int,
+    val repsMax: Int,
+    val weightKg: Double? = null,
+    val tempo: String? = null,
+    val restSec: Int = 60,
+    val note: String? = null,
+)
+
+@Serializable
+data class WatchSet(
+    val exercise: String,
+    val setIndex: Int,
+    val reps: Int,
+    val weightKg: Double? = null,
+    val rir: Int? = null,
 )
 
 @Serializable
@@ -76,6 +111,22 @@ sealed interface WatchEvent {
         val areas: List<String>,
         /** Koniec aktywności (epoch ms); domyślnie chwila wysłania. */
         val endedAt: Long,
+    ) : WatchEvent
+
+    @Serializable
+    @SerialName("workout")
+    data class WorkoutDone(
+        override val date: String,
+        /** Stały id treningu: ponowne wysłanie nadpisuje zamiast dublować. */
+        val id: String,
+        val title: String,
+        val type: String,
+        val startedAt: Long,
+        val endedAt: Long,
+        val rpe: Int? = null,
+        val avgHr: Int? = null,
+        val kcal: Int? = null,
+        val sets: List<WatchSet> = emptyList(),
     ) : WatchEvent
 }
 

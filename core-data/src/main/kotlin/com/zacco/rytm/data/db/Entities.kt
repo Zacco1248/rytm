@@ -100,6 +100,21 @@ data class DayNoteEntity(
     val updatedAt: Instant,
 )
 
+/**
+ * Seria z dziennika treningu (wersja 3). Sam trening to [ActivityEntity] o tym samym id (źródło WATCH_APP albo MANUAL),
+ * więc liczy się do obciążenia i kcal jak każda aktywność.
+ */
+@Entity(tableName = "workout_set", primaryKeys = ["workoutId", "exercise", "setIndex"], indices = [Index("date")])
+data class WorkoutSetEntity(
+    val workoutId: String,
+    val exercise: String,
+    val setIndex: Int,
+    val reps: Int,
+    val weightKg: Double?,
+    val rir: Int?,
+    val date: LocalDate,
+)
+
 /** „Mecz odwołany” / „Personalny odwołany” na dany dzień. */
 @Entity(tableName = "cancellation")
 data class CancellationEntity(

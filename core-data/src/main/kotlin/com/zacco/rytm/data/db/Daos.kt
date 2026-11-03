@@ -150,3 +150,25 @@ interface SyncStateDao {
     @Query("DELETE FROM sync_state WHERE `key` = :key")
     suspend fun delete(key: String)
 }
+
+@Dao
+abstract class WorkoutSetDao {
+    @Query("SELECT * FROM workout_set WHERE date BETWEEN :from AND :to ORDER BY date, workoutId, exercise, setIndex")
+    abstract fun observe(from: LocalDate, to: LocalDate): Flow<List<WorkoutSetEntity>>
+
+    @Query("SELECT * FROM workout_set WHERE workoutId = :workoutId ORDER BY setIndex")
+    abstract suspend fun forWorkout(workoutId: String): List<WorkoutSetEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insert(sets: List<WorkoutSetEntity>)
+
+    @Query("DELETE FROM workout_set WHERE workoutId = :workoutId")
+    abstract suspend fun deleteFor(workoutId: String)
+
+    /** Ponowne wysłanie tego samego treningu z zegarka nadpisuje serie zamiast je dublować. */
+    @Transaction
+    open suspend fun replace(workoutId: String, sets: List<WorkoutSetEntity>) {
+        deleteFor(workoutId)
+        insert(sets)
+    }
+}

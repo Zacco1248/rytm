@@ -87,6 +87,7 @@ object WatchStore {
         is WatchEvent.CheckIn -> s.copy(checkInDone = true)
         is WatchEvent.Rpe -> s.copy(toRate = s.toRate.filterNot { it.id == e.activityId })
         is WatchEvent.OtherActivity -> s
+        is WatchEvent.WorkoutDone -> s.copy(workout = s.workout?.copy(doneToday = true))
     }
 
     private fun load(context: Context) {
