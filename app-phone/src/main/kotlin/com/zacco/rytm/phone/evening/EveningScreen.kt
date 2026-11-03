@@ -5,6 +5,8 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
@@ -28,6 +30,8 @@ import com.zacco.rytm.phone.app.Format
 import com.zacco.rytm.phone.ui.components.CardHeader
 import com.zacco.rytm.phone.ui.components.Chip
 import com.zacco.rytm.phone.ui.components.ChipTone
+import com.zacco.rytm.phone.ui.components.Pill
+import com.zacco.rytm.domain.coach.NudgeKind
 import com.zacco.rytm.phone.ui.components.RytmButton
 import com.zacco.rytm.phone.ui.components.RytmCard
 import com.zacco.rytm.phone.ui.components.ScreenHeader
@@ -66,7 +70,40 @@ fun EveningScreen(
         }
     }
     ReviewCard(ai, onRun)
+    NudgesCard(ai.settings, onSaveSettings)
     AiSettingsCard(ai, onSaveSettings, onSaveKey, onClearKey)
+}
+
+/** Podpowiedzi w ciągu dnia: włącznik całości i każdego rodzaju. Z reguł, więc bez klucza AI i bez kosztu. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun NudgesCard(st: AiSettings, onSave: (AiSettings) -> Unit) {
+    val notify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    RytmCard {
+        CardHeader(
+            "Podpowiedzi w ciągu dnia",
+            help = "Krótkie powiadomienia, gdy coś warto zmienić dziś: po krótkiej nocy, gdy trening z planu jeszcze czeka, " +
+                "po 3 dniach bez ruchu albo gdy wieczorem brakuje białka. Najwyżej 2 dziennie, nic między 22 a 7. " +
+                "Liczone z reguł na telefonie, bez AI i bez kosztu.",
+        ) {
+            Chip(if (st.nudgesEnabled) "włączone" else "wyłączone", if (st.nudgesEnabled) ChipTone.GOOD else ChipTone.MUTED) {
+                if (!st.nudgesEnabled && Build.VERSION.SDK_INT >= 33) notify.launch(Manifest.permission.POST_NOTIFICATIONS)
+                onSave(st.copy(nudgesEnabled = !st.nudgesEnabled))
+            }
+        }
+        if (st.nudgesEnabled) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                NudgeKind.entries.forEach { k ->
+                    val on = k.name !in st.nudgesOff
+                    Pill(k.label, on) {
+                        if (Build.VERSION.SDK_INT >= 33) notify.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        onSave(st.copy(nudgesOff = if (on) st.nudgesOff + k.name else st.nudgesOff - k.name))
+                    }
+                }
+            }
+            SmallText(NudgeKind.entries.filter { it.name !in st.nudgesOff }.joinToString("; ") { "${it.label}: ${it.hint}" }.ifEmpty { "Wszystkie rodzaje wyłączone." })
+        }
+    }
 }
 
 @Composable

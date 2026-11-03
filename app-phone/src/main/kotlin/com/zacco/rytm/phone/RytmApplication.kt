@@ -32,6 +32,7 @@ class RytmApplication : Application() {
         EveningWorker.schedule(this)
         WeeklyWorker.schedule(this)
         MonthlyWorker.schedule(this)
+        com.zacco.rytm.data.nudge.NudgeWorker.schedule(this)
 
         // Póki proces żyje, każda zmiana danych (wpis, synchronizacja) od razu trafia na zegarek.
         val data = RytmData.get(this)

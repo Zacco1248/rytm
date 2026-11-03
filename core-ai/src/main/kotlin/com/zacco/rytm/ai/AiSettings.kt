@@ -23,6 +23,10 @@ data class AiSettings(
     val morningEnabled: Boolean = true,
     /** Analiza długoterminowa 1. dnia miesiąca o 19:00 (najmocniejszy model, ok. 0,3 USD). */
     val monthlyEnabled: Boolean = true,
+    /** Krótkie podpowiedzi w ciągu dnia z reguł (bez AI i bez kosztu), najwyżej 2 dziennie. */
+    val nudgesEnabled: Boolean = true,
+    /** Wyłączone rodzaje podpowiedzi (nazwy NudgeKind). */
+    val nudgesOff: List<String> = emptyList(),
 ) {
     fun toLlmSettings(): LlmSettings = LlmSettings(provider = provider, monthlyBudgetUsd = monthlyBudgetUsd)
 }
