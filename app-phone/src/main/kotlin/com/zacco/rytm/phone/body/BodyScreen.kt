@@ -29,6 +29,7 @@ import com.zacco.rytm.ai.SavedMonthlyReport
 import com.zacco.rytm.domain.coach.BodySnapshot
 import com.zacco.rytm.domain.coach.Macro
 import com.zacco.rytm.domain.coach.WeightPace
+import com.zacco.rytm.domain.profile.Goal
 import com.zacco.rytm.domain.nutrition.NutritionSuggestion
 import com.zacco.rytm.phone.app.Format
 import com.zacco.rytm.phone.ui.components.CardHeader
@@ -54,16 +55,18 @@ fun BodyScreen(
     val (paceLabel, paceTone) = when (b.pace) {
         WeightPace.UNKNOWN -> "za mało ważeń" to ChipTone.MUTED
         WeightPace.OK -> "Tempo OK" to ChipTone.GOOD
-        WeightPace.TOO_FAST -> "Za szybko w dół" to ChipTone.WARN
+        WeightPace.TOO_FAST -> (if (b.goal == Goal.MUSCLE_GAIN) "Waga spada" else "Za szybko w dół") to ChipTone.WARN
         WeightPace.GAINING -> "Waga rośnie" to ChipTone.WARN
+        WeightPace.STALLED -> "Waga stoi" to ChipTone.WARN
+        WeightPace.TOO_FAST_UP -> "Za szybko w górę" to ChipTone.WARN
     }
-    ScreenHeader(sub = "Rekompozycja · ostatnie 4 tygodnie", title = "Sylwetka") { Chip(paceLabel, paceTone) }
+    ScreenHeader(sub = Format.goal(b.goal) + " · ostatnie 4 tygodnie", title = "Sylwetka") { Chip(paceLabel, paceTone) }
     WeightCard(b, onAddWeighIn)
     MacroCard(b)
     RytmCard {
         CardHeader("Siła")
         if (b.strength.isEmpty()) {
-            SmallText("Zapisz pierwszy trening (na zegarku albo „Zapisz trening” w planie na dziś). Rytm dobierze z tego ciężar na kolejny raz i oceni, czy rekompozycja idzie dobrze: waga stoi albo lekko spada, a powtórzenia rosną.")
+            SmallText("Zapisz pierwszy trening (na zegarku albo „Zapisz trening” w planie na dziś). Rytm dobierze z tego ciężar na kolejny raz" + strengthHint(b.goal) + ".")
         } else {
             b.strength.forEach { e ->
                 Column {
@@ -220,4 +223,13 @@ private fun macroLabel(m: Macro) = when (m) {
     Macro.PROTEIN -> "Białko"
     Macro.FAT -> "Tłuszcz"
     Macro.CARBS -> "Węgle"
+}
+
+/** Czego szukamy w dzienniku siły przy danym celu (dopisek do pustej karty „Siła”). */
+private fun strengthHint(g: Goal): String = when (g) {
+    Goal.RECOMP -> " i oceni, czy rekompozycja idzie dobrze: waga stoi albo lekko spada, a powtórzenia rosną"
+    Goal.FAT_LOSS -> " i sprawdzi, czy przy spadku wagi utrzymujesz siłę"
+    Goal.MUSCLE_GAIN -> " i sprawdzi, czy razem z wagą rosną ciężary"
+    Goal.STRENGTH -> " i pokaże, jak rosną ciężary"
+    Goal.ENDURANCE, Goal.HEALTH -> " i pokaże, jak rośnie forma"
 }
