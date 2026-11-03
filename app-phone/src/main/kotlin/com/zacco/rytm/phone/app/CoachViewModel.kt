@@ -5,6 +5,10 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.zacco.rytm.data.RytmData
+import com.zacco.rytm.ai.AiSettings
+import com.zacco.rytm.ai.LlmProvider
+import com.zacco.rytm.ai.SavedEveningReview
+import com.zacco.rytm.data.ai.EveningWorker
 import com.zacco.rytm.data.healthconnect.HealthConnectPermissions
 import com.zacco.rytm.data.sync.HealthConnectSync
 import com.zacco.rytm.data.sync.SyncWorker
@@ -102,8 +106,47 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    // --- asystent AI (faza 4) ---
+    val aiSettings: StateFlow<AiSettings> = data.ai.settings
+    val aiHasKey: StateFlow<Boolean> = data.ai.hasKey
+    val aiReviews: StateFlow<List<SavedEveningReview>> = data.ai.reviews
+    private val _aiRunning = MutableStateFlow(false)
+    val aiRunning: StateFlow<Boolean> = _aiRunning.asStateFlow()
+    private val _aiSpent = MutableStateFlow<Double?>(null)
+    val aiSpent: StateFlow<Double?> = _aiSpent.asStateFlow()
+
+    fun refreshAiSpent() {
+        viewModelScope.launch { _aiSpent.value = runCatching { data.ai.spentThisMonth() }.getOrNull() }
+    }
+
+    fun saveAiSettings(s: AiSettings) {
+        data.ai.saveSettings(s)
+        EveningWorker.schedule(getApplication(), replace = true)
+    }
+
+    fun saveAiKey(provider: LlmProvider, key: String) = data.ai.saveKey(provider, key)
+
+    fun clearAiKey(provider: LlmProvider) = data.ai.clearKey(provider)
+
+    /** Analiza dnia na żądanie (np. po wpisaniu refleksji). */
+    fun runEvening(reflection: String?) {
+        if (_aiRunning.value) return
+        _aiRunning.value = true
+        viewModelScope.launch {
+            try {
+                data.ai.evening(LocalDate.now(RytmTime.zone), reflection, force = true)
+                WatchBridge.publish(getApplication())
+            } finally {
+                _aiRunning.value = false
+                refreshAiSpent()
+            }
+        }
+    }
+
     init {
         viewModelScope.launch { data.profiles.ensureLoaded() }
+        EveningWorker.schedule(app)
+        refreshAiSpent()
         SyncWorker.schedulePeriodic(app)
         refreshHealthConnect()
     }

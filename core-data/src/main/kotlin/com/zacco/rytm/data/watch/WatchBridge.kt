@@ -44,7 +44,8 @@ object WatchBridge {
     /** Wysyła stan dnia, jeśli zmienił się od ostatniej wysyłki. Bez sparowanego zegarka po prostu nic nie robi. */
     suspend fun publish(context: Context, data: CoachData? = null) {
         val d = data ?: RytmData.get(context).coach.observe(LocalDate.now(RytmTime.zone)).first()
-        val snapshot = snapshotOf(d, CoachEngine().today(d), System.currentTimeMillis())
+        val evening = RytmData.get(context).ai.reviewFor(d.today)?.review?.tomorrow
+        val snapshot = snapshotOf(d, CoachEngine().today(d), System.currentTimeMillis()).copy(evening = evening)
         val hash = WatchCodec.encode(snapshot.copy(generatedAt = 0)).contentHashCode()
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (prefs.getInt(KEY_LAST, 0) == hash) return

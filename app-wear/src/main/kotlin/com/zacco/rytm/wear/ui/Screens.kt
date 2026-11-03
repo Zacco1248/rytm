@@ -45,6 +45,7 @@ fun HomeScreen(
             Title(s.planTitle)
             Body(Labels.intensity(s.planIntensity) + " · sen do ${s.bedtime}")
             s.planWarning?.let { Body(it) }
+            if (!WatchStore.isStale(s)) s.evening?.let { Label("Wieczorem: $it") }
             if (stale) Label("Dane z ${s.date}. Otwórz Rytm na telefonie.")
             Spacer(Modifier.height(4.dp))
             if (!stale) {

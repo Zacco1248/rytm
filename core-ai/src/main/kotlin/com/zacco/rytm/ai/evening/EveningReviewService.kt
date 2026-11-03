@@ -7,7 +7,13 @@ import com.zacco.rytm.ai.ModelTier
 import com.zacco.rytm.ai.cost.CostGuard
 import kotlinx.serialization.json.Json
 
-data class EveningResult(val review: EveningReview, val source: Source, val costUsd: Double = 0.0, val error: String? = null) {
+data class EveningResult(
+    val review: EveningReview,
+    val source: Source,
+    val costUsd: Double = 0.0,
+    val error: String? = null,
+    val model: String? = null,
+) {
     enum class Source { LLM, RULES }
 }
 
@@ -42,7 +48,7 @@ class EveningReviewService(
                 throw LlmException.InvalidOutput("Niepoprawny JSON z LLM: ${e.message}", e)
             }
             // Pora snu zawsze z reguł, nawet gdy model ją zmienił.
-            EveningResult(parsed.copy(bedtime = input.suggestedBedtime), EveningResult.Source.LLM, cost)
+            EveningResult(parsed.copy(bedtime = input.suggestedBedtime), EveningResult.Source.LLM, cost, model = response.model)
         } catch (e: LlmException) {
             EveningResult(fallback, EveningResult.Source.RULES, error = e.message)
         }

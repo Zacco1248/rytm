@@ -42,6 +42,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zacco.rytm.phone.body.BodyScreen
 import com.zacco.rytm.phone.diagnostics.DiagnosticsScreen
+import com.zacco.rytm.phone.evening.AiUi
+import com.zacco.rytm.phone.evening.EveningScreen
 import com.zacco.rytm.phone.profile.ProfileScreen
 import com.zacco.rytm.phone.today.AlcoholSheet
 import com.zacco.rytm.phone.today.CheckInSheet
@@ -57,7 +59,6 @@ import com.zacco.rytm.phone.ui.components.RytmCard
 import com.zacco.rytm.phone.ui.components.RytmIcons
 import com.zacco.rytm.phone.ui.components.ScreenHeader
 import com.zacco.rytm.phone.ui.components.SmallText
-import com.zacco.rytm.phone.ui.components.WhyBox
 import com.zacco.rytm.phone.ui.theme.Rytm
 import com.zacco.rytm.phone.week.WeekScreen
 import java.time.format.DateTimeFormatter
@@ -86,6 +87,11 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     val sync by vm.sync.collectAsStateWithLifecycle()
     val profile by vm.profile.collectAsStateWithLifecycle()
     val profileReady by vm.profileReady.collectAsStateWithLifecycle()
+    val aiSettings by vm.aiSettings.collectAsStateWithLifecycle()
+    val aiHasKey by vm.aiHasKey.collectAsStateWithLifecycle()
+    val aiReviews by vm.aiReviews.collectAsStateWithLifecycle()
+    val aiRunning by vm.aiRunning.collectAsStateWithLifecycle()
+    val aiSpent by vm.aiSpent.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
         vm.refreshHealthConnect()
@@ -172,7 +178,20 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                     }
                     Tab.BODY -> BodyScreen(s.body, s.today.nutritionTargets.kcal - s.today.trainingKcal) { sheet = Sheet.WEIGH_IN }
                     Tab.HABITS -> HabitsTab(s, onToggle = { vm.toggleHabit(it.habit, it.done) })
-                    Tab.EVENING -> EveningTab(s)
+                    Tab.EVENING -> EveningScreen(
+                        s = s,
+                        ai = AiUi(
+                            settings = aiSettings,
+                            hasKey = aiHasKey,
+                            review = aiReviews.firstOrNull { it.date == s.today.date.toString() },
+                            running = aiRunning,
+                            spentUsd = aiSpent,
+                        ),
+                        onRun = vm::runEvening,
+                        onSaveSettings = vm::saveAiSettings,
+                        onSaveKey = vm::saveAiKey,
+                        onClearKey = vm::clearAiKey,
+                    )
                 }
             }
         }
@@ -257,20 +276,3 @@ private fun HabitsTab(s: CoachUiState, onToggle: (com.zacco.rytm.domain.coach.Ha
     SmallText("Dodawanie własnych nawyków i kafelek na zegarku: faza 2.")
 }
 
-@Composable
-private fun EveningTab(s: CoachUiState) {
-    val t = s.today
-    ScreenHeader(sub = Format.dayLong(t.date), title = "Wieczór")
-    RytmCard {
-        CardHeader("Pora snu")
-        Text(t.bedtime.format(DateTimeFormatter.ofPattern("HH:mm")), style = Rytm.type.bigNumber, color = Rytm.colors.ink)
-        SmallText("Jutro: ${t.tomorrow.title.lowercase()} (${Format.intensity(t.tomorrow.intensity).lowercase()}).")
-        if (t.bedtime != com.zacco.rytm.domain.profile.SleepTarget().onsetFrom) {
-            WhyBox("Pół godziny wcześniej niż zwykle: niska gotowość, ciężki dzień albo mocny trening jutro.")
-        }
-    }
-    RytmCard {
-        CardHeader("Przegląd dnia")
-        SmallText("Wieczorna analiza AI (Haiku 5.5) pojawi się w fazie 4. Do tego czasu plan i porę snu ustala silnik reguł.")
-    }
-}
