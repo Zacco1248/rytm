@@ -29,6 +29,13 @@ data class PlannerConfig(
     val heavyOtherActivityLoad: Int = 400,
     /** Gotowość poniżej tej wartości: zamiast treningu pełny odpoczynek. */
     val restBelowReadiness: Int = 35,
+    /** Wybrane rodzaje cardio, w kolejności (bieg, rower…); sesje rotują po nich. */
+    val cardioKinds: List<CardioKind> = emptyList(),
+    /** Ile sesji cardio z Rytmem w tygodniu (poza siłą). */
+    val cardioPerWeek: Int = 0,
+    val cardioMinutes: Int = 45,
+    /** Bieg i marsz na bieżni. */
+    val treadmill: Boolean = false,
 ) {
     fun hasPersonalTraining(date: LocalDate): Boolean =
         personalTrainingDay != null && date.dayOfWeek == personalTrainingDay &&
@@ -45,6 +52,27 @@ data class PlannerConfig(
         }.take(strengthPerWeek)
         val ordered = picked.sortedBy { it.value }
         return ordered.zip(focusesFor(ordered.size)).toMap()
+    }
+
+    /**
+     * Dni cardio w tygodniu: kolejne dni treningowe z listy po wybraniu siły, a gdy ich brakuje, wolne dni
+     * (najpierw weekend). Bez stałych sportów, treningu personalnego, dnia odpoczynku i dni dzień w dzień, gdy się da.
+     */
+    fun cardioPlan(anyDayOfWeek: LocalDate): Map<DayOfWeek, CardioSession> {
+        if (cardioPerWeek <= 0 || cardioKinds.isEmpty()) return emptyMap()
+        val monday = anyDayOfWeek.with(DayOfWeek.MONDAY)
+        val strength = strengthPlan(anyDayOfWeek).keys
+        fun free(d: DayOfWeek) = d !in fixedSports && d !in strength && d != restDay &&
+            !hasPersonalTraining(monday.plusDays((d.value - 1).toLong()))
+        val preferred = strengthDays.filter(::free)
+        val others = listOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY, DayOfWeek.WEDNESDAY, DayOfWeek.MONDAY, DayOfWeek.FRIDAY, DayOfWeek.TUESDAY, DayOfWeek.THURSDAY)
+            .filter { free(it) && it !in preferred }
+        val picked = (preferred + others).take(cardioPerWeek).sortedBy { it.value }
+        // Dłuższa sesja wypada na ostatni wybrany dzień (zwykle weekend).
+        val types = CardioLibrary.typesFor(picked.size)
+        return picked.mapIndexed { i, d ->
+            d to CardioLibrary.session(cardioKinds[i % cardioKinds.size], types[i], cardioMinutes, treadmill)
+        }.toMap()
     }
 
     companion object {

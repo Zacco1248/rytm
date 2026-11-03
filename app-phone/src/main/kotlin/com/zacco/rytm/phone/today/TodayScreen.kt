@@ -218,6 +218,12 @@ private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit, onLogWorkout: () ->
             RytmButton(if (s.setsToday.isEmpty()) "Zapisz trening" else "Zapisz kolejny trening", Modifier.fillMaxWidth(), onClick = onLogWorkout)
             SmallText("Na zegarku: „Zacznij trening” prowadzi seria po serii z przerwą i tętnem.")
         }
+        p.cardio?.let { cs ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                cs.steps.forEachIndexed { i, step -> SmallText("${i + 1}. $step", color = Rytm.colors.ink) }
+            }
+            SmallText("Tętno i kcal przyjdą z zegarka albo opaski przez Health Connect. Bez nich dodaj sesję przyciskiem „+”.")
+        }
         p.warnings.forEach { SmallText("⚠ $it", color = Rytm.colors.warn) }
         if (p.rationale.isNotEmpty()) WhyBox(p.rationale.joinToString(" "))
         SmallText("Jutro: ${s.tomorrow.title.lowercase()}. Pora snu dziś: ${s.bedtime.format(hhmm)}.")

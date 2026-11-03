@@ -118,6 +118,7 @@ object WatchBridge {
     fun workoutType(day: PlannedDay): ActivityType = when (day.kind) {
         DayKind.STRENGTH -> ActivityType.STRENGTH
         DayKind.FLEX -> ActivityType.CARDIO
+        DayKind.CARDIO -> if (day.cardio?.kind == com.zacco.rytm.domain.planner.CardioKind.WALK) ActivityType.WALK else ActivityType.CARDIO
         else -> ActivityType.MOBILITY
     }
 

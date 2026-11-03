@@ -66,6 +66,7 @@ class WeekPlanner(
                 PlannedDay(date, DayKind.PERSONAL_TRAINING, "Trening personalny", Intensity.HIGH, rationale = listOf("Grupowy trening personalny."))
         }
         config.strengthPlan(date)[date.dayOfWeek]?.let { return strength(date, it) }
+        config.cardioPlan(date)[date.dayOfWeek]?.let { return cardio(date, it) }
         if (date.dayOfWeek == config.restDay) return rest(date, "Odpoczynek: mobilność 20–30 min i spacer", "Dzień regeneracji.")
         return if (date.dayOfWeek == DayOfWeek.SATURDAY || date.dayOfWeek == DayOfWeek.SUNDAY) {
             PlannedDay(date, DayKind.FLEX, "Dowolna aktywność", Intensity.MODERATE, rationale = listOf("Dzień elastyczny."))
@@ -136,6 +137,11 @@ class WeekPlanner(
                 .withRationale("Jutro ${tomorrow.title.lowercase()}: bez ciężkich nóg.")
         }
 
+        // Jak reguła 1 dla cardio: przed meczem bez interwałów.
+        if (d.kind == DayKind.CARDIO && d.cardio?.type == CardioType.INTERVALS && tomorrow?.kind == DayKind.FIXED_SPORT) {
+            d = easierCardio(d).withRationale("Jutro ${tomorrow.title.lowercase()}: dziś spokojnie, bez interwałów.")
+        }
+
         // Reguła 2: dzień po meczu mobilność albo lekka góra.
         if (yesterdayMatch && d.kind == DayKind.STRENGTH) {
             d = d.copy(title = "Lekka góra + mobilność", focus = StrengthFocus.UPPER, intensity = Intensity.LOW)
@@ -168,14 +174,30 @@ class WeekPlanner(
             readiness != null && readiness.score < config.restBelowReadiness ->
                 d = rest(d.date, "Odpoczynek", "Bardzo niska gotowość (${readiness.score}): dziś regeneracja.")
             readiness?.level == ReadinessLevel.LOW ->
-                d = d.copy(kind = DayKind.MOBILITY, title = "Mobilność 20–30 min", intensity = Intensity.LOW, focus = null)
+                d = d.copy(kind = DayKind.MOBILITY, title = "Mobilność 20–30 min", intensity = Intensity.LOW, focus = null, cardio = null)
                     .withRationale("Niska gotowość (${readiness.score}): trening zastąpiony mobilnością.")
             acwrHigh ->
                 d = d.copy(intensity = Intensity.LOW).withRationale("ACWR powyżej 1,5: wymuszony lżejszy dzień.")
             readiness?.level == ReadinessLevel.MODERATE && d.intensity == Intensity.HIGH ->
                 d = d.copy(intensity = Intensity.MODERATE).withRationale("Umiarkowana gotowość: bez maksymalnego wysiłku.")
         }
+        // Lżejszy dzień cardio to spokojna sesja zamiast interwałów.
+        if (d.kind == DayKind.CARDIO && d.intensity < Intensity.HIGH && d.cardio?.type == CardioType.INTERVALS) d = easierCardio(d)
         return d
+    }
+
+    private fun easierCardio(d: PlannedDay): PlannedDay {
+        val s = d.cardio?.let { CardioLibrary.easier(it, config.cardioMinutes) } ?: return d
+        return d.copy(title = s.title, cardio = s, intensity = minOf(d.intensity, s.intensity))
+    }
+
+    private fun cardio(date: LocalDate, s: CardioSession) =
+        PlannedDay(date, DayKind.CARDIO, s.title, s.intensity, cardio = s, rationale = listOf(cardioWhy(s.type)))
+
+    private fun cardioWhy(t: CardioType) = when (t) {
+        CardioType.EASY -> "Spokojna sesja buduje bazę tlenową; większość treningów ma być w tym tempie."
+        CardioType.INTERVALS -> "Jedna mocniejsza sesja w tygodniu poprawia tempo i VO2max."
+        CardioType.LONG -> "Dłuższe wyjście raz w tygodniu wydłuża wytrzymałość."
     }
 
     private fun planFor(date: LocalDate, week: List<PlannedDay>, context: PlanningContext): PlannedDay? =
@@ -259,7 +281,7 @@ class WeekPlanner(
     }
 
     private companion object {
-        val TRAINING_KINDS = setOf(DayKind.STRENGTH, DayKind.FLEX, DayKind.MOBILITY)
+        val TRAINING_KINDS = setOf(DayKind.STRENGTH, DayKind.FLEX, DayKind.MOBILITY, DayKind.CARDIO)
         val STRENGTH_TYPES = setOf(ActivityType.STRENGTH, ActivityType.PERSONAL_TRAINING)
     }
 }

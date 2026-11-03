@@ -255,7 +255,7 @@ class CoachEngine(
         private const val HEAVY_DAY_MIN_LOAD = 300
         private const val HEAVY_DAY_FACTOR = 1.5
         private const val PROTEIN_IN_TARGET = 0.95
-        private val PLANNED_TRAINING = setOf(DayKind.STRENGTH, DayKind.PERSONAL_TRAINING, DayKind.FIXED_SPORT)
+        private val PLANNED_TRAINING = setOf(DayKind.STRENGTH, DayKind.PERSONAL_TRAINING, DayKind.FIXED_SPORT, DayKind.CARDIO)
 
         /** Przybliżone sRPE dnia z planu: typowy czas × typowe RPE dla intensywności. */
         fun estimatePlannedLoad(day: PlannedDay): Int {
@@ -269,6 +269,7 @@ class CoachEngine(
                 DayKind.PERSONAL_TRAINING, DayKind.STRENGTH -> 60
                 DayKind.MOBILITY -> 25
                 DayKind.FLEX -> 45
+                DayKind.CARDIO -> day.cardio?.minutes ?: 45
                 DayKind.REST -> 0
             }
             return rpe * minutes

@@ -50,6 +50,7 @@ class ExerciseLibrary(
         DayKind.MOBILITY -> mobility()
         DayKind.FLEX -> if (day.title.startsWith("Interwały")) intervals() else null
         DayKind.REST -> if (day.title.contains("mobilność", ignoreCase = true)) mobility() else null
+        DayKind.CARDIO -> null
         else -> null
     }
 

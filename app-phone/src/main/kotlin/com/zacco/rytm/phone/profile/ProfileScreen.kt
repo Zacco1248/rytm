@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.zacco.rytm.domain.model.ActivityType
 import com.zacco.rytm.domain.planner.EquipmentKind
+import com.zacco.rytm.domain.profile.ActivityChoice
 import com.zacco.rytm.domain.profile.ActivityLevel
 import com.zacco.rytm.domain.profile.CustomTargets
 import com.zacco.rytm.domain.profile.FixedSportEntry
@@ -38,6 +39,7 @@ import com.zacco.rytm.domain.profile.Sex
 import com.zacco.rytm.domain.time.RytmTime
 import com.zacco.rytm.phone.app.Format
 import com.zacco.rytm.domain.exercise.Muscle
+import com.zacco.rytm.domain.planner.CardioKind
 import com.zacco.rytm.domain.planner.ExerciseLibrary
 import com.zacco.rytm.phone.ui.components.CardHeader
 import com.zacco.rytm.phone.ui.components.Pill
@@ -178,26 +180,37 @@ fun ProfileScreen(
 
     RytmCard {
         CardHeader("Trening")
-        SmallText("Sprzęt:")
-        Pills(
+        SmallText("Co chcesz robić? Plan ułoży się wokół tego:")
+        val acts = p.activities ?: listOf(ActivityChoice.STRENGTH_HOME)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            ActivityChoice.entries.forEach { a ->
+                val on = a in acts
+                Pill(activityLabel(a), on) { p = p.copy(activities = if (on) acts - a else acts + a) }
+            }
+        }
+        if (ActivityChoice.RUN in acts || ActivityChoice.WALK in acts) {
+            Pill("Biegam albo chodzę na bieżni", p.treadmill) { p = p.copy(treadmill = !p.treadmill) }
+        }
+        if (p.wantsStrength) SmallText("Sprzęt:")
+        if (p.wantsStrength) Pills(
             listOf("Bez sprzętu" to EquipmentKind.NONE, "Gumy" to EquipmentKind.BANDS, "Hantle" to EquipmentKind.DUMBBELLS, "Siłownia" to EquipmentKind.GYM),
             p.equipment,
         ) { p = p.copy(equipment = it) }
-        if (p.equipment == EquipmentKind.DUMBBELLS) {
+        if (p.wantsStrength && p.equipment == EquipmentKind.DUMBBELLS) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Field("Maks. na hantel, para (kg)", pair, KeyboardType.Decimal, Modifier.weight(1f)) { pair = it.take(4) }
                 Field("Maks. jeden hantel (kg)", single, KeyboardType.Decimal, Modifier.weight(1f)) { single = it.take(4) }
             }
             Pill("Mam też gumy", p.bands) { p = p.copy(bands = !p.bands) }
         }
-        if (p.equipment == EquipmentKind.DUMBBELLS || p.equipment == EquipmentKind.GYM) {
+        if (p.wantsStrength && (p.equipment == EquipmentKind.DUMBBELLS || p.equipment == EquipmentKind.GYM)) {
             SmallText("Najmniejsza zmiana ciężaru (do progresji):")
             val steps = if (p.equipment == EquipmentKind.GYM) listOf(1.0, 2.0, 2.5, 5.0) else listOf(0.5, 1.0, 2.0)
             val current = p.weightStepKg ?: if (p.equipment == EquipmentKind.GYM) 2.5 else 1.0
             Pills(steps.map { Format.kg(it) + " kg" to it }, current) { p = p.copy(weightStepKg = it) }
         }
-        SmallText("Na czym chcesz się skupić? Sesja dostanie na to dodatkowe ćwiczenie albo serię (maks. 2 partie na sesję):")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (p.wantsStrength) SmallText("Na czym chcesz się skupić? Sesja dostanie na to dodatkowe ćwiczenie albo serię (maks. 2 partie na sesję):")
+        if (p.wantsStrength) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Muscle.entries.forEach { m ->
                 val on = m in p.focus
                 Pill(Format.muscle(m), on) { p = p.copy(focus = if (on) p.focus - m else p.focus + m) }
@@ -205,7 +218,7 @@ fun ProfileScreen(
         }
         SmallText("Czas na jedną sesję:")
         Pills(listOf(20, 30, 45, 60, 90).map { "$it min" to it }, p.sessionMinutes) { p = p.copy(sessionMinutes = it) }
-        SmallText("Dni, w które możesz trenować siłowo (kolejność kliknięć = kolejność preferencji):")
+        SmallText("Dni, w które możesz trenować z Rytmem (kolejność kliknięć = kolejność preferencji):")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             (1..7).forEach { d ->
                 val idx = p.strengthDays.indexOf(d)
@@ -214,8 +227,16 @@ fun ProfileScreen(
                 }
             }
         }
-        SmallText("Ile sesji siłowych w tygodniu:")
-        Pills((1..5).map { "$it" to it }, p.strengthPerWeek) { p = p.copy(strengthPerWeek = it) }
+        SmallText("Ile treningów z Rytmem w tygodniu (bez stałych sportów):")
+        Pills((1..6).map { "$it" to it }, p.strengthPerWeek) { p = p.copy(strengthPerWeek = it) }
+        val (strengthN, cardioN) = p.sessionSplit()
+        SmallText(
+            listOfNotNull(
+                strengthN.takeIf { it > 0 }?.let { "siła $it×" },
+                cardioN.takeIf { it > 0 }?.let { "cardio $it× (" + p.cardioKinds.joinToString { k -> cardioLabel(k) } + ")" },
+            ).joinToString(" + ").ifEmpty { "Bez treningów z planu: Rytm pilnuje ruchu, snu i nawyków." },
+            color = Rytm.colors.accent,
+        )
         SmallText("Dzień odpoczynku:")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             (1..7).forEach { d -> Pill(dayNames[d - 1], p.restDay == d) { p = p.copy(restDay = if (p.restDay == d) null else d) } }
@@ -337,6 +358,24 @@ fun ProfileScreen(
     ) { built?.let(onSave) }
     if (built == null) SmallText("Uzupełnij wzrost i wagę" + if (custom) " oraz kcal i białko." else ".", color = Rytm.colors.warn)
     onDiagnostics?.let { RytmButton("Diagnostyka Health Connect", Modifier.fillMaxWidth(), onClick = it) }
+}
+
+fun activityLabel(a: ActivityChoice): String = when (a) {
+    ActivityChoice.STRENGTH_HOME -> "Siła w domu"
+    ActivityChoice.GYM -> "Siłownia"
+    ActivityChoice.WALK -> "Spacery"
+    ActivityChoice.RUN -> "Bieganie"
+    ActivityChoice.BIKE -> "Rower"
+    ActivityChoice.SWIM -> "Pływanie"
+    ActivityChoice.SPORT -> "Sporty"
+    ActivityChoice.YOGA -> "Joga i mobilność"
+}
+
+private fun cardioLabel(k: CardioKind): String = when (k) {
+    CardioKind.RUN -> "bieg"
+    CardioKind.BIKE -> "rower"
+    CardioKind.SWIM -> "pływanie"
+    CardioKind.WALK -> "marsz"
 }
 
 private fun goalHint(g: Goal): String = when (g) {

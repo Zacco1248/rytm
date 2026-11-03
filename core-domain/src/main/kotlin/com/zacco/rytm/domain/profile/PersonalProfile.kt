@@ -4,6 +4,7 @@ import com.zacco.rytm.domain.exercise.Muscle
 import com.zacco.rytm.domain.habits.DefaultHabits
 import com.zacco.rytm.domain.habits.Habit
 import com.zacco.rytm.domain.model.ActivityType
+import com.zacco.rytm.domain.planner.CardioKind
 import com.zacco.rytm.domain.planner.Equipment
 import com.zacco.rytm.domain.planner.EquipmentKind
 import com.zacco.rytm.domain.planner.MobilityPrefs
@@ -20,6 +21,9 @@ enum class Sex { MALE, FEMALE }
 enum class ActivityLevel { SEDENTARY, LIGHT, MODERATE, ACTIVE }
 
 enum class Goal { RECOMP, FAT_LOSS, MUSCLE_GAIN, STRENGTH, ENDURANCE, HEALTH }
+
+/** Co osoba chce robić (krok 1 kreatora). Plan układa się wokół tego wyboru. */
+enum class ActivityChoice { STRENGTH_HOME, GYM, WALK, RUN, BIKE, SWIM, SPORT, YOGA }
 
 /** Stały sport w tygodniu, np. siatkówka we wtorki. */
 @Serializable
@@ -74,6 +78,10 @@ data class PersonalProfile(
     val trainingKcalFactor: Double = 0.75,
     /** Własny mnożnik kcal z treningu; null: zależnie od celu ([defaultKcalFactor]). */
     val kcalFactorOverride: Double? = null,
+    /** Wybrane aktywności; null: stary profil, czyli siła ze sprzętem z profilu. */
+    val activities: List<ActivityChoice>? = null,
+    /** Bieg i marsz na bieżni zamiast na zewnątrz. */
+    val treadmill: Boolean = false,
     /** Partie, na których chcesz się skupić (brzuch, biceps…). */
     val focus: List<Muscle> = emptyList(),
     /** Wyłączone domyślne ćwiczenia mobilności (nazwy). */
@@ -115,22 +123,59 @@ data class PersonalProfile(
 
     fun habits(): List<Habit> = DefaultHabits.withSteps(stepsTarget)
 
+    /** Siła jest w planie, gdy wybrano ją w kreatorze albo profil jest sprzed wyboru aktywności. */
+    val wantsStrength: Boolean
+        get() = activities == null || ActivityChoice.STRENGTH_HOME in activities || ActivityChoice.GYM in activities
+
+    /** Rodzaje cardio w kolejności ważności (bieg, rower, pływanie, marsz). */
+    val cardioKinds: List<CardioKind>
+        get() = listOfNotNull(
+            CardioKind.RUN.takeIf { activities?.contains(ActivityChoice.RUN) == true },
+            CardioKind.BIKE.takeIf { activities?.contains(ActivityChoice.BIKE) == true },
+            CardioKind.SWIM.takeIf { activities?.contains(ActivityChoice.SWIM) == true },
+            CardioKind.WALK.takeIf { activities?.contains(ActivityChoice.WALK) == true },
+        )
+
+    /**
+     * Podział [strengthPerWeek] (wszystkie treningi z Rytmem) na siłę i cardio. Bez siły wszystko to cardio;
+     * przy obu: cel „kondycja” daje 1 siłę i resztę cardio, w innym wypadku 1 cardio od 3 sesji (2 od 5).
+     * Sam marsz przy sile nie zabiera sesji, bo spacery i tak są codziennie.
+     */
+    fun sessionSplit(): Pair<Int, Int> {
+        val total = strengthPerWeek.coerceAtLeast(0)
+        val kinds = cardioKinds
+        if (!wantsStrength) return 0 to if (kinds.isEmpty()) 0 else total
+        if (kinds.isEmpty() || kinds == listOf(CardioKind.WALK) && goal != Goal.ENDURANCE) return total to 0
+        val cardio = when {
+            goal == Goal.ENDURANCE -> (total - 1).coerceAtLeast(if (total > 0) 1 else 0)
+            total >= 5 -> 2
+            total >= 3 -> 1
+            else -> 0
+        }
+        return (total - cardio) to cardio
+    }
+
     fun plannerConfig(): PlannerConfig {
         val days = strengthDays.distinct().mapNotNull { runCatching { DayOfWeek.of(it) }.getOrNull() }
+        val (strength, cardio) = sessionSplit()
         return PlannerConfig(
             fixedSports = fixedSports.associate { DayOfWeek.of(it.day) to it.type },
             sportNames = fixedSports.associate { DayOfWeek.of(it.day) to it.name },
             personalTrainingDay = personalTraining?.let { DayOfWeek.of(it.day) },
             personalTrainingUntil = personalTraining?.until?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
             strengthDays = days,
-            strengthPerWeek = strengthPerWeek,
+            strengthPerWeek = strength,
             restDay = restDay?.let { DayOfWeek.of(it) },
-            minStrengthSessionsPerWeek = minStrength(),
+            minStrengthSessionsPerWeek = if (wantsStrength) minStrength(strength) else 0,
+            cardioKinds = cardioKinds,
+            cardioPerWeek = cardio,
+            cardioMinutes = sessionMinutes,
+            treadmill = treadmill,
         )
     }
 
-    private fun minStrength(): Int {
-        val available = minOf(strengthPerWeek, strengthDays.distinct().size) + (if (personalTraining != null) 1 else 0)
+    private fun minStrength(sessions: Int): Int {
+        val available = minOf(sessions, strengthDays.distinct().size) + (if (personalTraining != null) 1 else 0)
         val wanted = when (goal) {
             Goal.STRENGTH, Goal.MUSCLE_GAIN -> 3
             Goal.ENDURANCE -> 1

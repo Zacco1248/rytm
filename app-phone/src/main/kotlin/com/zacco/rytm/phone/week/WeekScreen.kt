@@ -77,6 +77,7 @@ private fun RytmColors.forKind(k: DayKind): Color = when (k) {
     DayKind.MOBILITY -> kindMobility
     DayKind.REST -> kindRest
     DayKind.FLEX -> kindOther
+    DayKind.CARDIO -> kindSport
 }
 
 @OptIn(ExperimentalLayoutApi::class)
