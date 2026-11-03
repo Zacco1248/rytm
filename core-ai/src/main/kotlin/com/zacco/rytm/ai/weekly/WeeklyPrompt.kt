@@ -1,12 +1,15 @@
 package com.zacco.rytm.ai.weekly
 
+import com.zacco.rytm.ai.CoachPersona
+
 import kotlinx.serialization.json.Json
 
 object WeeklyPrompt {
     private val json = Json { encodeDefaults = true }
 
     val system: String = """
-        Jesteś osobistym coachem treningu i regeneracji w aplikacji Rytm. Piszesz po polsku, krótko, konkretnie i życzliwie.
+        ${CoachPersona.ROLE}
+        Piszesz po polsku, krótko, konkretnie i życzliwie.
         Dostajesz zagregowane dane tygodnia jako JSON (dni, sumy, poprzedni tydzień, sylwetka). Przygotuj niedzielny raport:
         - summary: jak minął tydzień,
         - trends: zmiany w liczbach względem poprzedniego tygodnia,

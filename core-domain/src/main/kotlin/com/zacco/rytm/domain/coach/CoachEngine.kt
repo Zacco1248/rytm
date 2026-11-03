@@ -82,7 +82,9 @@ class CoachEngine(
             steps = steps,
             lastSync = data.lastSync,
             setsToday = data.sets.filter { it.date == data.today },
-            activitiesToday = data.activities.filter { it.localDate() == data.today }.sortedBy { it.start },
+            activitiesToday = data.activities.filter { it.localDate() == data.today }.sortedBy { it.start }
+                .map { a -> if (a.kcal == null) a.copy(kcal = estimateKcal(a, data.profile.weightKg)) else a },
+            estimatedKcalIds = data.activities.filter { it.localDate() == data.today && it.kcal == null && it.durationMin > 0 }.map { it.id }.toSet(),
         )
     }
 
@@ -215,7 +217,8 @@ class CoachEngine(
 
     /** Kcal z treningów dnia doliczane do celu: [UserProfile.trainingKcalFactor] × kcal z zegarka, bez spacerów. */
     fun trainingKcal(data: CoachData, date: LocalDate): Int =
-        (data.activities.filter { it.localDate() == date && it.type != ActivityType.WALK }.sumOf { it.kcal ?: 0 } *
+        (data.activities.filter { it.localDate() == date && it.type != ActivityType.WALK }
+            .sumOf { it.kcal ?: estimateKcal(it, data.profile.weightKg) ?: 0 } *
             data.profile.trainingKcalFactor).roundToInt()
 
     private fun alcoholOn(data: CoachData, date: LocalDate): Int =
@@ -282,6 +285,20 @@ class CoachEngine(
          * Tempo zmiany wagi względem celu. Redukcja: zdrowo do ok. 1% masy tygodniowo w dół; masa: do 0,5% w górę;
          * pozostałe cele: waga ma mniej więcej stać.
          */
+        /**
+         * Szacunek kcal ponad spoczynek, gdy zegarek ich nie podał (ręczny wpis, opaska bez kcal):
+         * MET z RPE (RPE 5 ≈ 4,5 MET, RPE 8 ≈ 6,3 MET; bez RPE 4 MET, spacer 3,5 MET) × waga × czas.
+         */
+        fun estimateKcal(a: Activity, weightKg: Double): Int? {
+            if (a.durationMin <= 0) return null
+            val met = when {
+                a.type == ActivityType.WALK -> 3.5
+                a.rpe != null -> 1.5 + 0.6 * a.rpe.coerceIn(1, 10)
+                else -> 4.0
+            }
+            return ((met - 1) * weightKg * a.durationMin / 60.0).roundToInt()
+        }
+
         fun paceOf(kgPerWeek: Double?, goal: Goal = Goal.RECOMP, weightKg: Double = 80.0): WeightPace {
             if (kgPerWeek == null) return WeightPace.UNKNOWN
             val pct = kgPerWeek / weightKg * 100

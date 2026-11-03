@@ -59,6 +59,8 @@ data class TodaySnapshot(
     val setsToday: List<SetLog> = emptyList(),
     /** Wszystkie aktywności dnia (z Health Connect i ręczne), także spacery spoza planu. */
     val activitiesToday: List<Activity> = emptyList(),
+    /** Aktywności, którym kcal oszacował Rytm (z RPE i czasu), bo zegarek ich nie podał. */
+    val estimatedKcalIds: Set<String> = emptySet(),
 ) {
     /** Kcal z aktywności dnia (bez doliczania mnożnika). */
     val activityKcal: Int get() = activitiesToday.sumOf { it.kcal ?: 0 }

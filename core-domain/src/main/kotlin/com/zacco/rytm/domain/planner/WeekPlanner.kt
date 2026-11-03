@@ -89,7 +89,10 @@ class WeekPlanner(
                 it.type in STRENGTH_TYPES && it.start.atZone(RytmTime.zone).toLocalDate() == day.date
             }
         }
-        fun planned() = result.count { it.isStrengthLike() && it.date >= context.today } + doneStrength
+        val start = config.planStart
+        // Dni przed założeniem profilu: planowana tam siła liczy się, jakby była (nie było jeszcze planu do wykonania).
+        val beforeStart = if (start == null) 0 else days.count { it.isStrengthLike() && it.date < start && it.date < context.today }
+        fun planned() = result.count { it.isStrengthLike() && it.date >= context.today } + doneStrength + beforeStart
 
         for (i in result.indices) {
             if (planned() >= config.minStrengthSessionsPerWeek) break
@@ -145,7 +148,7 @@ class WeekPlanner(
         // Reguła 2: dzień po meczu mobilność albo lekka góra.
         if (yesterdayMatch && d.kind == DayKind.STRENGTH) {
             d = d.copy(title = "Lekka góra + mobilność", focus = StrengthFocus.UPPER, intensity = Intensity.LOW)
-                .withRationale("Wczoraj mecz: lżejszy dzień.")
+                .withRationale("Wczoraj sport z dużym obciążeniem: lżejszy dzień.")
         }
 
         // Reguła 4: po ciężkiej „innej aktywności” (np. remoncie) odciążamy partie z pola „co obciążyło”.
@@ -232,7 +235,7 @@ class WeekPlanner(
             upperLoaded && d.focus != StrengthFocus.LOWER ->
                 if (tomorrow?.kind == DayKind.FIXED_SPORT) {
                     // Dół odpada przez jutrzejszy mecz, więc zostaje lekka sesja.
-                    d.copy(intensity = Intensity.LOW).withRationale("Góra obciążona, a jutro mecz: lekka sesja.")
+                    d.copy(intensity = Intensity.LOW).withRationale("Góra obciążona, a jutro sport: lekka sesja.")
                 } else {
                     d.copy(title = strengthTitle(StrengthFocus.LOWER), focus = StrengthFocus.LOWER)
                         .withRationale("Góra obciążona wczoraj: dziś dół.")

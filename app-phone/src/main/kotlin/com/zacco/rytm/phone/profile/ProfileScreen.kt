@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import com.zacco.rytm.domain.model.ActivityType
 import com.zacco.rytm.domain.planner.EquipmentKind
 import com.zacco.rytm.domain.profile.ActivityChoice
-import com.zacco.rytm.domain.profile.ActivityLevel
 import com.zacco.rytm.domain.profile.CustomTargets
 import com.zacco.rytm.domain.profile.FixedSportEntry
 import com.zacco.rytm.domain.profile.Goal
@@ -38,7 +37,6 @@ import com.zacco.rytm.domain.profile.PersonalTrainingEntry
 import com.zacco.rytm.domain.profile.Sex
 import com.zacco.rytm.domain.time.RytmTime
 import com.zacco.rytm.phone.app.Format
-import com.zacco.rytm.domain.exercise.Muscle
 import com.zacco.rytm.domain.planner.CardioKind
 import com.zacco.rytm.domain.planner.ExerciseLibrary
 import com.zacco.rytm.phone.ui.components.CardHeader
@@ -142,16 +140,7 @@ fun ProfileScreen(
             Field("Wzrost (cm)", height, KeyboardType.Number, Modifier.weight(1f)) { height = it.filter(Char::isDigit).take(3) }
             Field("Waga (kg)", weight, KeyboardType.Decimal, Modifier.weight(1f)) { weight = it.filter { c -> c.isDigit() || c == ',' || c == '.' }.take(5) }
         }
-        SmallText("Ruch w ciągu dnia (bez treningów, te Rytm dolicza z zegarka):")
-        Pills(
-            listOf(
-                "Siedząca praca" to ActivityLevel.SEDENTARY,
-                "Trochę ruchu" to ActivityLevel.LIGHT,
-                "Dużo chodzenia" to ActivityLevel.MODERATE,
-                "Praca fizyczna" to ActivityLevel.ACTIVE,
-            ),
-            p.activity,
-        ) { p = p.copy(activity = it) }
+        ActivityLevelPicker(p) { p = it }
     }
 
     RytmCard {
@@ -188,20 +177,12 @@ fun ProfileScreen(
                 Pill(activityLabel(a), on) { p = p.copy(activities = if (on) acts - a else acts + a) }
             }
         }
-        if (ActivityChoice.RUN in acts || ActivityChoice.WALK in acts) {
-            Pill("Biegam albo chodzę na bieżni", p.treadmill) { p = p.copy(treadmill = !p.treadmill) }
-        }
-        if (p.wantsStrength) SmallText("Sprzęt:")
-        if (p.wantsStrength) Pills(
-            listOf("Bez sprzętu" to EquipmentKind.NONE, "Gumy" to EquipmentKind.BANDS, "Hantle" to EquipmentKind.DUMBBELLS, "Siłownia" to EquipmentKind.GYM),
-            p.equipment,
-        ) { p = p.copy(equipment = it) }
-        if (p.wantsStrength && p.equipment == EquipmentKind.DUMBBELLS) {
+        GearChecklist(p) { p = it }
+        if (p.wantsStrength && p.hasDumbbells && !p.hasGym) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Field("Maks. na hantel, para (kg)", pair, KeyboardType.Decimal, Modifier.weight(1f)) { pair = it.take(4) }
                 Field("Maks. jeden hantel (kg)", single, KeyboardType.Decimal, Modifier.weight(1f)) { single = it.take(4) }
             }
-            Pill("Mam też gumy", p.bands) { p = p.copy(bands = !p.bands) }
         }
         if (p.wantsStrength && (p.equipment == EquipmentKind.DUMBBELLS || p.equipment == EquipmentKind.GYM)) {
             SmallText("Najmniejsza zmiana ciężaru (do progresji):")
@@ -209,13 +190,7 @@ fun ProfileScreen(
             val current = p.weightStepKg ?: if (p.equipment == EquipmentKind.GYM) 2.5 else 1.0
             Pills(steps.map { Format.kg(it) + " kg" to it }, current) { p = p.copy(weightStepKg = it) }
         }
-        if (p.wantsStrength) SmallText("Na czym chcesz się skupić? Sesja dostanie na to dodatkowe ćwiczenie albo serię (maks. 2 partie na sesję):")
-        if (p.wantsStrength) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Muscle.entries.forEach { m ->
-                val on = m in p.focus
-                Pill(Format.muscle(m), on) { p = p.copy(focus = if (on) p.focus - m else p.focus + m) }
-            }
-        }
+        if (p.wantsStrength) FocusPicker(p) { p = it }
         SmallText("Czas na jedną sesję:")
         Pills(listOf(20, 30, 45, 60, 90).map { "$it min" to it }, p.sessionMinutes) { p = p.copy(sessionMinutes = it) }
         SmallText("Dni, w które możesz trenować z Rytmem (kolejność kliknięć = kolejność preferencji):")
@@ -245,7 +220,7 @@ fun ProfileScreen(
 
     RytmCard {
         CardHeader("Stałe sporty i zajęcia")
-        SmallText("Np. siatkówka we wtorki. Plan nie da ciężkich nóg dzień wcześniej, a dzień po meczu będzie lżejszy.")
+        SmallText("Np. siatkówka we wtorki. Plan nie da ciężkich nóg dzień wcześniej, a dzień po nim będzie lżejszy.")
         p.fixedSports.forEachIndexed { i, s ->
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

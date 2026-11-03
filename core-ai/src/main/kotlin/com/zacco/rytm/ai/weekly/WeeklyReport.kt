@@ -33,7 +33,7 @@ data class WeeklyReport(
             "properties" to mapOf(
                 "summary" to mapOf("type" to "string", "description" to "Jak minął tydzień, 2–3 zdania."),
                 "trends" to list("Do 5 trendów z liczbami, porównanie z poprzednim tygodniem."),
-                "correlations" to list("Do 4 zależności widocznych w dniach (sen vs mecze, nawyki vs nastrój, białko vs regeneracja). Pusta lista, gdy danych za mało."),
+                "correlations" to list("Do 4 zależności widocznych w dniach (sen vs dni ze sportem, nawyki vs nastrój, białko vs regeneracja). Pusta lista, gdy danych za mało."),
                 "body" to mapOf("type" to "string", "description" to "Sylwetka i siła: waga (średnia 7-dniowa), trend siły, zgodność z celem."),
                 "suggestions" to list("1–3 konkretne sugestie na kolejny tydzień."),
             ),

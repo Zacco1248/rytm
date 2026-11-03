@@ -452,14 +452,27 @@ private fun ActivityTodayCard(s: TodaySnapshot, onAdd: () -> Unit) {
                             ).joinToString(" · "),
                         )
                     }
-                    Text(a.kcal?.let { "${Format.int(it)} kcal" } ?: "–", style = Rytm.type.small, color = if (a.kcal != null) c.ink else c.muted)
+                    val est = a.id in s.estimatedKcalIds
+                    Text(a.kcal?.let { (if (est) "~" else "") + "${Format.int(it)} kcal" } ?: "–", style = Rytm.type.small, color = if (a.kcal != null && !est) c.ink else c.muted)
                 }
             }
         }
-        val parts = buildList {
-            if (s.trainingKcal > 0) add("do celu jedzenia doliczono ${Format.int(s.trainingKcal)} kcal (bez spacerów)")
-            s.night?.totalKcal?.takeIf { it > 0 }?.let { add("łącznie z podstawową przemianą ${Format.int(it)} kcal wg zegarka") }
+        if (acts.isNotEmpty()) {
+            val pct = (s.trainingKcalFactor * 100).toInt()
+            SmallText(
+                buildString {
+                    append("Aktywności dziś: ok. ${Format.int(s.activityKcal)} kcal. ")
+                    if (s.trainingKcal > 0) {
+                        append("Do celu jedzenia doliczam ${Format.int(s.trainingKcal)} kcal: $pct% kcal z treningów, bez spacerów, bo zegarki zwykle zawyżają spalanie.")
+                    } else {
+                        append("Spacery nie podnoszą celu jedzenia, bo są już w poziomie ruchu z profilu.")
+                    }
+                    if (s.estimatedKcalIds.isNotEmpty()) append(" Kcal z „~” to szacunek z czasu i RPE.")
+                },
+            )
         }
-        if (parts.isNotEmpty()) SmallText(parts.joinToString("; ").replaceFirstChar { it.uppercase() } + ".")
+        s.night?.totalKcal?.takeIf { it > 0 }?.let {
+            SmallText("Zegarek liczy na dziś łącznie ${Format.int(it)} kcal, razem z przemianą spoczynkową (to, co spalasz, nic nie robiąc).")
+        }
     }
 }

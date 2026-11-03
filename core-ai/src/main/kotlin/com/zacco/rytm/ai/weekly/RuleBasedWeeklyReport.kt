@@ -25,7 +25,7 @@ object RuleBasedWeeklyReport {
             val other = i.days.filter { !it.hadMatch }.mapNotNull { it.sleepMin }
             if (match.isNotEmpty() && other.size >= 2) {
                 val diff = (match.average() - other.average()).roundToInt()
-                if (kotlin.math.abs(diff) >= 20) add("W noce po meczach sen był ${if (diff < 0) "krótszy" else "dłuższy"} o ok. ${kotlin.math.abs(diff)} min.")
+                if (kotlin.math.abs(diff) >= 20) add("W noce po dniach ze sportem sen był ${if (diff < 0) "krótszy" else "dłuższy"} o ok. ${kotlin.math.abs(diff)} min.")
             }
             val drinks = i.days.filter { it.alcohol > 0 }
             if (drinks.isNotEmpty()) add("Alkohol w ${drinks.size} ${if (drinks.size == 1) "dzień" else "dni"}; następnego dnia gotowość jest obniżana.")

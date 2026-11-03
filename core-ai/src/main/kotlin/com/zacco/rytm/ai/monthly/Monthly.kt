@@ -1,5 +1,7 @@
 package com.zacco.rytm.ai.monthly
 
+import com.zacco.rytm.ai.CoachPersona
+
 import com.zacco.rytm.ai.CoachLlm
 import com.zacco.rytm.ai.LlmException
 import com.zacco.rytm.ai.LlmRequest
@@ -264,7 +266,8 @@ class MonthlyReportService(private val llm: CoachLlm?, private val costGuard: Co
 
     companion object {
         val SYSTEM = """
-            Jesteś osobistym coachem w aplikacji Rytm. Raz w miesiącu robisz analizę długoterminową, po polsku, konkretnie i życzliwie.
+            ${CoachPersona.ROLE}
+            Raz w miesiącu robisz analizę długoterminową, po polsku, konkretnie i życzliwie.
             Dostajesz tygodniowe agregaty z ostatnich do 12 tygodni (weeks, od najstarszego), postęp ćwiczeń i streszczenia raportów tygodniowych.
             - summary: jak wyglądały te tygodnie,
             - trends: zmiany w liczbach w czasie (waga ze średnich tygodniowych, siła, sen, tętno spoczynkowe, HRV, obciążenie, żywienie),

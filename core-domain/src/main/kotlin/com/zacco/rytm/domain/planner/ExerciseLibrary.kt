@@ -30,6 +30,8 @@ data class Equipment(
     val sessionMinutes: Int = 45,
     /** Najmniejsza zmiana ciężaru; null: 1 kg przy hantlach, 2,5 kg na siłowni. */
     val stepKgOverride: Double? = null,
+    /** Drążek w domu: podciąganie i unoszenie kolan w zwisie zamiast zastępczych ćwiczeń. */
+    val pullUpBar: Boolean = false,
 ) {
     val stepKg: Double get() = stepKgOverride ?: if (kind == EquipmentKind.GYM) 2.5 else 1.0
 
@@ -46,7 +48,7 @@ class ExerciseLibrary(
 ) {
 
     fun workoutFor(day: PlannedDay): StrengthWorkout? = when (day.kind) {
-        DayKind.STRENGTH -> strength(day.focus ?: StrengthFocus.FULL_BODY, day.intensity)
+        DayKind.STRENGTH -> strength(day.focus ?: StrengthFocus.FULL_BODY, day.intensity, block(day.date))
         DayKind.MOBILITY -> mobility()
         DayKind.FLEX -> if (day.title.startsWith("Interwały")) intervals() else null
         DayKind.REST -> if (day.title.contains("mobilność", ignoreCase = true)) mobility() else null
@@ -54,8 +56,8 @@ class ExerciseLibrary(
         else -> null
     }
 
-    private fun strength(focus: StrengthFocus, intensity: Intensity): StrengthWorkout {
-        var exercises = forGoal(base(focus))
+    private fun strength(focus: StrengthFocus, intensity: Intensity, block: Int): StrengthWorkout {
+        var exercises = forGoal(variant(withBar(base(focus), focus), block))
         exercises = when (intensity) {
             // Lżej: 2 serie i bez ostatniego ćwiczenia.
             Intensity.LOW -> exercises.dropLast(1).map { it.copy(sets = 2) }
@@ -81,6 +83,33 @@ class ExerciseLibrary(
             EquipmentKind.GYM -> " · siłownia (ciężar na 2 powtórzenia zapasu)"
         }
         return StrengthWorkout(name + kit, exercises)
+    }
+
+    /**
+     * Blok treningowy (mezocykl) 4 tygodni. Ćwiczenia zostają te same przez cały blok, żeby dało się
+     * progresować ciężar i powtórzenia, a w kolejnym bloku zmieniają się warianty (inny bodziec, mniej nudy).
+     */
+    private fun block(date: java.time.LocalDate): Int =
+        ((date.with(java.time.DayOfWeek.MONDAY).toEpochDay() / 7) / BLOCK_WEEKS % 2).toInt()
+
+    /** W co drugim bloku warianty głównych ćwiczeń (ten sam wzorzec ruchu, inny bodziec). */
+    private fun variant(list: List<PlannedExercise>, block: Int): List<PlannedExercise> =
+        if (block == 0) list else list.map { e -> VARIANTS[ExerciseGuide.key(e.name)]?.let { v -> e.copy(name = v) } ?: e }
+
+    /** Drążek w domu: pionowe przyciąganie zamiast zastępczego wiosłowania, zwis zamiast deski lub dead buga. */
+    private fun withBar(list: List<PlannedExercise>, focus: StrengthFocus): List<PlannedExercise> {
+        if (!eq.pullUpBar || eq.kind == EquipmentKind.GYM) return list
+        val pull = ex("Podciąganie na drążku (albo negatywy 3–5 s)", 3, 4..8, null, "2-1-3", 120)
+        val hang = ex("Unoszenie kolan w zwisie", 3, 8..12, null, "2-1-2", 60)
+        var out = list.map { e ->
+            when (ExerciseGuide.key(e.name)) {
+                "wiosłowanie odwrócone pod stołem" -> pull
+                "deska", "dead bug", "brzuszki", "superman" -> hang
+                else -> e
+            }
+        }.distinctBy { ExerciseGuide.key(it.name) }
+        if (focus != StrengthFocus.LOWER && out.none { it.name == pull.name }) out = out.take(1) + pull + out.drop(1)
+        return out
     }
 
     /**
@@ -117,12 +146,14 @@ class ExerciseLibrary(
         val gym = eq.kind == EquipmentKind.GYM
         val db = eq.kind == EquipmentKind.DUMBBELLS
         val bands = eq.kind == EquipmentKind.BANDS || eq.bands
+        val bar = eq.pullUpBar && !gym
         return when (m) {
-            Muscle.ABS -> if (gym) ex("Unoszenie nóg w zwisie", 3, 8..12, null, null, 60) else ex("Dead bug (na stronę)", 3, 8..12, null, "3-1-1", 45)
+            Muscle.ABS -> if (bar) ex("Unoszenie kolan w zwisie", 3, 8..12, null, "2-1-2", 60) else if (gym) ex("Unoszenie nóg w zwisie", 3, 8..12, null, null, 60) else ex("Dead bug (na stronę)", 3, 8..12, null, "3-1-1", 45)
             Muscle.BICEPS -> when {
                 gym -> ex("Uginanie ramion ze sztangielkami", 3, 8..12, null, null, 60)
                 db -> ex("Uginanie ramion z hantlami", 3, 10..15, eq.pairMaxKg, "2-0-3", 60)
                 bands -> ex("Uginanie ramion z gumą", 3, 12..20, null, "2-0-3", 45)
+                bar -> ex("Podciąganie podchwytem (albo negatywy)", 3, 4..8, null, "2-1-3", 90)
                 else -> ex("Wiosłowanie odwrócone pod stołem", 3, 8..12, null, "2-1-2", 60)
             }
             Muscle.TRICEPS -> ex("Dipy na krześle", 3, 8..15, null, "3-0-1", 60)
@@ -134,6 +165,7 @@ class ExerciseLibrary(
                 else -> ex("Pompki w pozycji piki (na barki)", 3, 6..12, null, "3-0-1", 60)
             }
             Muscle.BACK -> when {
+                bar -> ex("Podciąganie na drążku (albo negatywy 3–5 s)", 3, 4..8, null, "2-1-3", 120)
                 gym -> ex("Ściąganie drążka do klatki (albo podciąganie)", 3, 8..12, null, null, 90)
                 db -> ex("Wiosłowanie jednorącz w opadzie (na stronę)", 3, 10..15, eq.singleMaxKg, "2-1-2", 60)
                 bands -> ex("Wiosłowanie gumą", 3, 12..20, null, "2-1-2", 45)
@@ -303,6 +335,29 @@ class ExerciseLibrary(
 
     companion object {
         private val LOWER_MUSCLES = setOf(Muscle.GLUTES, Muscle.LEGS, Muscle.CALVES)
+        private const val BLOCK_WEEKS = 4
+
+        /** Warianty na drugi blok: klucz ćwiczenia → nazwa wariantu. */
+        private val VARIANTS: Map<String, String> = mapOf(
+            "przysiad" to "Przysiad z pauzą",
+            "przysiad goblet" to "Przysiad goblet z pauzą",
+            "przysiad ze sztangą" to "Przysiad przedni ze sztangą",
+            "wykroki w tył" to "Wykroki chodzone (na nogę)",
+            "martwy ciąg rumuński z hantlami" to "Martwy ciąg rumuński na jednej nodze (na nogę)",
+            "martwy ciąg rumuński" to "Hip thrust ze sztangą",
+            "wypychanie na suwnicy" to "Uginanie nóg na maszynie",
+            "wyciskanie hantli leżąc na podłodze" to "Wyciskanie hantli jednorącz na podłodze (na stronę)",
+            "wyciskanie sztangi leżąc" to "Wyciskanie hantli na ławce skośnej",
+            "wyciskanie hantli nad głowę stojąc" to "Wyciskanie Arnolda",
+            "wiosłowanie jednorącz w opadzie" to "Wiosłowanie oburącz w opadzie",
+            "wiosłowanie sztangą w opadzie" to "Wiosłowanie na wyciągu siedząc",
+            "uginanie ramion z hantlami" to "Uginanie młotkowe",
+            "face pull gumą" to "Band pull-apart",
+            "dipy na krześle" to "Pompki diamentowe",
+            "deska" to "Deska boczna (sekundy na stronę)",
+            "brzuszki" to "Odwrotne brzuszki",
+            "dead bug" to "Bird dog (na stronę)",
+        )
 
         /** Domyślne ćwiczenia sesji mobilności (do włączania i wyłączania w profilu). */
         val MOBILITY_DEFAULT: List<PlannedExercise> = listOf(

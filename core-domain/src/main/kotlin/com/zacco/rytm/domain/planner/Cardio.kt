@@ -14,6 +14,7 @@ data class CardioSession(
     val type: CardioType,
     val minutes: Int,
     val steps: List<String>,
+    /** Na sprzęcie w domu albo na siłowni: bieżnia (bieg, marsz) albo rower stacjonarny. */
     val treadmill: Boolean = false,
 ) {
     val intensity: Intensity
@@ -27,7 +28,7 @@ data class CardioSession(
         get() {
             val what = when (kind) {
                 CardioKind.RUN -> if (treadmill) "Bieg na bieżni" else "Bieg"
-                CardioKind.BIKE -> "Rower"
+                CardioKind.BIKE -> if (treadmill) "Rower stacjonarny" else "Rower"
                 CardioKind.SWIM -> "Pływanie"
                 CardioKind.WALK -> if (treadmill) "Marsz na bieżni" else "Szybki marsz"
             }
@@ -54,14 +55,14 @@ object CardioLibrary {
         else -> listOf(CardioType.EASY, CardioType.INTERVALS) + List(n - 3) { CardioType.EASY } + CardioType.LONG
     }
 
-    fun session(kind: CardioKind, type: CardioType, sessionMinutes: Int, treadmill: Boolean = false): CardioSession {
+    fun session(kind: CardioKind, type: CardioType, sessionMinutes: Int, treadmill: Boolean = false, indoorBike: Boolean = false): CardioSession {
         val base = sessionMinutes.coerceIn(20, 75)
         val minutes = when (type) {
             CardioType.EASY -> base
             CardioType.INTERVALS -> base.coerceAtMost(45)
             CardioType.LONG -> (base * 1.4).toInt().coerceIn(40, if (kind == CardioKind.BIKE || kind == CardioKind.WALK) 120 else 90)
         }
-        val tm = treadmill && (kind == CardioKind.RUN || kind == CardioKind.WALK)
+        val tm = treadmill && (kind == CardioKind.RUN || kind == CardioKind.WALK) || indoorBike && kind == CardioKind.BIKE
         val steps = when (kind) {
             CardioKind.RUN -> when (type) {
                 CardioType.EASY -> listOf(
@@ -108,6 +109,7 @@ object CardioLibrary {
         val treadmillTip = when {
             !tm -> emptyList()
             kind == CardioKind.RUN -> listOf("Na bieżni ustaw nachylenie 1%, żeby było jak na zewnątrz.")
+            kind == CardioKind.BIKE -> listOf("Na rowerze stacjonarnym: 80–90 obrotów na minutę, opór tak, żeby dało się mówić (poza interwałami).")
             else -> listOf("Na bieżni: 5,5–6,5 km/h i nachylenie 4–8%; im wyżej, tym mocniej.")
         }
         return CardioSession(kind, type, minutes, steps + treadmillTip, tm)
@@ -115,5 +117,5 @@ object CardioLibrary {
 
     /** Lżejsza wersja przy niższej gotowości albo przed meczem: interwały zamieniają się w spokojną sesję. */
     fun easier(s: CardioSession, sessionMinutes: Int): CardioSession =
-        if (s.type == CardioType.INTERVALS) session(s.kind, CardioType.EASY, sessionMinutes, s.treadmill) else s
+        if (s.type == CardioType.INTERVALS) session(s.kind, CardioType.EASY, sessionMinutes, s.treadmill && s.kind != CardioKind.BIKE, s.treadmill && s.kind == CardioKind.BIKE) else s
 }

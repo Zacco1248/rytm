@@ -90,7 +90,29 @@ data class PersonalProfile(
     val mobilityCustom: List<String> = emptyList(),
     /** Tętno maksymalne z testu; bez niego szacunek z wieku. */
     val maxHr: Int? = null,
+    /** Hantle w domu; null: stary profil, wtedy z [equipment]. */
+    val ownsDumbbells: Boolean? = null,
+    val pullUpBar: Boolean = false,
+    val indoorBike: Boolean = false,
+    /** Dzień założenia profilu w kreatorze (ISO); od niego liczy się plan. */
+    val startedOn: String? = null,
 ) {
+    val hasDumbbells: Boolean get() = ownsDumbbells ?: (equipment == EquipmentKind.DUMBBELLS)
+    val hasGym: Boolean get() = equipment == EquipmentKind.GYM
+    val hasBands: Boolean get() = bands || equipment == EquipmentKind.BANDS
+
+    /** Lista „co masz” → główny rodzaj sprzętu do planu: siłownia, potem hantle, potem gumy. */
+    fun withGear(dumbbells: Boolean = hasDumbbells, bands: Boolean = hasBands, gym: Boolean = hasGym): PersonalProfile = copy(
+        ownsDumbbells = dumbbells,
+        bands = bands,
+        equipment = when {
+            gym -> EquipmentKind.GYM
+            dumbbells -> EquipmentKind.DUMBBELLS
+            bands -> EquipmentKind.BANDS
+            else -> EquipmentKind.NONE
+        },
+    )
+
     fun age(today: LocalDate): Int? = birthYear?.let { today.year - it }
 
     /**
@@ -113,7 +135,7 @@ data class PersonalProfile(
         maxHr = maxHr ?: age(today)?.let { (208 - 0.7 * it).roundToInt() } ?: 190,
         trainingKcalFactor = kcalFactor,
         planner = plannerConfig(),
-        equipment = Equipment(equipment, dumbbellPairMaxKg, dumbbellSingleMaxKg, bands || equipment == EquipmentKind.BANDS, sessionMinutes, weightStepKg),
+        equipment = Equipment(equipment, dumbbellPairMaxKg, dumbbellSingleMaxKg, bands || equipment == EquipmentKind.BANDS, sessionMinutes, weightStepKg, pullUpBar),
         goal = goal,
         goalNote = goalNote,
         name = name,
@@ -171,6 +193,8 @@ data class PersonalProfile(
             cardioPerWeek = cardio,
             cardioMinutes = sessionMinutes,
             treadmill = treadmill,
+            indoorBike = indoorBike,
+            planStart = startedOn?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
         )
     }
 

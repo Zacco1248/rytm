@@ -9,7 +9,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,15 +31,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.zacco.rytm.ai.LlmProvider
 import com.zacco.rytm.ai.plan.PlanTweak
 import com.zacco.rytm.ai.plan.PlanTweakResult
 import com.zacco.rytm.domain.coach.CoachData
 import com.zacco.rytm.domain.coach.CoachEngine
 import com.zacco.rytm.domain.model.ActivityType
-import com.zacco.rytm.domain.planner.EquipmentKind
 import com.zacco.rytm.domain.profile.ActivityChoice
-import com.zacco.rytm.domain.profile.ActivityLevel
 import com.zacco.rytm.domain.profile.FixedSportEntry
 import com.zacco.rytm.domain.profile.Goal
 import com.zacco.rytm.domain.profile.NutritionCalculator
@@ -44,7 +47,10 @@ import com.zacco.rytm.domain.profile.PersonalProfile
 import com.zacco.rytm.domain.profile.Sex
 import com.zacco.rytm.domain.time.RytmTime
 import com.zacco.rytm.phone.app.Format
+import com.zacco.rytm.phone.profile.ActivityLevelPicker
 import com.zacco.rytm.phone.profile.Field
+import com.zacco.rytm.phone.profile.FocusPicker
+import com.zacco.rytm.phone.profile.GearChecklist
 import com.zacco.rytm.phone.profile.Pills
 import com.zacco.rytm.phone.profile.activityLabel
 import com.zacco.rytm.phone.ui.components.CardHeader
@@ -75,6 +81,8 @@ fun OnboardingWizard(
     onTweak: (PersonalProfile, String, (PlanTweakResult) -> Unit) -> Unit,
     onFullForm: () -> Unit,
     onFinish: (PersonalProfile) -> Unit,
+    hasAiKey: Boolean = false,
+    onSaveAiKey: (LlmProvider, String) -> Unit = { _, _ -> },
 ) {
     var p by remember {
         mutableStateOf(
@@ -89,7 +97,7 @@ fun OnboardingWizard(
         )
     }
     var stepIndex by remember { mutableIntStateOf(0) }
-    val steps = Step.entries.filter { it != Step.EQUIPMENT || p.wantsStrength }
+    val steps = Step.entries.toList()
     val step = steps[stepIndex.coerceIn(0, steps.lastIndex)]
 
     ScreenHeader(sub = "Krok ${stepIndex + 1} z ${steps.size}", title = "Witaj w Rytmie")
@@ -107,7 +115,7 @@ fun OnboardingWizard(
         Step.GOAL -> GoalStep(p) { p = it }
         Step.WEEK -> WeekStep(p) { p = it }
         Step.EQUIPMENT -> EquipmentStep(p) { p = it }
-        Step.SUMMARY -> SummaryStep(p, onTweak) { p = it }
+        Step.SUMMARY -> SummaryStep(p, onTweak, hasAiKey, onSaveAiKey) { p = it }
     }
 
     val canNext = when (step) {
@@ -124,7 +132,7 @@ fun OnboardingWizard(
             primary = true,
             enabled = canNext,
         ) {
-            if (step == Step.SUMMARY) onFinish(finalize(p)) else stepIndex++
+            if (step == Step.SUMMARY) onFinish(finalize(p, LocalDate.now(RytmTime.zone))) else stepIndex++
         }
     }
     if (step == Step.ACTIVITIES) {
@@ -133,13 +141,10 @@ fun OnboardingWizard(
 }
 
 /** Domyślne rzeczy, których kreator nie pyta wprost. */
-private fun finalize(p: PersonalProfile): PersonalProfile {
+private fun finalize(p: PersonalProfile, today: LocalDate): PersonalProfile {
     val acts = p.activities.orEmpty()
-    val equipment = when {
-        ActivityChoice.GYM in acts && ActivityChoice.STRENGTH_HOME !in acts -> EquipmentKind.GYM
-        else -> p.equipment
-    }
-    return p.copy(equipment = equipment)
+    val gear = if (ActivityChoice.GYM in acts && !p.hasGym) p.withGear(gym = true) else p
+    return gear.copy(startedOn = p.startedOn ?: today.toString())
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -150,17 +155,15 @@ private fun ActivitiesStep(p: PersonalProfile, onChange: (PersonalProfile) -> Un
         Text("Co chcesz robić?", style = Rytm.type.planTitle, color = Rytm.colors.ink)
         SmallText("Zaznacz wszystko, co pasuje. Plan ułoży się wokół tego.")
         ActivityChoice.entries.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { a ->
-                    Tile(activityLabel(a), activityHint(a), a in acts, Modifier.weight(1f)) {
+                    Tile(activityLabel(a), activityHint(a), a in acts, Modifier.weight(1f).fillMaxHeight()) {
                         onChange(p.copy(activities = if (a in acts) acts - a else acts + a))
                     }
                 }
             }
         }
-        if (ActivityChoice.RUN in acts || ActivityChoice.WALK in acts) {
-            Pill("Biegam albo chodzę na bieżni", p.treadmill) { onChange(p.copy(treadmill = !p.treadmill)) }
-        }
+        SmallText("Sprzęt (np. bieżnię albo gumy) zaznaczysz za chwilę.")
     }
 }
 
@@ -283,12 +286,9 @@ private fun EquipmentStep(p: PersonalProfile, onChange: (PersonalProfile) -> Uni
     var pair by remember { mutableStateOf(Format.dec(p.dumbbellPairMaxKg, 0)) }
     var single by remember { mutableStateOf(Format.dec(p.dumbbellSingleMaxKg, 0)) }
     RytmCard {
-        Text("Czym ćwiczysz?", style = Rytm.type.planTitle, color = Rytm.colors.ink)
-        Pills(
-            listOf("Bez sprzętu" to EquipmentKind.NONE, "Gumy" to EquipmentKind.BANDS, "Hantle" to EquipmentKind.DUMBBELLS, "Siłownia" to EquipmentKind.GYM),
-            p.equipment,
-        ) { onChange(p.copy(equipment = it)) }
-        if (p.equipment == EquipmentKind.DUMBBELLS) {
+        Text("Sprzęt i czas", style = Rytm.type.planTitle, color = Rytm.colors.ink)
+        GearChecklist(p, onChange)
+        if (p.wantsStrength && p.hasDumbbells && !p.hasGym) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Field("Para, maks. na rękę (kg)", pair, KeyboardType.Decimal, Modifier.weight(1f)) {
                     pair = it.take(4)
@@ -299,12 +299,12 @@ private fun EquipmentStep(p: PersonalProfile, onChange: (PersonalProfile) -> Uni
                     it.replace(',', '.').toDoubleOrNull()?.let { v -> onChange(p.copy(dumbbellSingleMaxKg = v)) }
                 }
             }
-            Pill("Mam też gumy", p.bands) { onChange(p.copy(bands = !p.bands)) }
-            SmallText("Skok ciężaru:")
+            SmallText("Najmniejsza zmiana ciężaru (do progresji):")
             Pills(listOf(0.5, 1.0, 2.0).map { Format.kg(it) + " kg" to it }, p.weightStepKg ?: 1.0) { onChange(p.copy(weightStepKg = it)) }
         }
         SmallText("Ile minut na trening:")
         Pills(listOf(20, 30, 45, 60, 90).map { "$it" to it }, p.sessionMinutes) { onChange(p.copy(sessionMinutes = it)) }
+        if (p.wantsStrength) FocusPicker(p, onChange)
     }
 }
 
@@ -313,6 +313,8 @@ private fun EquipmentStep(p: PersonalProfile, onChange: (PersonalProfile) -> Uni
 private fun SummaryStep(
     p: PersonalProfile,
     onTweak: (PersonalProfile, String, (PlanTweakResult) -> Unit) -> Unit,
+    hasAiKey: Boolean,
+    onSaveAiKey: (LlmProvider, String) -> Unit,
     onChange: (PersonalProfile) -> Unit,
 ) {
     val today = LocalDate.now(RytmTime.zone)
@@ -342,17 +344,15 @@ private fun SummaryStep(
                 weight.replace(',', '.').toDoubleOrNull()?.let { w -> onChange(p.copy(weightKg = w)) }
             }
         }
-        Pills(
-            listOf("Siedząca praca" to ActivityLevel.SEDENTARY, "Trochę ruchu" to ActivityLevel.LIGHT, "Dużo chodzenia" to ActivityLevel.MODERATE, "Praca fizyczna" to ActivityLevel.ACTIVE),
-            p.activity,
-        ) { onChange(p.copy(activity = it)) }
+        ActivityLevelPicker(p, onChange)
         val t = NutritionCalculator.targets(p, today)
         WhyBox("Na dzień bez treningu: ${Format.int(t.kcal)} kcal · białko ${t.proteinG} g · tłuszcz ${t.fatG} g · węgle ${t.carbsG} g. Własne cele (np. z Fitatu) wpiszesz w profilu.")
     }
 
     RytmCard {
         CardHeader("Twój tydzień")
-        val plan = CoachEngine().week(CoachData(today = today, profile = p.toUserProfile(today), habits = p.habits())).days
+        val start = p.copy(startedOn = p.startedOn ?: today.toString())
+        val plan = CoachEngine().week(CoachData(today = today, profile = start.toUserProfile(today), habits = p.habits())).days
         plan.forEach { d ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(dayNames[d.date.dayOfWeek.value - 1], style = Rytm.type.small, color = Rytm.colors.muted, modifier = Modifier.width(26.dp))
@@ -360,14 +360,15 @@ private fun SummaryStep(
             }
         }
         SmallText("Coś nie pasuje? Wróć do kroku albo napisz, co zmienić.")
-        OutlinedTextField(
+        if (!hasAiKey) AiKeyBox(onSaveAiKey)
+        if (hasAiKey) OutlinedTextField(
             value = request,
             onValueChange = { request = it.take(500) },
             label = { Text("Popraw z AI, np. we wtorki nie mam czasu") },
             minLines = 2,
             modifier = Modifier.fillMaxWidth(),
         )
-        RytmButton(if (running) "AI myśli…" else "Popraw z AI", Modifier.fillMaxWidth(), enabled = request.isNotBlank() && !running) {
+        if (hasAiKey) RytmButton(if (running) "AI myśli…" else "Popraw z AI", Modifier.fillMaxWidth(), enabled = request.isNotBlank() && !running) {
             running = true
             error = null
             onTweak(p, request) { r ->
@@ -388,6 +389,33 @@ private fun SummaryStep(
                 RytmButton("Odrzuć", Modifier.weight(1f)) { proposal = null }
             }
         }
+    }
+}
+
+/**
+ * Wpis klucza AI w kreatorze. Klucz zostaje tylko na tym telefonie, zaszyfrowany w Android Keystore;
+ * bez klucza Rytm działa na regułach, a poprawki robisz, wracając do kroków.
+ */
+@Composable
+private fun AiKeyBox(onSave: (LlmProvider, String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    var provider by remember { mutableStateOf(LlmProvider.CLAUDE) }
+    var key by remember { mutableStateOf("") }
+    WhyBox("„Popraw z AI” i analizy AI potrzebują klucza API (Claude albo OpenAI). Bez niego wszystko działa na regułach; klucz dodasz też później w zakładce Wieczór.")
+    if (!open) {
+        RytmButton("Mam klucz AI", Modifier.fillMaxWidth()) { open = true }
+    } else {
+        Pills(listOf("Claude" to LlmProvider.CLAUDE, "OpenAI" to LlmProvider.OPENAI), provider) { provider = it }
+        OutlinedTextField(
+            value = key,
+            onValueChange = { key = it.trim() },
+            label = { Text("Klucz API") },
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        SmallText("Klucz zostaje tylko na tym telefonie, zaszyfrowany. Limit wydatków (domyślnie 3 USD na miesiąc) zmienisz w zakładce Wieczór.")
+        RytmButton("Zapisz klucz", Modifier.fillMaxWidth(), primary = true, enabled = key.length >= 20) { onSave(provider, key) }
     }
 }
 
