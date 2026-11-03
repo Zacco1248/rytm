@@ -37,7 +37,7 @@ class CoachEngine(
 ) {
     /** Plan i ćwiczenia z profilu osoby (stałe sporty, dni siły, sprzęt, cel). */
     private fun plannerFor(data: CoachData) =
-        WeekPlanner(data.profile.planner, ExerciseLibrary(data.profile.equipment, data.profile.goal))
+        WeekPlanner(data.profile.planner, ExerciseLibrary(data.profile.equipment, data.profile.goal, data.profile.focus))
 
     fun today(data: CoachData): TodaySnapshot {
         val load = load(data)
@@ -72,6 +72,7 @@ class CoachEngine(
             nutrition = data.nutrition.firstOrNull { it.date == data.today },
             nutritionTargets = data.profile.nutrition.withTraining(trainingKcal),
             trainingKcal = trainingKcal,
+            trainingKcalFactor = data.profile.trainingKcalFactor,
             dayOff = data.dayNotes.any { it.date == data.today && it.dayOff },
             alcoholYesterday = alcoholOn(data, data.today.minusDays(1)),
             alcoholToday = alcoholOn(data, data.today),

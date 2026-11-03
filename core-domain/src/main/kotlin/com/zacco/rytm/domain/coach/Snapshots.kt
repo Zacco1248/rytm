@@ -43,8 +43,9 @@ data class TodaySnapshot(
     val nutrition: NutritionDay?,
     /** Cel dnia z doliczonym treningiem ([trainingKcal]). */
     val nutritionTargets: NutritionTargets,
-    /** Ile kcal z treningów doliczono do celu (0,75 × kcal z zegarka). */
+    /** Ile kcal z treningów doliczono do celu ([trainingKcalFactor] × kcal z zegarka). */
     val trainingKcal: Int,
+    val trainingKcalFactor: Double = 0.75,
     val dayOff: Boolean,
     /** Porcje alkoholu: wczoraj (liczone do dzisiejszej gotowości) i dziś. */
     val alcoholYesterday: Int,

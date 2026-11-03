@@ -249,7 +249,7 @@ private fun NutritionCard(s: TodaySnapshot, sync: SyncUi, onSync: () -> Unit, on
             }
             Chip(label, ChipTone.MUTED, onClick = onSync)
         }
-        if (s.trainingKcal > 0) SmallText("Cel powiększony o ${Format.int(s.trainingKcal)} kcal z treningu (0,75 × kcal z zegarka), makro proporcjonalnie.")
+        if (s.trainingKcal > 0) SmallText("Cel powiększony o ${Format.int(s.trainingKcal)} kcal z treningu (${Format.dec(s.trainingKcalFactor, 2).trimEnd('0').trimEnd(',')} × kcal z zegarka), makro proporcjonalnie.")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Macro("Kcal", n?.kcal ?: 0, t.kcal, "", c.accent, Modifier.weight(1f))
             Macro("Białko", Format.roundInt(n?.proteinG ?: 0.0), t.proteinG, " g", c.good, Modifier.weight(1f))

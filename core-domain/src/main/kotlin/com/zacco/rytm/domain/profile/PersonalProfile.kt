@@ -1,5 +1,6 @@
 package com.zacco.rytm.domain.profile
 
+import com.zacco.rytm.domain.exercise.Muscle
 import com.zacco.rytm.domain.habits.DefaultHabits
 import com.zacco.rytm.domain.habits.Habit
 import com.zacco.rytm.domain.model.ActivityType
@@ -68,11 +69,22 @@ data class PersonalProfile(
     val sleepHoursMax: Int = 9,
     /** Własne cele (np. z Fitatu albo od dietetyka). Null: liczone z profilu. */
     val customTargets: CustomTargets? = null,
+    /** Stare pole (zawsze 0,75); zostaje tylko po to, żeby wczytać zapisane profile. */
     val trainingKcalFactor: Double = 0.75,
+    /** Własny mnożnik kcal z treningu; null: zależnie od celu ([defaultKcalFactor]). */
+    val kcalFactorOverride: Double? = null,
+    /** Partie, na których chcesz się skupić (brzuch, biceps…). */
+    val focus: List<Muscle> = emptyList(),
     /** Tętno maksymalne z testu; bez niego szacunek z wieku. */
     val maxHr: Int? = null,
 ) {
     fun age(today: LocalDate): Int? = birthYear?.let { today.year - it }
+
+    /**
+     * Jaką część kcal treningu z zegarka doliczać do celu. Zegarki zawyżają spalanie o ok. 20–30%,
+     * więc przy redukcji bierzemy połowę, przy masie całość. Przy celach z Fitatu zostaje 0,75 jak w Fitatu.
+     */
+    val kcalFactor: Double get() = kcalFactorOverride ?: defaultKcalFactor(goal, customTargets != null)
 
     fun toUserProfile(today: LocalDate): UserProfile = UserProfile(
         weightKg = weightKg,
@@ -86,12 +98,13 @@ data class PersonalProfile(
         ),
         // Wzór Tanaki: 208 − 0,7 × wiek.
         maxHr = maxHr ?: age(today)?.let { (208 - 0.7 * it).roundToInt() } ?: 190,
-        trainingKcalFactor = trainingKcalFactor,
+        trainingKcalFactor = kcalFactor,
         planner = plannerConfig(),
         equipment = Equipment(equipment, dumbbellPairMaxKg, dumbbellSingleMaxKg, bands || equipment == EquipmentKind.BANDS, sessionMinutes, weightStepKg),
         goal = goal,
         goalNote = goalNote,
         name = name,
+        focus = focus.toSet(),
     )
 
     fun habits(): List<Habit> = DefaultHabits.withSteps(stepsTarget)
@@ -121,6 +134,14 @@ data class PersonalProfile(
     }
 
     companion object {
+        fun defaultKcalFactor(goal: Goal, customTargets: Boolean): Double = when {
+            customTargets -> 0.75
+            goal == Goal.FAT_LOSS -> 0.5
+            goal == Goal.MUSCLE_GAIN -> 1.0
+            goal == Goal.ENDURANCE || goal == Goal.STRENGTH -> 0.9
+            else -> 0.75
+        }
+
         private fun timeOf(min: Int): LocalTime = LocalTime.of((min / 60) % 24, min % 60)
     }
 }

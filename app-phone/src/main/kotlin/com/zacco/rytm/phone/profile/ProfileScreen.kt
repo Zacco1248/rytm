@@ -36,6 +36,7 @@ import com.zacco.rytm.domain.profile.PersonalTrainingEntry
 import com.zacco.rytm.domain.profile.Sex
 import com.zacco.rytm.domain.time.RytmTime
 import com.zacco.rytm.phone.app.Format
+import com.zacco.rytm.domain.exercise.Muscle
 import com.zacco.rytm.phone.ui.components.CardHeader
 import com.zacco.rytm.phone.ui.components.Pill
 import com.zacco.rytm.phone.ui.components.RytmButton
@@ -193,6 +194,13 @@ fun ProfileScreen(
             val current = p.weightStepKg ?: if (p.equipment == EquipmentKind.GYM) 2.5 else 1.0
             Pills(steps.map { Format.kg(it) + " kg" to it }, current) { p = p.copy(weightStepKg = it) }
         }
+        SmallText("Na czym chcesz się skupić? Sesja dostanie na to dodatkowe ćwiczenie albo serię (maks. 2 partie na sesję):")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Muscle.entries.forEach { m ->
+                val on = m in p.focus
+                Pill(Format.muscle(m), on) { p = p.copy(focus = if (on) p.focus - m else p.focus + m) }
+            }
+        }
         SmallText("Czas na jedną sesję:")
         Pills(listOf(20, 30, 45, 60, 90).map { "$it min" to it }, p.sessionMinutes) { p = p.copy(sessionMinutes = it) }
         SmallText("Dni, w które możesz trenować siłowo (kolejność kliknięć = kolejność preferencji):")
@@ -270,7 +278,7 @@ fun ProfileScreen(
         CardHeader("Żywienie")
         Pills(listOf("Policz z profilu" to false, "Mam własne cele" to true), custom) { custom = it }
         if (custom) {
-            SmallText("Np. z Fitatu albo od dietetyka. Treningi i tak doliczają się osobno (0,75 × kcal z zegarka).")
+            SmallText("Np. z Fitatu albo od dietetyka. Treningi i tak doliczają się osobno.")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Field("Kcal", kcal, KeyboardType.Number, Modifier.weight(1f)) { kcal = it.filter(Char::isDigit).take(5) }
                 Field("Białko g", protein, KeyboardType.Number, Modifier.weight(1f)) { protein = it.filter(Char::isDigit).take(3) }
@@ -286,6 +294,15 @@ fun ProfileScreen(
                     "Liczone wzorem Mifflina-St Jeora z ruchem w ciągu dnia i korektą pod cel. Treningi dolicza Rytm.",
             )
         }
+        val auto = PersonalProfile.defaultKcalFactor(p.goal, custom)
+        SmallText(
+            "Ile kcal z treningu doliczać do celu? Zegarki zawyżają spalanie o ok. 20–30%, a spacery są już w ruchu dziennym. " +
+                "Automatycznie dla Twojego celu: ${Format.dec(auto, 2).trimEnd('0').trimEnd(',')}.",
+        )
+        Pills(
+            listOf("Auto (${Format.dec(auto, 2).trimEnd('0').trimEnd(',')})" to null, "0,5" to 0.5, "0,75" to 0.75, "1,0" to 1.0),
+            p.kcalFactorOverride,
+        ) { p = p.copy(kcalFactorOverride = it) }
     }
 
     RytmButton(
