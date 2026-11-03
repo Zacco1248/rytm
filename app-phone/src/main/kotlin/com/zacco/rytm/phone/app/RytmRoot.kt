@@ -338,6 +338,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onRunMonthly = vm::runMonthly,
                         onAddWeighIn = { entryDate = null; sheet = Sheet.WEIGH_IN },
                         onResetKcal = vm::resetKcalAdjust,
+                        onAddGoal = vm::addGoal,
+                        onRemoveGoal = vm::removeGoal,
                     )
                     Tab.HABITS -> HabitsTab(s, onToggle = { vm.toggleHabit(it.habit, it.done) })
                     Tab.EVENING -> EveningScreen(

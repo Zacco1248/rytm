@@ -188,6 +188,7 @@ class CoachEngine(
             macros = nutrition.map { MacroDay(it, data.profile.nutrition.withTraining(trainingKcal(data, it.date))) },
             kcalAdjust = data.profile.kcalAdjust,
             kcalNextReview = data.profile.kcalReviewedOn?.plusDays(com.zacco.rytm.domain.nutrition.KcalAdjuster.PERIOD_DAYS),
+            goals = data.profile.goals.map { com.zacco.rytm.domain.goals.Goals.progress(it, data.today, data.weighIns, data.sets) },
         )
     }
 

@@ -53,6 +53,8 @@ fun BodyScreen(
     onRunMonthly: () -> Unit = {},
     onAddWeighIn: () -> Unit,
     onResetKcal: () -> Unit = {},
+    onAddGoal: (com.zacco.rytm.domain.goals.UserGoal) -> Unit = {},
+    onRemoveGoal: (String) -> Unit = {},
 ) {
     val (paceLabel, paceTone) = when (b.pace) {
         WeightPace.UNKNOWN -> "za mało ważeń" to ChipTone.MUTED
@@ -64,6 +66,7 @@ fun BodyScreen(
     }
     ScreenHeader(sub = Format.goal(b.goal) + " · ostatnie 4 tygodnie", title = "Sylwetka") { Chip(paceLabel, paceTone) }
     WeightCard(b, onAddWeighIn)
+    GoalsCard(b.goals, b.strength.map { it.exercise }, b.currentAvg7, onAddGoal, onRemoveGoal)
     KcalLoopCard(b, kcalTarget, onResetKcal)
     MacroCard(b)
     RytmCard {

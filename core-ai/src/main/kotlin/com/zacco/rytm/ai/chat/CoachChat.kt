@@ -95,6 +95,10 @@ data class ChatContext(
     val proteinTarget: Int,
     /** Ćwiczenia, które Rytm zna (z opisem techniki), z partiami. */
     val knownExercises: List<String>,
+    /** Cele osoby z postępem i prognozą. */
+    val goals: List<String> = emptyList(),
+    /** Tydzień lżej (deload), gdy trwa. */
+    val deload: String? = null,
 ) {
     companion object {
         fun from(data: CoachData, s: TodaySnapshot, week: WeekSnapshot, nowTime: String): ChatContext {
@@ -146,6 +150,11 @@ data class ChatContext(
                 proteinEaten = s.nutrition?.proteinG?.roundToInt(),
                 proteinTarget = s.nutritionTargets.proteinG,
                 knownExercises = ExerciseGuide.all().map { e -> e.name + " [" + e.muscles.joinToString(",") { it.name } + "]" },
+                goals = data.profile.goals.map { g ->
+                    val p = com.zacco.rytm.domain.goals.Goals.progress(g, data.today, data.weighIns, data.sets)
+                    "${g.title}: ${(p.share * 100).toInt()}%, ${p.note}"
+                },
+                deload = s.deload?.text,
             )
         }
     }

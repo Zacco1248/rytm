@@ -29,6 +29,7 @@ data class UserProfile(
     val kcalAdjust: Int = 0,
     /** Ostatni przegląd celu kcal; null: jeszcze nie ma od czego liczyć. */
     val kcalReviewedOn: java.time.LocalDate? = null,
+    val goals: List<com.zacco.rytm.domain.goals.UserGoal> = emptyList(),
 )
 
 /** Cele z Fitatu pod rekompozycję. */

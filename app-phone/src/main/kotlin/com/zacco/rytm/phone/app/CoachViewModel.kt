@@ -360,6 +360,23 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         data.profiles.save(p.copy(kcalAdjust = 0, kcalReviewedOn = LocalDate.now(RytmTime.zone).toString()))
     }
 
+    fun addGoal(g: com.zacco.rytm.domain.goals.UserGoal) {
+        val p = data.profiles.profile.value ?: return
+        // Start celu = dzisiejsza wartość (żeby kamienie milowe liczyły się od teraz).
+        val start = state.value?.body?.let { b ->
+            when (g.kind) {
+                com.zacco.rytm.domain.goals.GoalKind.WEIGHT -> b.currentAvg7
+                else -> null
+            }
+        }
+        data.profiles.save(p.copy(goals = p.goals + g.copy(start = start)))
+    }
+
+    fun removeGoal(id: String) {
+        val p = data.profiles.profile.value ?: return
+        data.profiles.save(p.copy(goals = p.goals.filterNot { it.id == id }))
+    }
+
     fun deleteWeighIn(id: String) {
         viewModelScope.launch { data.entries.deleteWeighIn(id) }
     }

@@ -129,6 +129,7 @@ data class BodySnapshot(
     /** Korekta celu kcal z pętli jedzenie–waga i kiedy następny przegląd. */
     val kcalAdjust: Int = 0,
     val kcalNextReview: java.time.LocalDate? = null,
+    val goals: List<com.zacco.rytm.domain.goals.GoalProgress> = emptyList(),
 )
 
 data class MacroDay(val nutrition: NutritionDay, val target: NutritionTargets) {

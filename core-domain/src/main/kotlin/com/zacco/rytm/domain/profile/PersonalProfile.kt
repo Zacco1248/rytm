@@ -100,6 +100,8 @@ data class PersonalProfile(
     val kcalAdjust: Int = 0,
     /** Ostatni przegląd celu kcal (ISO); null: od [startedOn]. */
     val kcalReviewedOn: String? = null,
+    /** Cele z kamieniami milowymi (waga, powtórzenia, ciężar). */
+    val goals: List<com.zacco.rytm.domain.goals.UserGoal> = emptyList(),
 ) {
     val hasDumbbells: Boolean get() = ownsDumbbells ?: (equipment == EquipmentKind.DUMBBELLS)
     val hasGym: Boolean get() = equipment == EquipmentKind.GYM
@@ -130,6 +132,7 @@ data class PersonalProfile(
         heightCm = heightCm,
         nutrition = (customTargets?.toTargets() ?: NutritionCalculator.targets(this, today)).adjusted(kcalAdjust),
         kcalAdjust = kcalAdjust,
+        goals = goals,
         kcalReviewedOn = (kcalReviewedOn ?: startedOn)?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
         sleep = SleepTarget(
             onsetFrom = timeOf(sleepOnsetFromMin),

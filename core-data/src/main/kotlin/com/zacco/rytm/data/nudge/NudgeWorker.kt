@@ -22,6 +22,7 @@ import com.zacco.rytm.domain.coach.Nudge
 import com.zacco.rytm.domain.coach.NudgeKind
 import com.zacco.rytm.domain.coach.Nudges
 import com.zacco.rytm.domain.nutrition.KcalAdjuster
+import com.zacco.rytm.domain.goals.Goals
 import com.zacco.rytm.domain.time.RytmTime
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
@@ -36,6 +37,7 @@ class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
 
     override suspend fun doWork(): Result {
         runCatching { reviewKcal(applicationContext) }.onFailure { Log.w(TAG, "Przegląd kcal nieudany", it) }
+        runCatching { celebrateGoals(applicationContext) }.onFailure { Log.w(TAG, "Cele nieudane", it) }
         runCatching { check(applicationContext) }.onFailure { Log.w(TAG, "Podpowiedź nieudana", it) }
         return Result.success()
     }
@@ -78,6 +80,30 @@ class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             if (review.change != 0 && data.ai.settings.value.nudgesEnabled) {
                 show(context, Nudge(NudgeKind.PROTEIN, "Nowy cel: ${t.kcal + review.change} kcal", review.reason + " Cofniesz to w Sylwetce."), id = 99)
             }
+        }
+
+        /** Małe wygrane: powiadomienie za każdy nowy kamień milowy celu (25, 50, 75, 100%). */
+        suspend fun celebrateGoals(context: Context) {
+            val data = RytmData.get(context)
+            if (!data.ai.settings.value.nudgesEnabled) return
+            val hour = LocalTime.now(RytmTime.zone).hour
+            if (hour < 7 || hour >= 22) return
+            data.profiles.ensureLoaded()
+            val p = data.profiles.current() ?: return
+            if (p.goals.isEmpty()) return
+            val today = LocalDate.now(RytmTime.zone)
+            val coach = data.coach.observe(today).first()
+            var changed = false
+            val goals = p.goals.mapIndexed { i, g ->
+                val progress = Goals.progress(g, today, coach.weighIns, coach.sets)
+                if (progress.milestonesReached > g.celebrated) {
+                    val title = if (progress.done) "Cel osiągnięty!" else "Kamień milowy: ${progress.milestonesReached * 25}%"
+                    show(context, Nudge(NudgeKind.WORKOUT, title, "${g.title}. ${progress.note}"), id = 200 + i)
+                    changed = true
+                    g.copy(celebrated = progress.milestonesReached)
+                } else g
+            }
+            if (changed) data.profiles.save(p.copy(goals = goals))
         }
 
         suspend fun check(context: Context) {
