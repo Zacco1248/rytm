@@ -33,6 +33,13 @@ data class EveningInput(
     val tomorrowWarnings: List<String>,
     val suggestedBedtime: String,
     val calibrating: Boolean,
+    /** Cel z profilu (np. RECOMP) i opis własnymi słowami. */
+    val goal: String? = null,
+    val goalNote: String? = null,
+    /** Serie z dzisiejszego treningu siłowego, np. „Przysiad goblet: 3 × 15 na 10 kg”. */
+    val strengthToday: List<String> = emptyList(),
+    val dayOff: Boolean = false,
+    val alcoholDrinksToday: Int = 0,
 )
 
 @Serializable

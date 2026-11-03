@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,9 +27,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.zacco.rytm.domain.coach.HabitStatus
+import com.zacco.rytm.domain.exercise.ExerciseGuide
+import com.zacco.rytm.domain.exercise.ExerciseInfo
 import com.zacco.rytm.domain.coach.TodaySnapshot
 import com.zacco.rytm.domain.habits.HabitAutoSource
 import com.zacco.rytm.domain.habits.HabitKind
+import com.zacco.rytm.domain.readiness.CalibrationGap
+import com.zacco.rytm.domain.readiness.CalibrationStatus
 import com.zacco.rytm.domain.readiness.ReadinessComponent
 import com.zacco.rytm.domain.readiness.ReadinessLevel
 import com.zacco.rytm.domain.time.RytmTime
@@ -58,11 +66,12 @@ fun TodayScreen(
     onProfile: () -> Unit,
     onToggleHabit: (HabitStatus) -> Unit,
     onCheckIn: () -> Unit,
-    onOtherActivity: () -> Unit,
     onNutrition: () -> Unit,
     onDayOff: () -> Unit,
-    onAlcohol: () -> Unit,
+    onAdd: () -> Unit,
     onLogWorkout: () -> Unit = {},
+    phoneRunActive: Boolean = false,
+    onPhoneWorkout: () -> Unit = {},
 ) {
     ScreenHeader(sub = Format.dayLong(s.date), title = greeting()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -80,21 +89,11 @@ fun TodayScreen(
     sync.error?.let { RytmCard { SmallText(it, color = Rytm.colors.bad) } }
 
     ReadinessCard(s, onCheckIn)
-    PlanCard(s, onDayOff, onLogWorkout)
+    PlanCard(s, onDayOff, onLogWorkout, phoneRunActive, onPhoneWorkout)
     NutritionCard(s, sync, onSync, onNutrition)
     HabitsCard(s.habits, onToggleHabit)
 
-    RytmCard {
-        CardHeader("Szybki wpis")
-        ButtonRow {
-            RytmButton("Zaloguj inną aktywność", Modifier.weight(1f), onClick = onOtherActivity)
-            RytmButton("Check-in", Modifier.weight(1f), onClick = onCheckIn)
-        }
-        ButtonRow {
-            RytmButton("Żywienie (też wstecz)", Modifier.weight(1f), onClick = onNutrition)
-            RytmButton(if (s.alcoholToday + s.alcoholYesterday > 0) "Alkohol ✓" else "Alkohol", Modifier.weight(1f), onClick = onAlcohol)
-        }
-    }
+    ActivityTodayCard(s, onAdd)
 }
 
 private fun greeting(): String {
@@ -127,10 +126,17 @@ private fun ReadinessCard(s: TodaySnapshot, onCheckIn: () -> Unit) {
         ReadinessLevel.MODERATE -> c.warn
         ReadinessLevel.LOW -> c.bad
     }
+    var showCalibration by remember { mutableStateOf(false) }
     RytmCard {
         CardHeader("Gotowość") {
-            if (r.calibrating) Chip("Kalibracja ${s.baselineDays}/14", ChipTone.WARN)
+            val cal = s.calibration
+            if (r.calibrating && cal != null) {
+                Chip("Kalibracja ${cal.restingHrDays.coerceAtMost(cal.needDays)}/${cal.needDays} " + if (showCalibration) "▴" else "▾", ChipTone.WARN) {
+                    showCalibration = !showCalibration
+                }
+            }
         }
+        s.calibration?.takeIf { showCalibration && r.calibrating }?.let { CalibrationDetails(it) }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Ring(r.score / 100f, ringColor) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -192,7 +198,7 @@ private fun ComponentRow(name: String, value: String, score: Int?) {
 }
 
 @Composable
-private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit, onLogWorkout: () -> Unit) {
+private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit, onLogWorkout: () -> Unit, phoneRunActive: Boolean, onPhoneWorkout: () -> Unit) {
     val p = s.plan
     RytmCard {
         CardHeader("Plan na dziś") {
@@ -211,8 +217,20 @@ private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit, onLogWorkout: () ->
                     color = Rytm.colors.good,
                 )
             }
-            RytmButton(if (s.setsToday.isEmpty()) "Zapisz trening" else "Zapisz kolejny trening", Modifier.fillMaxWidth(), onClick = onLogWorkout)
-            SmallText("Na zegarku: „Zacznij trening” prowadzi seria po serii z przerwą i tętnem.")
+            RytmButton(
+                if (phoneRunActive) "Wróć do treningu" else "Zacznij trening na telefonie",
+                Modifier.fillMaxWidth(),
+                primary = true,
+                onClick = onPhoneWorkout,
+            )
+            RytmButton(if (s.setsToday.isEmpty()) "Wpisz trening po fakcie" else "Wpisz kolejny trening", Modifier.fillMaxWidth(), onClick = onLogWorkout)
+            SmallText("Telefon prowadzi seria po serii z przerwą i wibracją. Na zegarku z Wear OS to samo daje „Zacznij trening”.")
+        }
+        p.cardio?.let { cs ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                cs.steps.forEachIndexed { i, step -> SmallText("${i + 1}. $step", color = Rytm.colors.ink) }
+            }
+            SmallText("Tętno i kcal przyjdą z zegarka albo opaski przez Health Connect. Bez nich dodaj sesję przyciskiem „+”.")
         }
         p.warnings.forEach { SmallText("⚠ $it", color = Rytm.colors.warn) }
         if (p.rationale.isNotEmpty()) WhyBox(p.rationale.joinToString(" "))
@@ -234,7 +252,7 @@ private fun NutritionCard(s: TodaySnapshot, sync: SyncUi, onSync: () -> Unit, on
             }
             Chip(label, ChipTone.MUTED, onClick = onSync)
         }
-        if (s.trainingKcal > 0) SmallText("Cel powiększony o ${Format.int(s.trainingKcal)} kcal z treningu (0,75 × kcal z zegarka), makro proporcjonalnie.")
+        if (s.trainingKcal > 0) SmallText("Cel powiększony o ${Format.int(s.trainingKcal)} kcal z treningu (${Format.dec(s.trainingKcalFactor, 2).trimEnd('0').trimEnd(',')} × kcal z zegarka), makro proporcjonalnie.")
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Macro("Kcal", n?.kcal ?: 0, t.kcal, "", c.accent, Modifier.weight(1f))
             Macro("Białko", Format.roundInt(n?.proteinG ?: 0.0), t.proteinG, " g", c.good, Modifier.weight(1f))
@@ -273,7 +291,7 @@ fun HabitsCard(habits: List<HabitStatus>, onToggle: (HabitStatus) -> Unit, showS
 @Composable
 private fun HabitRow(h: HabitStatus, onToggle: (HabitStatus) -> Unit, showStreak: Boolean) {
     val c = Rytm.colors
-    val auto = h.habit.autoSource != null
+    val auto = h.habit.autoOnly
     Row(
         Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -302,6 +320,8 @@ private fun HabitRow(h: HabitStatus, onToggle: (HabitStatus) -> Unit, showStreak
 private fun habitDetail(h: HabitStatus): String = when {
     h.habit.autoSource == HabitAutoSource.STEPS ->
         "${Format.int(h.value ?: 0)} / ${Format.int(h.habit.target ?: 0)} kroków · z Health Connect"
+    h.habit.autoSource == HabitAutoSource.MOBILITY && (h.value ?: 0) > 0 -> "${h.value} min z rozciągania, jogi albo mobilności"
+    h.habit.autoSource == HabitAutoSource.MOBILITY -> "${h.habit.target} min dziennie · odhaczy się samo po rozciąganiu albo jodze"
     h.habit.kind == HabitKind.MINUTES -> "${h.habit.target} min dziennie"
     else -> "codziennie"
 }
@@ -310,13 +330,19 @@ private fun habitDetail(h: HabitStatus): String = when {
 @Composable
 private fun WorkoutList(w: com.zacco.rytm.domain.model.StrengthWorkout) {
     val c = Rytm.colors
+    var info by remember { mutableStateOf<ExerciseInfo?>(null) }
+    info?.let { ExerciseSheet(it) { info = null } }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        SmallText(w.name)
+        SmallText(w.name + " · dotknij ćwiczenia, żeby zobaczyć opis")
         w.exercises.forEachIndexed { i, e ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val guide = ExerciseGuide.find(e.name)
+            Row(
+                Modifier.fillMaxWidth().then(if (guide != null) Modifier.clickable { info = guide } else Modifier),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Text("${i + 1}.", style = Rytm.type.small, color = c.muted)
                 Column(Modifier.weight(1f)) {
-                    Text(e.name, style = Rytm.type.small.copy(fontWeight = FontWeight.Medium), color = c.ink)
+                    Text(e.name + if (guide != null) "  ⓘ" else "", style = Rytm.type.small.copy(fontWeight = FontWeight.Medium), color = c.ink)
                     val reps = if (e.reps.first == e.reps.last) "${e.reps.first}" else "${e.reps.first}–${e.reps.last}"
                     SmallText(
                         listOfNotNull(
@@ -333,5 +359,92 @@ private fun WorkoutList(w: com.zacco.rytm.domain.model.StrengthWorkout) {
         if (w.exercises.size > 3 && w.name != "Mobilność") {
             SmallText("Mało czasu? Zrób 3 pierwsze ćwiczenia po 2 serie (ok. 20 min). Plan tygodnia się dostosuje.")
         }
+    }
+}
+
+/** Co weszło do kalibracji i czego brakowało, dzień po dniu. */
+@Composable
+private fun CalibrationDetails(cal: CalibrationStatus) {
+    val c = Rytm.colors
+    Column(
+        Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).background(c.soft).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("Czego jeszcze brakuje", style = Rytm.type.bodyStrong, color = c.ink)
+        val lines = buildList {
+            add(
+                (if (cal.restingHrReady) "✓ " else "• ") +
+                    "Tętno spoczynkowe: ${cal.restingHrDays} z ${cal.needDays} potrzebnych dni (z ostatnich ${CalibrationStatus.WINDOW_DAYS}).",
+            )
+            cal.hrvDays?.let { add((if (cal.hrvReady) "✓ " else "• ") + "HRV: $it z ${cal.needDays} pomiarów. Mierz rano w check-inie.") }
+            add(
+                (if (cal.loadReliable) "✓ " else "• ") +
+                    "Obciążenie treningowe: ${cal.loadHistoryDays.coerceAtMost(CalibrationStatus.LOAD_DAYS)} z ${CalibrationStatus.LOAD_DAYS} dni historii." +
+                    if (cal.loadReliable) "" else " Do tego czasu ACWR jest orientacyjny.",
+            )
+        }
+        lines.forEach { SmallText(it) }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            cal.days.forEach { d ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        Format.weekdayShort(d.date.dayOfWeek) + " " + Format.dayMonth(d.date),
+                        style = Rytm.type.tiny,
+                        color = c.muted,
+                        modifier = Modifier.weight(0.38f),
+                    )
+                    val (text, color) = when (d.gap) {
+                        null -> "✓ noc, tętno ${d.nightRestingHr}" + (if (d.hrv) " · HRV" else "") to c.good
+                        CalibrationGap.DAY_ONLY -> "◐ brak nocy (ładowarka?), tętno z dnia ${d.dayRestingHr}" to c.warn
+                        CalibrationGap.NO_HR -> "✕ sen bez tętna, sprawdź uprawnienia Health Connect" to c.bad
+                        CalibrationGap.NO_DATA -> "✕ brak danych z zegarka" to c.bad
+                    }
+                    Text(text, style = Rytm.type.tiny, color = color, modifier = Modifier.weight(0.62f))
+                }
+            }
+        }
+        SmallText("Dni z tętnem tylko z dnia liczą się osobno: porównujemy je z innymi dniami bez nocy.")
+    }
+}
+
+/** Wszystko, co dziś się ruszało, z kcal: treningi z planu, spacery spoza planu i wpisy ręczne. */
+@Composable
+private fun ActivityTodayCard(s: TodaySnapshot, onAdd: () -> Unit) {
+    val c = Rytm.colors
+    val acts = s.activitiesToday
+    RytmCard {
+        CardHeader("Aktywność dziś") {
+            Chip(if (s.activityKcal > 0) "${Format.int(s.activityKcal)} kcal" else "+ dodaj", if (s.activityKcal > 0) ChipTone.GOOD else ChipTone.ACCENT, onClick = onAdd)
+        }
+        if (acts.isEmpty()) {
+            SmallText("Jeszcze nic. Spacery i treningi z zegarka albo opaski pojawią się po synchronizacji; resztę dodasz przyciskiem „+”.")
+        } else {
+            acts.forEach { a ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        a.start.atZone(RytmTime.zone).format(hhmm),
+                        style = Rytm.type.tiny,
+                        color = c.muted,
+                    )
+                    Column(Modifier.weight(1f)) {
+                        Text(a.notes?.takeIf { it.isNotBlank() } ?: Format.activity(a.type), style = Rytm.type.small.copy(fontWeight = FontWeight.Medium), color = c.ink)
+                        SmallText(
+                            listOfNotNull(
+                                Format.minutes(a.durationMin),
+                                a.avgHr?.let { "śr. tętno $it" },
+                                a.rpe?.let { "RPE $it" },
+                                if (a.source == com.zacco.rytm.domain.model.Source.MANUAL) "wpis ręczny" else null,
+                            ).joinToString(" · "),
+                        )
+                    }
+                    Text(a.kcal?.let { "${Format.int(it)} kcal" } ?: "–", style = Rytm.type.small, color = if (a.kcal != null) c.ink else c.muted)
+                }
+            }
+        }
+        val parts = buildList {
+            if (s.trainingKcal > 0) add("do celu jedzenia doliczono ${Format.int(s.trainingKcal)} kcal (bez spacerów)")
+            s.night?.totalKcal?.takeIf { it > 0 }?.let { add("łącznie z podstawową przemianą ${Format.int(it)} kcal wg zegarka") }
+        }
+        if (parts.isNotEmpty()) SmallText(parts.joinToString("; ").replaceFirstChar { it.uppercase() } + ".")
     }
 }

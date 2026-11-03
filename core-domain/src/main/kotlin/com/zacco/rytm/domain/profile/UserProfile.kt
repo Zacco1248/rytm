@@ -1,6 +1,8 @@
 package com.zacco.rytm.domain.profile
 
+import com.zacco.rytm.domain.exercise.Muscle
 import com.zacco.rytm.domain.planner.Equipment
+import com.zacco.rytm.domain.planner.MobilityPrefs
 import com.zacco.rytm.domain.planner.PlannerConfig
 import java.time.LocalTime
 import kotlin.math.roundToInt
@@ -20,6 +22,9 @@ data class UserProfile(
     val goal: Goal = Goal.RECOMP,
     val goalNote: String = "",
     val name: String = "",
+    /** Partie, na których osoba chce się skupić; sesje siłowe dostają na nie dodatkowe ćwiczenie. */
+    val focus: Set<Muscle> = emptySet(),
+    val mobility: MobilityPrefs = MobilityPrefs(),
 )
 
 /** Cele z Fitatu pod rekompozycję. */

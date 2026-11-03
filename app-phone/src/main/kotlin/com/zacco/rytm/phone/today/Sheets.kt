@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -40,7 +42,12 @@ import com.zacco.rytm.domain.model.BodyComposition
 import com.zacco.rytm.domain.model.NutritionDay
 import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.LoadedArea
+import com.zacco.rytm.domain.model.ActivityType
+import com.zacco.rytm.domain.time.RytmTime
+import androidx.compose.foundation.verticalScroll
+import com.zacco.rytm.phone.app.ActivityEntry
 import com.zacco.rytm.phone.app.Format
+import com.zacco.rytm.phone.ui.components.Pill
 import com.zacco.rytm.phone.ui.components.RytmButton
 import com.zacco.rytm.phone.ui.components.SmallText
 import com.zacco.rytm.phone.ui.theme.Rytm
@@ -59,7 +66,8 @@ private fun RytmSheet(title: String, onDismiss: () -> Unit, content: @Composable
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(bottom = 26.dp).navigationBarsPadding(),
+            Modifier.fillMaxWidth().verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(horizontal = 18.dp).padding(bottom = 26.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(title, style = Rytm.type.planTitle.copy(fontSize = Rytm.type.planTitle.fontSize * 0.95f), color = Rytm.colors.ink)
@@ -92,21 +100,6 @@ private fun Scale(range: IntRange, selected: Int?, onSelect: (Int) -> Unit) {
     }
 }
 
-@Composable
-private fun Pill(text: String, on: Boolean, onClick: () -> Unit) {
-    val c = Rytm.colors
-    Text(
-        text,
-        style = Rytm.type.small,
-        color = if (on) c.bg else c.ink,
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(if (on) c.ink else c.surface)
-            .border(1.dp, if (on) c.ink else c.line, CircleShape)
-            .clickable(role = Role.Checkbox, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-    )
-}
 
 @Composable
 private fun Label(text: String) = Text(text, style = Rytm.type.body, color = Rytm.colors.ink)
@@ -130,52 +123,103 @@ fun CheckInSheet(current: DailyCheckIn?, onDismiss: () -> Unit, onSave: (Int, In
     }
 }
 
-private val DURATIONS = listOf(30, 60, 90, 120, 180, 240)
+private val DURATIONS = listOf(10, 15, 20, 30, 45, 60, 90, 120, 180)
 
+/** Gotowe rodzaje aktywności w arkuszu; „Inna” wymaga opisu. */
+private enum class ActivityPreset(val label: String, val type: ActivityType, val description: String) {
+    WALK("Spacer", ActivityType.WALK, "Spacer"),
+    WALK_TREADMILL("Spacer na bieżni", ActivityType.WALK, "Spacer na bieżni"),
+    RUN("Bieg", ActivityType.CARDIO, "Bieg"),
+    RUN_TREADMILL("Bieg na bieżni", ActivityType.CARDIO, "Bieg na bieżni"),
+    BIKE("Rower", ActivityType.CARDIO, "Rower"),
+    STRETCH("Rozciąganie / joga", ActivityType.MOBILITY, "Rozciąganie"),
+    STRENGTH("Trening siłowy", ActivityType.STRENGTH, "Trening siłowy"),
+    OTHER("Inna", ActivityType.OTHER, ""),
+}
+
+/**
+ * Ręczny wpis aktywności na wybrany dzień: spacer, bieg (też na bieżni), rower, rozciąganie, siła albo inna.
+ * Dla opasek bez Health Connect można wpisać kcal z aplikacji opaski.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun OtherActivitySheet(onDismiss: () -> Unit, onSave: (String, Int, Int?, Set<LoadedArea>) -> Unit) {
+fun ActivitySheet(date: LocalDate, onDismiss: () -> Unit, onSave: (ActivityEntry) -> Unit) {
+    val today = LocalDate.now(RytmTime.zone)
+    var preset by remember { mutableStateOf(ActivityPreset.WALK) }
     var description by remember { mutableStateOf("") }
-    var duration by remember { mutableIntStateOf(60) }
+    var duration by remember { mutableIntStateOf(30) }
     var rpe by remember { mutableStateOf<Int?>(null) }
     var areas by remember { mutableStateOf(emptySet<LoadedArea>()) }
     var areasTouched by remember { mutableStateOf(false) }
+    var kcal by remember { mutableStateOf("") }
+    // Godzina końca: null = przed chwilą (tylko dziś).
+    var endHour by remember { mutableStateOf<Int?>(if (date == today) null else 18) }
 
-    RytmSheet("Zaloguj inną aktywność", onDismiss) {
-        OutlinedTextField(
-            value = description,
-            onValueChange = {
-                description = it
-                // Domyślne zaznaczenie z opisu („remont” → plecy i barki), dopóki użytkownik sam nie wybierze.
-                if (!areasTouched) areas = LoadedArea.defaultsFor(it)
-            },
-            label = { Text("Co to było? np. remont: noszenie płyt") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
+    RytmSheet("Aktywność · " + Format.dayShortLabel(date, today), onDismiss) {
+        Label("Co to było")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            ActivityPreset.entries.forEach { p -> Pill(p.label, p == preset) { preset = p } }
+        }
+        if (preset == ActivityPreset.OTHER) {
+            OutlinedTextField(
+                value = description,
+                onValueChange = {
+                    description = it
+                    // Domyślne zaznaczenie z opisu („remont” → plecy i barki), dopóki użytkownik sam nie wybierze.
+                    if (!areasTouched) areas = LoadedArea.defaultsFor(it)
+                },
+                label = { Text("Opis, np. remont: noszenie płyt") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         Label("Ile trwało")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             DURATIONS.forEach { d -> Pill(Format.minutes(d), d == duration) { duration = d } }
         }
-        Label("Jak ciężko (RPE 1–10)")
-        Scale(1..5, rpe) { rpe = it }
-        Scale(6..10, rpe) { rpe = it }
-        Label("Co obciążyło")
+        Label("Kiedy skończone")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            LoadedArea.entries.forEach { a ->
-                Pill(Format.loaded(a), a in areas) {
-                    areasTouched = true
-                    areas = if (a in areas) areas - a else areas + a
+            if (date == today) Pill("Przed chwilą", endHour == null) { endHour = null }
+            val nowHour = java.time.LocalTime.now(RytmTime.zone).hour
+            END_HOURS.filter { date != today || it <= nowHour }.forEach { h -> Pill("%02d:00".format(h), endHour == h) { endHour = h } }
+        }
+        Label("Jak ciężko (RPE 1–10, opcjonalnie)")
+        Scale(1..5, rpe) { rpe = if (rpe == it) null else it }
+        Scale(6..10, rpe) { rpe = if (rpe == it) null else it }
+        NumberField("Kcal z opaski (opcjonalnie)", kcal, Modifier.fillMaxWidth()) { kcal = it.filter(Char::isDigit).take(4) }
+        if (preset == ActivityPreset.OTHER) {
+            Label("Co obciążyło")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                LoadedArea.entries.forEach { a ->
+                    Pill(Format.loaded(a), a in areas) {
+                        areasTouched = true
+                        areas = if (a in areas) areas - a else areas + a
+                    }
                 }
             }
+            SmallText("Od 2 godzin albo sRPE 400 planer odciąży jutro zaznaczone partie.")
         }
-        SmallText("Od 2 godzin albo sRPE 400 planer odciąży jutro zaznaczone partie.")
-        RytmButton("Zapisz", Modifier.fillMaxWidth(), primary = true, enabled = description.isNotBlank()) {
-            onSave(description, duration, rpe, areas)
+        if (preset == ActivityPreset.STRETCH) SmallText("Od 10 minut odhaczy się nawyk mobilności.")
+        val text = if (preset == ActivityPreset.OTHER) description.trim() else preset.description
+        RytmButton("Zapisz", Modifier.fillMaxWidth(), primary = true, enabled = text.isNotBlank()) {
+            val end = endHour?.let { date.atTime(it, 0).atZone(RytmTime.zone).toInstant() } ?: Instant.now()
+            onSave(
+                ActivityEntry(
+                    type = preset.type,
+                    description = text,
+                    end = end,
+                    durationMin = duration,
+                    rpe = rpe,
+                    areas = if (preset == ActivityPreset.OTHER) areas else emptySet(),
+                    kcal = kcal.toIntOrNull()?.takeIf { it in 1..5000 },
+                ),
+            )
             onDismiss()
         }
     }
 }
+
+private val END_HOURS = listOf(7, 10, 13, 16, 18, 20, 22)
 
 /** Wpis z Fitatu na dziś albo wstecz (do 13 dni), bo bez Premium Fitatu nie wysyła danych do Health Connect. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -185,8 +229,9 @@ fun NutritionSheet(
     recent: List<NutritionDay>,
     onDismiss: () -> Unit,
     onSave: (LocalDate, Int, Double, Double?, Double?) -> Unit,
+    initial: LocalDate = today,
 ) {
-    var date by remember { mutableStateOf(today) }
+    var date by remember { mutableStateOf(initial) }
     val current = recent.firstOrNull { it.date == date }
     // Pola wypełniają się wartościami wybranego dnia.
     var kcal by remember(date) { mutableStateOf(current?.kcal?.toString().orEmpty()) }
@@ -226,15 +271,10 @@ fun NutritionSheet(
 
 /** Alkohol w porcjach standardowych. Wczorajszy obniża dzisiejszą gotowość. */
 @Composable
-fun AlcoholSheet(today: LocalDate, yesterday: Int, todayDrinks: Int, onDismiss: () -> Unit, onSave: (LocalDate, Int) -> Unit) {
-    var forYesterday by remember { mutableStateOf(java.time.LocalTime.now(com.zacco.rytm.domain.time.RytmTime.zone).hour < 14) }
-    var drinks by remember(forYesterday) { mutableIntStateOf(if (forYesterday) yesterday else todayDrinks) }
-    RytmSheet("Alkohol", onDismiss) {
+fun AlcoholSheet(date: LocalDate, current: Int, onDismiss: () -> Unit, onSave: (LocalDate, Int) -> Unit) {
+    var drinks by remember { mutableIntStateOf(current) }
+    RytmSheet("Alkohol · " + Format.dayShortLabel(date, LocalDate.now(RytmTime.zone)), onDismiss) {
         SmallText("1 porcja = piwo 0,5 l, lampka wina (150 ml) albo 50 ml wódki. Liczy się do gotowości następnego dnia.")
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Pill("Wczoraj", forYesterday) { forYesterday = true }
-            Pill("Dziś", !forYesterday) { forYesterday = false }
-        }
         Scale(0..5, drinks.coerceAtMost(5)) { drinks = it }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Pill("6", drinks == 6) { drinks = 6 }
@@ -244,7 +284,7 @@ fun AlcoholSheet(today: LocalDate, yesterday: Int, todayDrinks: Int, onDismiss: 
         val penalty = com.zacco.rytm.domain.readiness.ReadinessCalculator.alcoholPenalty(drinks)
         SmallText(if (penalty == 0) "Bez wpływu na gotowość." else "Gotowość następnego dnia: −$penalty pkt.")
         RytmButton("Zapisz", Modifier.fillMaxWidth(), primary = true) {
-            onSave(if (forYesterday) today.minusDays(1) else today, drinks)
+            onSave(date, drinks)
             onDismiss()
         }
     }
@@ -285,7 +325,7 @@ fun RpeSheet(activities: List<com.zacco.rytm.domain.model.Activity>, onDismiss: 
  * Odczyt ze zrzutu to rozwiązanie tymczasowe, dopóki pomiary nie przychodzą same do Health Connect.
  */
 @Composable
-fun WeighInSheet(onDismiss: () -> Unit, onSave: (Double, Double?, Instant?, BodyComposition?) -> Unit) {
+fun WeighInSheet(date: LocalDate, onDismiss: () -> Unit, onSave: (Double, Double?, Instant?, BodyComposition?) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var kg by remember { mutableStateOf("") }
@@ -311,7 +351,7 @@ fun WeighInSheet(onDismiss: () -> Unit, onSave: (Double, Double?, Instant?, Body
         }
     }
 
-    RytmSheet("Dodaj ważenie", onDismiss) {
+    RytmSheet("Ważenie · " + Format.dayShortLabel(date, LocalDate.now(RytmTime.zone)), onDismiss) {
         SmallText("Wpisz wynik albo wczytaj zrzut ekranu pomiaru z Xiaomi Home. Najlepiej rano, po toalecie, przed jedzeniem.")
         RytmButton("Wczytaj zrzut z Xiaomi Home", Modifier.fillMaxWidth()) {
             picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -410,5 +450,80 @@ fun WorkoutLogSheet(
             onSave(entries, minutes, rpe)
             onDismiss()
         }
+    }
+}
+
+/** Opis ćwiczenia: jak je zrobić, wskazówki, najczęstszy błąd i wideo z sieci. */
+@Composable
+fun ExerciseSheet(info: com.zacco.rytm.domain.exercise.ExerciseInfo, onDismiss: () -> Unit) {
+    val c = Rytm.colors
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    RytmSheet(info.name, onDismiss) {
+        if (info.muscles.isNotEmpty()) SmallText("Pracują: " + info.muscles.joinToString { Format.muscle(it).lowercase() })
+        Text(info.how, style = Rytm.type.body, color = c.ink)
+        Text("Wskazówki", style = Rytm.type.bodyStrong, color = c.ink)
+        info.tips.forEach { SmallText("• $it") }
+        Text("Najczęstszy błąd", style = Rytm.type.bodyStrong, color = c.ink)
+        SmallText(info.mistake, color = c.warn)
+        RytmButton("Zobacz wideo (YouTube)", Modifier.fillMaxWidth(), primary = true) { runCatching { uri.openUri(info.videoUrl) } }
+        RytmButton("Zamknij", Modifier.fillMaxWidth(), onClick = onDismiss)
+    }
+}
+
+/** Co można dodać z przycisku „+”. */
+enum class QuickEntry { ACTIVITY, WORKOUT, NUTRITION, WEIGH_IN, ALCOHOL, CHECK_IN }
+
+/**
+ * Jeden przycisk „+” zamiast rzędu przycisków. Dzień wybierasz raz u góry i dotyczy każdego wpisu;
+ * check-in i trening z planu są tylko na dziś.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun QuickAddSheet(
+    today: LocalDate,
+    date: LocalDate,
+    hasWorkout: Boolean,
+    onDate: (LocalDate) -> Unit,
+    onDismiss: () -> Unit,
+    onPick: (QuickEntry) -> Unit,
+) {
+    val c = Rytm.colors
+    RytmSheet("Dodaj wpis", onDismiss) {
+        Label("Na dzień")
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            (0L..13L).map { today.minusDays(it) }.forEach { d -> Pill(Format.dayShortLabel(d, today), d == date) { onDate(d) } }
+        }
+        val isToday = date == today
+        val tiles = buildList {
+            add(Triple(QuickEntry.ACTIVITY, "Aktywność", "spacer, bieg, rower, joga…"))
+            if (isToday && hasWorkout) add(Triple(QuickEntry.WORKOUT, "Trening z planu", "serie i ciężary"))
+            add(Triple(QuickEntry.NUTRITION, "Żywienie", "kcal i makro z Fitatu"))
+            add(Triple(QuickEntry.WEIGH_IN, "Ważenie", "ręcznie albo zrzut"))
+            add(Triple(QuickEntry.ALCOHOL, "Alkohol", "liczba porcji"))
+            if (isToday) add(Triple(QuickEntry.CHECK_IN, "Check-in", "energia, nastrój, co boli"))
+        }
+        tiles.chunked(2).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { (entry, title, sub) ->
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .border(1.dp, c.line, RoundedCornerShape(14.dp))
+                            .clickable(role = Role.Button) { onPick(entry) }
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(title, style = Rytm.type.bodyStrong, color = c.ink)
+                        SmallText(sub)
+                    }
+                }
+                if (row.size == 1) Box(Modifier.weight(1f))
+            }
+        }
+        if (!isToday) SmallText("Check-in i trening z planu dodasz tylko na dziś.")
     }
 }

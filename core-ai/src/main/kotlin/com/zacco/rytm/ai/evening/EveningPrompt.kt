@@ -19,6 +19,9 @@ object EveningPrompt {
         - Gdy calibrating = true, zaznacz raz, że wskaźniki dopiero się kalibrują.
         - Odwołuj się do liczb z danych, nie wymyślaj brakujących. Pole null oznacza brak danych.
         - Jeśli jest reflection, odnieś się do niego jednym zdaniem.
+        - Uwzględnij cel (goal, goalNote): przy rekompozycji i redukcji liczy się białko i utrzymanie siły, przy masie nadwyżka kcal, przy wytrzymałości regeneracja.
+        - strengthToday to serie z treningu siłowego; gdy są, pochwal konkretny postęp albo powiedz, co jutro odpuścić.
+        - dayOff = true to świadomie wolny dzień: bez wyrzutów.
     """.trimIndent()
 
     fun user(input: EveningInput): String = "Dane dnia:\n" + json.encodeToString(EveningInput.serializer(), input)

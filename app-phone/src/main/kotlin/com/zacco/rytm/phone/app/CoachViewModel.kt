@@ -5,6 +5,10 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.zacco.rytm.data.RytmData
+import com.zacco.rytm.ai.AiSettings
+import com.zacco.rytm.ai.LlmProvider
+import com.zacco.rytm.ai.SavedEveningReview
+import com.zacco.rytm.data.ai.EveningWorker
 import com.zacco.rytm.data.healthconnect.HealthConnectPermissions
 import com.zacco.rytm.data.sync.HealthConnectSync
 import com.zacco.rytm.data.sync.SyncWorker
@@ -58,6 +62,8 @@ data class CoachUiState(
     val personalTrainingUntil: LocalDate?,
     /** Żywienie z ostatnich dni, do wpisu wstecz. */
     val recentNutrition: List<NutritionDay>,
+    /** Porcje alkoholu z ostatnich 14 dni, do wpisu na wybrany dzień. */
+    val recentAlcohol: Map<LocalDate, Int> = emptyMap(),
 )
 
 /** Jeden ViewModel na trzy ekrany: wszystkie liczą się z tych samych danych i tego samego silnika. */
@@ -98,12 +104,53 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
                 cancelled = d.cancelled,
                 personalTrainingUntil = planner.personalTrainingUntil,
                 recentNutrition = d.nutrition.filter { it.date >= d.today.minusDays(13) },
+                recentAlcohol = d.dayNotes.filter { it.date >= d.today.minusDays(13) }
+                    .groupBy { it.date }.mapValues { (_, l) -> l.sumOf { it.alcoholDrinks } },
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    // --- asystent AI (faza 4) ---
+    val aiSettings: StateFlow<AiSettings> = data.ai.settings
+    val aiHasKey: StateFlow<Boolean> = data.ai.hasKey
+    val aiReviews: StateFlow<List<SavedEveningReview>> = data.ai.reviews
+    private val _aiRunning = MutableStateFlow(false)
+    val aiRunning: StateFlow<Boolean> = _aiRunning.asStateFlow()
+    private val _aiSpent = MutableStateFlow<Double?>(null)
+    val aiSpent: StateFlow<Double?> = _aiSpent.asStateFlow()
+
+    fun refreshAiSpent() {
+        viewModelScope.launch { _aiSpent.value = runCatching { data.ai.spentThisMonth() }.getOrNull() }
+    }
+
+    fun saveAiSettings(s: AiSettings) {
+        data.ai.saveSettings(s)
+        EveningWorker.schedule(getApplication(), replace = true)
+    }
+
+    fun saveAiKey(provider: LlmProvider, key: String) = data.ai.saveKey(provider, key)
+
+    fun clearAiKey(provider: LlmProvider) = data.ai.clearKey(provider)
+
+    /** Analiza dnia na żądanie (np. po wpisaniu refleksji). */
+    fun runEvening(reflection: String?) {
+        if (_aiRunning.value) return
+        _aiRunning.value = true
+        viewModelScope.launch {
+            try {
+                data.ai.evening(LocalDate.now(RytmTime.zone), reflection, force = true)
+                WatchBridge.publish(getApplication())
+            } finally {
+                _aiRunning.value = false
+                refreshAiSpent()
+            }
+        }
+    }
+
     init {
         viewModelScope.launch { data.profiles.ensureLoaded() }
+        EveningWorker.schedule(app)
+        refreshAiSpent()
         SyncWorker.schedulePeriodic(app)
         refreshHealthConnect()
     }
@@ -154,10 +201,18 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun logOtherActivity(description: String, durationMin: Int, rpe: Int?, areas: Set<LoadedArea>) {
-        val end = Instant.now()
+    /** Aktywność wpisana ręcznie, także wstecz: [end] to koniec, z wybranego dnia i godziny. */
+    fun logActivity(entry: ActivityEntry) {
         viewModelScope.launch {
-            data.coach.logOtherActivity(description, end.minus(Duration.ofMinutes(durationMin.toLong())), durationMin, rpe, areas)
+            data.coach.logOtherActivity(
+                description = entry.description,
+                start = entry.end.minus(Duration.ofMinutes(entry.durationMin.toLong())),
+                durationMin = entry.durationMin,
+                rpe = entry.rpe,
+                loadedAreas = entry.areas,
+                type = entry.type,
+                kcal = entry.kcal,
+            )
         }
     }
 
@@ -165,8 +220,11 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { data.coach.saveNutrition(date, kcal, proteinG, fatG, carbsG) }
     }
 
-    fun addWeighIn(kg: Double, bodyFatPct: Double?, time: Instant?, composition: BodyComposition?) {
-        viewModelScope.launch { data.coach.addWeighIn(kg, bodyFatPct, time ?: Instant.now(), composition) }
+    /** [date]: dzień z arkusza „+”; czas ze zrzutu wygrywa, bo jest dokładny. */
+    fun addWeighIn(kg: Double, bodyFatPct: Double?, time: Instant?, composition: BodyComposition?, date: LocalDate? = null) {
+        val fallback = date?.takeIf { it != LocalDate.now(RytmTime.zone) }
+            ?.atTime(8, 0)?.atZone(RytmTime.zone)?.toInstant() ?: Instant.now()
+        viewModelScope.launch { data.coach.addWeighIn(kg, bodyFatPct, time ?: fallback, composition) }
     }
 
     /** Trening wpisany na telefonie (bez zegarka): dziś, kończy się teraz. */
@@ -194,6 +252,45 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Trening prowadzony na telefonie; null, gdy żaden nie trwa. */
+    val phoneRun: StateFlow<com.zacco.rytm.domain.workout.WorkoutRun?> = data.phoneWorkout.run
+
+    fun startPhoneWorkout() {
+        if (data.phoneWorkout.run.value != null) return
+        val today = state.value?.today ?: return
+        val workout = today.plan.workout ?: return
+        val profile = profile.value
+        val step = profile?.weightStepKg ?: profile?.toUserProfile(today.date)?.equipment?.stepKg ?: 1.0
+        data.phoneWorkout.set(
+            com.zacco.rytm.domain.workout.WorkoutRun.start(
+                id = "phone-" + java.util.UUID.randomUUID(),
+                workout = workout,
+                type = WatchBridge.workoutType(today.plan),
+                stepKg = step,
+                nowMs = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    fun updatePhoneRun(f: (com.zacco.rytm.domain.workout.WorkoutRun) -> com.zacco.rytm.domain.workout.WorkoutRun) = data.phoneWorkout.update(f)
+
+    /** Kończy trening z telefonu i zapisuje serie; [rpe] z ekranu końcowego. */
+    fun finishPhoneWorkout(rpe: Int?) {
+        val run = data.phoneWorkout.run.value ?: return
+        data.phoneWorkout.set(null)
+        if (run.sets.none { it.reps > 0 }) return
+        viewModelScope.launch {
+            data.coach.saveWorkout(run.toLog(System.currentTimeMillis(), rpe, null, null, Source.MANUAL))
+        }
+    }
+
+    fun cancelPhoneWorkout() = data.phoneWorkout.set(null)
+
+    /** „Popraw z AI” w kreatorze; wynik wraca na główny wątek. */
+    fun tweakPlan(p: PersonalProfile, request: String, onResult: (com.zacco.rytm.ai.plan.PlanTweakResult) -> Unit) {
+        viewModelScope.launch { onResult(data.ai.tweakPlan(p, request)) }
+    }
+
     fun saveProfile(p: PersonalProfile) {
         data.profiles.save(p)
     }
@@ -217,3 +314,14 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { data.coach.setCancelled(date, !cancelled) }
     }
 }
+
+/** Wpis z arkusza aktywności. */
+data class ActivityEntry(
+    val type: com.zacco.rytm.domain.model.ActivityType,
+    val description: String,
+    val end: Instant,
+    val durationMin: Int,
+    val rpe: Int?,
+    val areas: Set<LoadedArea>,
+    val kcal: Int?,
+)

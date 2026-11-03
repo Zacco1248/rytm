@@ -26,6 +26,13 @@ object Format {
 
     fun dayMonth(d: LocalDate): String = "${d.dayOfMonth} ${months[d.monthValue - 1]}"
 
+    /** „dziś”, „wczoraj” albo „pon, 2 listopada”. */
+    fun dayShortLabel(d: LocalDate, today: LocalDate): String = when (d) {
+        today -> "dziś"
+        today.minusDays(1) -> "wczoraj"
+        else -> weekdayShort(d.dayOfWeek) + ", " + dayMonth(d)
+    }
+
     fun range(from: LocalDate, to: LocalDate): String = "${dayMonth(from)} – ${dayMonth(to)}"
 
     fun weekdayShort(d: DayOfWeek): String = when (d) {
@@ -91,12 +98,27 @@ object Format {
 
     fun body(a: BodyArea): String = when (a) {
         BodyArea.SHOULDERS -> "Barki"
+        BodyArea.CHEST -> "Klatka"
+        BodyArea.ARMS -> "Ramiona"
         BodyArea.ELBOW -> "Łokieć"
+        BodyArea.ABS -> "Brzuch"
         BodyArea.THIGHS -> "Uda"
         BodyArea.KNEES -> "Kolana"
         BodyArea.BACK -> "Plecy"
         BodyArea.CALVES -> "Łydki"
         BodyArea.ANKLES -> "Kostki"
+    }
+
+    fun muscle(m: com.zacco.rytm.domain.exercise.Muscle): String = when (m) {
+        com.zacco.rytm.domain.exercise.Muscle.ABS -> "Brzuch"
+        com.zacco.rytm.domain.exercise.Muscle.CHEST -> "Klatka"
+        com.zacco.rytm.domain.exercise.Muscle.BACK -> "Plecy"
+        com.zacco.rytm.domain.exercise.Muscle.SHOULDERS -> "Barki"
+        com.zacco.rytm.domain.exercise.Muscle.BICEPS -> "Biceps"
+        com.zacco.rytm.domain.exercise.Muscle.TRICEPS -> "Triceps"
+        com.zacco.rytm.domain.exercise.Muscle.GLUTES -> "Pośladki"
+        com.zacco.rytm.domain.exercise.Muscle.LEGS -> "Nogi"
+        com.zacco.rytm.domain.exercise.Muscle.CALVES -> "Łydki"
     }
 
     fun roundInt(v: Double): Int = v.roundToInt()

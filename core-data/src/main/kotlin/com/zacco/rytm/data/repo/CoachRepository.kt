@@ -133,6 +133,7 @@ class CoachRepository(private val db: RytmDatabase, private val profiles: Profil
         rpe: Int?,
         loadedAreas: Set<LoadedArea>,
         type: ActivityType = ActivityType.OTHER,
+        kcal: Int? = null,
     ): String {
         val id = "manual-" + UUID.randomUUID()
         db.activities().upsert(
@@ -144,7 +145,7 @@ class CoachRepository(private val db: RytmDatabase, private val profiles: Profil
                 durationMin = durationMin,
                 rpe = rpe,
                 avgHr = null,
-                kcal = null,
+                kcal = kcal,
                 source = Source.MANUAL,
                 origin = null,
                 title = null,

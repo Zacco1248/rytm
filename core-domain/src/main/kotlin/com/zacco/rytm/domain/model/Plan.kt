@@ -2,7 +2,7 @@ package com.zacco.rytm.domain.model
 
 import java.time.LocalDate
 
-enum class DayKind { FIXED_SPORT, STRENGTH, PERSONAL_TRAINING, MOBILITY, REST, FLEX }
+enum class DayKind { FIXED_SPORT, STRENGTH, PERSONAL_TRAINING, MOBILITY, REST, FLEX, CARDIO }
 
 enum class Intensity { LOW, MODERATE, HIGH }
 
@@ -16,6 +16,8 @@ data class PlannedDay(
     val intensity: Intensity,
     val focus: StrengthFocus? = null,
     val workout: StrengthWorkout? = null,
+    /** Sesja biegu, roweru, pływania albo marszu, gdy [kind] to CARDIO. */
+    val cardio: com.zacco.rytm.domain.planner.CardioSession? = null,
     /** Krótkie uzasadnienia po polsku, w kolejności ważności. */
     val rationale: List<String> = emptyList(),
     val warnings: List<String> = emptyList(),

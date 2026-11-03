@@ -77,6 +77,7 @@ private fun RytmColors.forKind(k: DayKind): Color = when (k) {
     DayKind.MOBILITY -> kindMobility
     DayKind.REST -> kindRest
     DayKind.FLEX -> kindOther
+    DayKind.CARDIO -> kindSport
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -194,7 +195,8 @@ private fun AcwrCard(w: WeekSnapshot) {
 private fun PlanCard(state: CoachUiState, onToggleCancelled: (LocalDate) -> Unit, onRate: (WeekDay) -> Unit) {
     val w = state.week
     RytmCard {
-        CardHeader("Plan")
+        val weekKcal = w.days.sumOf { d -> d.activities.sumOf { it.kcal ?: 0 } }
+        CardHeader("Plan") { if (weekKcal > 0) SmallText("spalone w aktywnościach: ${Format.int(weekKcal)} kcal") }
         Column {
             w.days.forEachIndexed { i, d ->
                 if (i > 0 && d.date != w.today && w.days[i - 1].date != w.today) Divider()
@@ -264,6 +266,9 @@ private fun DayRow(d: WeekDay, today: Boolean, past: Boolean, onRate: (WeekDay) 
                 }
                 d.plannedLoad > 0 -> SmallText("~" + Format.int(d.plannedLoad))
             }
+            // Spalone kcal ze wszystkich aktywności dnia, także spacerów spoza planu.
+            val kcal = d.activities.sumOf { it.kcal ?: 0 }
+            if (kcal > 0) SmallText("${Format.int(kcal)} kcal", color = c.good)
         }
     }
 }

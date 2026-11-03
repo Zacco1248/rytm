@@ -28,6 +28,8 @@ data class WatchSnapshot(
     val generatedAt: Long,
     /** Dzisiejsza sesja z ćwiczeniami i ciężarem z progresji; null w dni bez treningu do zrobienia. */
     val workout: WatchWorkout? = null,
+    /** Skrót wieczornej analizy (rekomendacja na jutro), gdy już jest. */
+    val evening: String? = null,
 )
 
 @Serializable

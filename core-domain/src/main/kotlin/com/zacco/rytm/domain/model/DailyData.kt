@@ -3,7 +3,7 @@ package com.zacco.rytm.domain.model
 import java.time.Instant
 import java.time.LocalDate
 
-enum class BodyArea { SHOULDERS, ELBOW, BACK, THIGHS, KNEES, CALVES, ANKLES }
+enum class BodyArea { SHOULDERS, CHEST, ARMS, ELBOW, ABS, BACK, THIGHS, KNEES, CALVES, ANKLES }
 
 data class DailyCheckIn(
     val date: LocalDate,

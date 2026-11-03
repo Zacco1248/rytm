@@ -11,8 +11,11 @@ sealed interface HabitSchedule {
 
 enum class HabitKind { YES_NO, COUNT, MINUTES }
 
-/** Nawyk odhaczany automatycznie z danych (bez ręcznego wpisu). */
-enum class HabitAutoSource { STEPS }
+/**
+ * Nawyk odhaczany automatycznie z danych. STEPS: tylko z Health Connect.
+ * MOBILITY: minuty rozciągania, jogi, pilatesu i sesji „Mobilność” z dnia; można też odhaczyć ręcznie.
+ */
+enum class HabitAutoSource { STEPS, MOBILITY }
 
 data class Habit(
     val id: String,
@@ -23,7 +26,10 @@ data class Habit(
     val target: Int? = null,
     /** Gdy ustawione, wartość dnia pochodzi z Health Connect, np. liczba kroków. */
     val autoSource: HabitAutoSource? = null,
-)
+) {
+    /** Kroki liczy tylko Health Connect; resztę można też odhaczyć ręcznie. */
+    val autoOnly: Boolean get() = autoSource == HabitAutoSource.STEPS
+}
 
 data class HabitLog(val habitId: String, val date: LocalDate, val value: Int)
 
@@ -38,7 +44,7 @@ object DefaultHabits {
     /** Startowe nawyki (sekcja 13). Sen i zmęczenie mierzy check-in i zegarek, więc nie są nawykami do odhaczania. */
     val all = listOf(
         Habit("no-screen-2330", "Bez ekranu po 23:30", HabitSchedule.Daily, HabitKind.YES_NO),
-        Habit("mobility-10", "10 min mobilności", HabitSchedule.Daily, HabitKind.MINUTES, target = 10),
+        Habit("mobility-10", "10 min mobilności", HabitSchedule.Daily, HabitKind.MINUTES, target = 10, autoSource = HabitAutoSource.MOBILITY),
         // Cel kroków jak w Samsung Health; wartość z Health Connect.
         Habit("activity-steps", "Ogólna aktywność", HabitSchedule.Daily, HabitKind.COUNT, target = 6_000, autoSource = HabitAutoSource.STEPS),
     )
@@ -111,8 +117,9 @@ object HabitTracker {
     }
 
     /** Wpis dnia dla nawyku automatycznego (np. kroki z Health Connect); null dla nawyków ręcznych. */
-    fun autoLog(habit: Habit, date: LocalDate, steps: Int?): HabitLog? = when (habit.autoSource) {
+    fun autoLog(habit: Habit, date: LocalDate, steps: Int?, mobilityMin: Int? = null): HabitLog? = when (habit.autoSource) {
         HabitAutoSource.STEPS -> steps?.let { HabitLog(habit.id, date, it) }
+        HabitAutoSource.MOBILITY -> mobilityMin?.takeIf { it > 0 }?.let { HabitLog(habit.id, date, it) }
         null -> null
     }
 

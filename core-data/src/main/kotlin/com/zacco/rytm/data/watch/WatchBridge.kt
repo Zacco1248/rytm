@@ -44,7 +44,8 @@ object WatchBridge {
     /** Wysyła stan dnia, jeśli zmienił się od ostatniej wysyłki. Bez sparowanego zegarka po prostu nic nie robi. */
     suspend fun publish(context: Context, data: CoachData? = null) {
         val d = data ?: RytmData.get(context).coach.observe(LocalDate.now(RytmTime.zone)).first()
-        val snapshot = snapshotOf(d, CoachEngine().today(d), System.currentTimeMillis())
+        val evening = RytmData.get(context).ai.reviewFor(d.today)?.review?.tomorrow
+        val snapshot = snapshotOf(d, CoachEngine().today(d), System.currentTimeMillis()).copy(evening = evening)
         val hash = WatchCodec.encode(snapshot.copy(generatedAt = 0)).contentHashCode()
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         if (prefs.getInt(KEY_LAST, 0) == hash) return
@@ -60,7 +61,7 @@ object WatchBridge {
         when (event) {
             is WatchEvent.HabitToggle -> {
                 val habit = CoachData(today = date).habits.firstOrNull { it.id == event.habitId } ?: return
-                if (habit.autoSource != null) return
+                if (habit.autoOnly) return
                 val value = when {
                     !event.done -> null
                     habit.kind == HabitKind.YES_NO -> 1
@@ -117,6 +118,7 @@ object WatchBridge {
     fun workoutType(day: PlannedDay): ActivityType = when (day.kind) {
         DayKind.STRENGTH -> ActivityType.STRENGTH
         DayKind.FLEX -> ActivityType.CARDIO
+        DayKind.CARDIO -> if (day.cardio?.kind == com.zacco.rytm.domain.planner.CardioKind.WALK) ActivityType.WALK else ActivityType.CARDIO
         else -> ActivityType.MOBILITY
     }
 
@@ -153,11 +155,11 @@ object WatchBridge {
             bedtime = "%02d:%02d".format(Locale.ROOT, today.bedtime.hour, today.bedtime.minute),
             habits = today.habits.map { s ->
                 val detail = when {
-                    s.habit.autoSource != null -> "${s.value ?: 0} / ${s.habit.target ?: 0}"
+                    s.habit.autoOnly -> "${s.value ?: 0} / ${s.habit.target ?: 0}"
                     s.streak > 0 -> "seria ${s.streak}"
                     else -> ""
                 }
-                WatchHabit(s.habit.id, s.habit.name, s.done, s.habit.autoSource != null, detail)
+                WatchHabit(s.habit.id, s.habit.name, s.done, s.habit.autoOnly, detail)
             },
             toRate = toRate,
             checkInDone = today.checkIn != null,

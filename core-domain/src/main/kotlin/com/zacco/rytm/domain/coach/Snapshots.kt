@@ -15,6 +15,7 @@ import com.zacco.rytm.domain.readiness.Readiness
 import com.zacco.rytm.domain.workout.ExerciseProgress
 import com.zacco.rytm.domain.workout.SetLog
 import java.time.Instant
+import com.zacco.rytm.domain.readiness.CalibrationStatus
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -24,6 +25,8 @@ data class TodaySnapshot(
     val readiness: Readiness,
     /** Ile dni baseline'u tętna już mamy (do chipa „Kalibracja X/14”). */
     val baselineDays: Int,
+    /** Co weszło do kalibracji, a czego brakowało (po dotknięciu chipa). */
+    val calibration: CalibrationStatus? = null,
     val checkIn: DailyCheckIn?,
     /** Ostatnia noc (sen, tętno spoczynkowe) i kroki z dziś. */
     val night: DailyMetrics?,
@@ -40,8 +43,9 @@ data class TodaySnapshot(
     val nutrition: NutritionDay?,
     /** Cel dnia z doliczonym treningiem ([trainingKcal]). */
     val nutritionTargets: NutritionTargets,
-    /** Ile kcal z treningów doliczono do celu (0,75 × kcal z zegarka). */
+    /** Ile kcal z treningów doliczono do celu ([trainingKcalFactor] × kcal z zegarka). */
     val trainingKcal: Int,
+    val trainingKcalFactor: Double = 0.75,
     val dayOff: Boolean,
     /** Porcje alkoholu: wczoraj (liczone do dzisiejszej gotowości) i dziś. */
     val alcoholYesterday: Int,
@@ -51,7 +55,12 @@ data class TodaySnapshot(
     val lastSync: Instant?,
     /** Serie zapisane dziś (trening z zegarka albo z telefonu). */
     val setsToday: List<SetLog> = emptyList(),
-)
+    /** Wszystkie aktywności dnia (z Health Connect i ręczne), także spacery spoza planu. */
+    val activitiesToday: List<Activity> = emptyList(),
+) {
+    /** Kcal z aktywności dnia (bez doliczania mnożnika). */
+    val activityKcal: Int get() = activitiesToday.sumOf { it.kcal ?: 0 }
+}
 
 data class HabitStatus(val habit: Habit, val value: Int?, val done: Boolean, val streak: Int)
 
@@ -104,6 +113,35 @@ data class BodySnapshot(
     val weekReport: NutritionWeekReport,
     /** Ostatnie sesje ćwiczeń z dziennika serii. */
     val strength: List<ExerciseProgress> = emptyList(),
+    /** Dni z wpisem żywienia i celem tego dnia (z doliczonym treningiem), do karty „Makro”. */
+    val macros: List<MacroDay> = emptyList(),
 )
+
+data class MacroDay(val nutrition: NutritionDay, val target: NutritionTargets) {
+    val date: LocalDate get() = nutrition.date
+
+    fun actual(m: Macro): Double = when (m) {
+        Macro.KCAL -> nutrition.kcal.toDouble()
+        Macro.PROTEIN -> nutrition.proteinG
+        Macro.FAT -> nutrition.fatG
+        Macro.CARBS -> nutrition.carbsG
+    }
+
+    fun target(m: Macro): Int = when (m) {
+        Macro.KCAL -> target.kcal
+        Macro.PROTEIN -> target.proteinG
+        Macro.FAT -> target.fatG
+        Macro.CARBS -> target.carbsG
+    }
+
+    /** W celu: białko co najmniej 90% celu, reszta w ±10%. */
+    fun inTarget(m: Macro): Boolean {
+        val t = target(m).takeIf { it > 0 } ?: return false
+        val r = actual(m) / t
+        return if (m == Macro.PROTEIN) r >= 0.9 else r in 0.9..1.1
+    }
+}
+
+enum class Macro { KCAL, PROTEIN, FAT, CARBS }
 
 enum class WeightPace { UNKNOWN, TOO_FAST, OK, GAINING }

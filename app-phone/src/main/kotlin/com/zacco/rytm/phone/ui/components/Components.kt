@@ -195,3 +195,20 @@ fun SmallText(text: String, modifier: Modifier = Modifier, color: Color = Rytm.c
 fun Divider() {
     Box(Modifier.fillMaxWidth().height(1.dp).background(Rytm.colors.line))
 }
+
+/** Przełącznik w kształcie pigułki (wybór jednej lub wielu opcji). */
+@Composable
+fun Pill(text: String, on: Boolean, onClick: () -> Unit) {
+    val c = Rytm.colors
+    Text(
+        text,
+        style = Rytm.type.small,
+        color = if (on) c.bg else c.ink,
+        modifier = Modifier
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(if (on) c.ink else c.surface)
+            .border(1.dp, if (on) c.ink else c.line, androidx.compose.foundation.shape.CircleShape)
+            .clickable(role = androidx.compose.ui.semantics.Role.Checkbox, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
+}
