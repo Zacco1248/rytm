@@ -6,6 +6,7 @@ import com.zacco.rytm.domain.habits.Habit
 import com.zacco.rytm.domain.model.ActivityType
 import com.zacco.rytm.domain.planner.Equipment
 import com.zacco.rytm.domain.planner.EquipmentKind
+import com.zacco.rytm.domain.planner.MobilityPrefs
 import com.zacco.rytm.domain.planner.PlannerConfig
 import kotlinx.serialization.Serializable
 import java.time.DayOfWeek
@@ -75,6 +76,10 @@ data class PersonalProfile(
     val kcalFactorOverride: Double? = null,
     /** Partie, na których chcesz się skupić (brzuch, biceps…). */
     val focus: List<Muscle> = emptyList(),
+    /** Wyłączone domyślne ćwiczenia mobilności (nazwy). */
+    val mobilityOff: List<String> = emptyList(),
+    /** Własne ćwiczenia mobilności, np. „Gołąb (pigeon) na stronę”. */
+    val mobilityCustom: List<String> = emptyList(),
     /** Tętno maksymalne z testu; bez niego szacunek z wieku. */
     val maxHr: Int? = null,
 ) {
@@ -105,6 +110,7 @@ data class PersonalProfile(
         goalNote = goalNote,
         name = name,
         focus = focus.toSet(),
+        mobility = MobilityPrefs(mobilityOff, mobilityCustom),
     )
 
     fun habits(): List<Habit> = DefaultHabits.withSteps(stepsTarget)

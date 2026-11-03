@@ -12,6 +12,9 @@ import com.zacco.rytm.domain.profile.Goal
 
 enum class EquipmentKind { NONE, BANDS, DUMBBELLS, GYM }
 
+/** Własna sesja mobilności: wyłączone domyślne ćwiczenia i dopisane własne (nazwy). */
+data class MobilityPrefs(val off: List<String> = emptyList(), val custom: List<String> = emptyList())
+
 /**
  * Sprzęt z profilu. Przy lekkich hantlach (np. para 2–8 kg, jeden do 14 kg) trudność dają powtórzenia (12–15),
  * wolne opuszczanie (tempo 3-1-1) i ćwiczenia na jedną nogę lub rękę.
@@ -39,6 +42,7 @@ class ExerciseLibrary(
     private val eq: Equipment = Equipment(),
     private val goal: Goal = Goal.RECOMP,
     private val focus: Set<Muscle> = emptySet(),
+    private val mobility: MobilityPrefs = MobilityPrefs(),
 ) {
 
     fun workoutFor(day: PlannedDay): StrengthWorkout? = when (day.kind) {
@@ -273,17 +277,13 @@ class ExerciseLibrary(
         }
     }
 
-    private fun mobility() = StrengthWorkout(
-        "Mobilność",
-        listOf(
-            ex("Kot–krowa", 2, 10..10, null, null, 0),
-            ex("Rotacje odcinka piersiowego w klęku (na stronę)", 2, 8..10, null, null, 0),
-            ex("Rozciąganie zginaczy bioder w wykroku (sekundy na stronę)", 2, 45..60, null, null, 0),
-            ex("Głęboki przysiad z podparciem (sekundy)", 2, 45..60, null, null, 0),
-            ex("Rozciąganie łydek przy ścianie (sekundy na stronę)", 2, 45..45, null, null, 0),
-            ex("Krążenia barków z kijem lub ręcznikiem", 2, 10..12, null, null, 0),
-        ),
-    )
+    /** Sesja mobilności: domyślne ćwiczenia bez wyłączonych w profilu, plus własne (2 serie po ok. 45 s). */
+    private fun mobility(): StrengthWorkout {
+        val off = mobility.off.map(ExerciseGuide::key).toSet()
+        val list = MOBILITY_DEFAULT.filter { ExerciseGuide.key(it.name) !in off } +
+            mobility.custom.filter { it.isNotBlank() }.map { ex(it.trim(), 2, 45..60, null, null, 0) }
+        return StrengthWorkout("Mobilność", list.ifEmpty { MOBILITY_DEFAULT })
+    }
 
     /** Zamiennik przy niskim tygodniowym obciążeniu: obwód 4–5 rund, 40 s pracy / 20 s przerwy. */
     private fun intervals() = if (eq.kind != EquipmentKind.DUMBBELLS) bodyweightIntervals() else StrengthWorkout(
@@ -300,8 +300,18 @@ class ExerciseLibrary(
     private fun ex(name: String, sets: Int, reps: IntRange, kg: Double?, tempo: String?, rest: Int) =
         PlannedExercise(name, sets, reps, kg, tempo, rest)
 
-    private companion object {
-        val LOWER_MUSCLES = setOf(Muscle.GLUTES, Muscle.LEGS, Muscle.CALVES)
+    companion object {
+        private val LOWER_MUSCLES = setOf(Muscle.GLUTES, Muscle.LEGS, Muscle.CALVES)
+
+        /** Domyślne ćwiczenia sesji mobilności (do włączania i wyłączania w profilu). */
+        val MOBILITY_DEFAULT: List<PlannedExercise> = listOf(
+            PlannedExercise("Kot–krowa", 2, 10..10, null, null, 0),
+            PlannedExercise("Rotacje odcinka piersiowego w klęku (na stronę)", 2, 8..10, null, null, 0),
+            PlannedExercise("Rozciąganie zginaczy bioder w wykroku (sekundy na stronę)", 2, 45..60, null, null, 0),
+            PlannedExercise("Głęboki przysiad z podparciem (sekundy)", 2, 45..60, null, null, 0),
+            PlannedExercise("Rozciąganie łydek przy ścianie (sekundy na stronę)", 2, 45..45, null, null, 0),
+            PlannedExercise("Krążenia barków z kijem lub ręcznikiem", 2, 10..12, null, null, 0),
+        )
     }
 
     private fun bodyweightIntervals() = StrengthWorkout(

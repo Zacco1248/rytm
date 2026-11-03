@@ -37,7 +37,7 @@ class CoachEngine(
 ) {
     /** Plan i ćwiczenia z profilu osoby (stałe sporty, dni siły, sprzęt, cel). */
     private fun plannerFor(data: CoachData) =
-        WeekPlanner(data.profile.planner, ExerciseLibrary(data.profile.equipment, data.profile.goal, data.profile.focus))
+        WeekPlanner(data.profile.planner, ExerciseLibrary(data.profile.equipment, data.profile.goal, data.profile.focus, data.profile.mobility))
 
     fun today(data: CoachData): TodaySnapshot {
         val load = load(data)

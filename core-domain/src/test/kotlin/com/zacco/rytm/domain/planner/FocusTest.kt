@@ -48,4 +48,13 @@ class FocusTest {
         assertEquals(0.75, PersonalProfile(goal = Goal.FAT_LOSS, customTargets = CustomTargets(2300, 161, 72, 253)).kcalFactor)
         assertEquals(0.6, PersonalProfile(goal = Goal.MUSCLE_GAIN, kcalFactorOverride = 0.6).kcalFactor)
     }
+
+    @Test
+    fun mobilityRespectsProfile() {
+        val lib = ExerciseLibrary(eq, mobility = MobilityPrefs(off = listOf("Kot–krowa"), custom = listOf("Gołąb na stronę")))
+        val names = lib.workoutFor(PlannedDay(date, DayKind.MOBILITY, "Mobilność 30 min", Intensity.LOW))!!.exercises.map { it.name }
+        assertTrue("Kot–krowa" !in names)
+        assertTrue("Gołąb na stronę" in names)
+        assertEquals(ExerciseLibrary.MOBILITY_DEFAULT.size, names.size)
+    }
 }

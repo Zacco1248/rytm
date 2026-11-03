@@ -15,6 +15,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +38,7 @@ import com.zacco.rytm.domain.profile.Sex
 import com.zacco.rytm.domain.time.RytmTime
 import com.zacco.rytm.phone.app.Format
 import com.zacco.rytm.domain.exercise.Muscle
+import com.zacco.rytm.domain.planner.ExerciseLibrary
 import com.zacco.rytm.phone.ui.components.CardHeader
 import com.zacco.rytm.phone.ui.components.Pill
 import com.zacco.rytm.phone.ui.components.RytmButton
@@ -256,6 +258,28 @@ fun ProfileScreen(
                 (1..7).forEach { d -> Pill(dayNames[d - 1], pt.day == d) { p = p.copy(personalTraining = pt.copy(day = d)) } }
             }
             Field("Do kiedy (RRRR-MM-DD, puste = bez końca)", ptUntil, KeyboardType.Text) { ptUntil = it.take(10) }
+        }
+    }
+
+    RytmCard {
+        CardHeader("Mobilność")
+        SmallText("Ćwiczenia w sesji mobilności. Dotknij, żeby wyłączyć albo włączyć; własne usuniesz tak samo.")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            ExerciseLibrary.MOBILITY_DEFAULT.forEach { e ->
+                val on = e.name !in p.mobilityOff
+                Pill(e.name.substringBefore(" (").trim(), on) {
+                    p = p.copy(mobilityOff = if (on) p.mobilityOff + e.name else p.mobilityOff - e.name)
+                }
+            }
+            p.mobilityCustom.forEach { name -> Pill("$name ✕", true) { p = p.copy(mobilityCustom = p.mobilityCustom - name) } }
+        }
+        var newMobility by remember { mutableStateOf("") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Field("Własne ćwiczenie, np. gołąb na stronę", newMobility, KeyboardType.Text, Modifier.weight(1f)) { newMobility = it.take(60) }
+            RytmButton("Dodaj", enabled = newMobility.isNotBlank()) {
+                p = p.copy(mobilityCustom = (p.mobilityCustom + newMobility.trim()).distinct())
+                newMobility = ""
+            }
         }
     }
 
