@@ -86,7 +86,7 @@ class EveningWorker(context: Context, params: WorkerParameters) : CoroutineWorke
                 android.app.PendingIntent.getActivity(context, 0, it, android.app.PendingIntent.FLAG_IMMUTABLE)
             }
             val n = NotificationCompat.Builder(context, CHANNEL)
-                .setSmallIcon(android.R.drawable.ic_menu_today)
+                .setSmallIcon(com.zacco.rytm.data.R.drawable.ic_stat_rytm)
                 .setContentTitle("Podsumowanie dnia")
                 .setContentText(text)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(text))
