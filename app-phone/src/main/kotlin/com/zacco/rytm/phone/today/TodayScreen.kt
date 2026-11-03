@@ -1,5 +1,7 @@
 package com.zacco.rytm.phone.today
 
+import com.zacco.rytm.ai.morning.MorningNote
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -72,6 +74,7 @@ fun TodayScreen(
     onLogWorkout: () -> Unit = {},
     phoneRunActive: Boolean = false,
     onPhoneWorkout: () -> Unit = {},
+    morning: MorningNote? = null,
 ) {
     ScreenHeader(sub = Format.dayLong(s.date), title = greeting()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -89,6 +92,7 @@ fun TodayScreen(
     sync.error?.let { RytmCard { SmallText(it, color = Rytm.colors.bad) } }
 
     ReadinessCard(s, onCheckIn)
+    if (morning != null && s.checkIn != null) MorningCard(morning)
     PlanCard(s, onDayOff, onLogWorkout, phoneRunActive, onPhoneWorkout)
     NutritionCard(s, sync, onSync, onNutrition)
     HabitsCard(s.habits, onToggleHabit)
@@ -183,6 +187,17 @@ private fun ReadinessCard(s: TodaySnapshot, onCheckIn: () -> Unit) {
             )
         }
         if (s.restingHrFromDay) SmallText("Brak snu z zegarka, więc tętno spoczynkowe liczę z najspokojniejszych 30 min dnia.")
+    }
+}
+
+/** Poranne uzasadnienie planu po check-inie (AI albo reguły). */
+@Composable
+private fun MorningCard(n: MorningNote) {
+    RytmCard {
+        CardHeader("Na dziś")
+        Text(n.headline, style = Rytm.type.bodyStrong, color = Rytm.colors.ink)
+        WhyBox(n.why)
+        SmallText(n.tip)
     }
 }
 

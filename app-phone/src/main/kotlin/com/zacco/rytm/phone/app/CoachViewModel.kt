@@ -9,6 +9,9 @@ import com.zacco.rytm.ai.AiSettings
 import com.zacco.rytm.ai.LlmProvider
 import com.zacco.rytm.ai.SavedEveningReview
 import com.zacco.rytm.data.ai.EveningWorker
+import com.zacco.rytm.data.ai.WeeklyWorker
+import com.zacco.rytm.ai.SavedMorningNote
+import com.zacco.rytm.ai.SavedWeeklyReport
 import com.zacco.rytm.data.healthconnect.HealthConnectPermissions
 import com.zacco.rytm.data.sync.HealthConnectSync
 import com.zacco.rytm.data.sync.SyncWorker
@@ -114,6 +117,25 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
     val aiSettings: StateFlow<AiSettings> = data.ai.settings
     val aiHasKey: StateFlow<Boolean> = data.ai.hasKey
     val aiReviews: StateFlow<List<SavedEveningReview>> = data.ai.reviews
+    val morningNotes: StateFlow<List<SavedMorningNote>> = data.ai.morningNotes
+    val weeklyReports: StateFlow<List<SavedWeeklyReport>> = data.ai.weeklyReports
+    private val _weeklyRunning = MutableStateFlow(false)
+    val weeklyRunning: StateFlow<Boolean> = _weeklyRunning.asStateFlow()
+
+    /** Raport tygodniowy na żądanie: za 7 dni kończących się dziś. */
+    fun runWeekly() {
+        if (_weeklyRunning.value) return
+        _weeklyRunning.value = true
+        viewModelScope.launch {
+            try {
+                data.ai.weekly(LocalDate.now(RytmTime.zone), force = true)
+            } finally {
+                _weeklyRunning.value = false
+                refreshAiSpent()
+            }
+        }
+    }
+
     private val _aiRunning = MutableStateFlow(false)
     val aiRunning: StateFlow<Boolean> = _aiRunning.asStateFlow()
     private val _aiSpent = MutableStateFlow<Double?>(null)
@@ -126,6 +148,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
     fun saveAiSettings(s: AiSettings) {
         data.ai.saveSettings(s)
         EveningWorker.schedule(getApplication(), replace = true)
+        WeeklyWorker.schedule(getApplication(), replace = true)
     }
 
     fun saveAiKey(provider: LlmProvider, key: String) = data.ai.saveKey(provider, key)
@@ -198,6 +221,9 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val existing = state.value?.today?.checkIn
             data.coach.saveCheckIn(DailyCheckIn(date, energy, mood, sore, existing?.hrvRmssd))
+            runCatching { data.ai.morning(date) }
+            WatchBridge.publish(getApplication())
+            refreshAiSpent()
         }
     }
 

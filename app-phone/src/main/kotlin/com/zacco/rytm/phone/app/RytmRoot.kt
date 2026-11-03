@@ -105,6 +105,9 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     val aiHasKey by vm.aiHasKey.collectAsStateWithLifecycle()
     val aiReviews by vm.aiReviews.collectAsStateWithLifecycle()
     val aiRunning by vm.aiRunning.collectAsStateWithLifecycle()
+    val morningNotes by vm.morningNotes.collectAsStateWithLifecycle()
+    val weeklyReports by vm.weeklyReports.collectAsStateWithLifecycle()
+    val weeklyRunning by vm.weeklyRunning.collectAsStateWithLifecycle()
     val aiSpent by vm.aiSpent.collectAsStateWithLifecycle()
     val phoneRun by vm.phoneRun.collectAsStateWithLifecycle()
 
@@ -223,8 +226,15 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                             vm.startPhoneWorkout()
                             workoutOpen = true
                         },
+                        morning = morningNotes.firstOrNull { it.date == s.today.date.toString() }?.note,
                     )
-                    Tab.WEEK -> WeekScreen(s, vm::toggleCancelled) { day ->
+                    Tab.WEEK -> WeekScreen(
+                        s,
+                        vm::toggleCancelled,
+                        weekly = weeklyReports.firstOrNull(),
+                        weeklyRunning = weeklyRunning,
+                        onRunWeekly = vm::runWeekly,
+                    ) { day ->
                         rpeDate = day.date.toString()
                         sheet = Sheet.RPE
                     }

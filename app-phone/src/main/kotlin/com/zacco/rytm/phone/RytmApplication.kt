@@ -3,6 +3,7 @@ package com.zacco.rytm.phone
 import android.app.Application
 import com.zacco.rytm.data.RytmData
 import com.zacco.rytm.data.ai.EveningWorker
+import com.zacco.rytm.data.ai.WeeklyWorker
 import com.zacco.rytm.data.sync.SyncWorker
 import com.zacco.rytm.data.watch.WatchBridge
 import com.zacco.rytm.domain.time.RytmTime
@@ -28,6 +29,7 @@ class RytmApplication : Application() {
         super.onCreate()
         SyncWorker.schedulePeriodic(this)
         EveningWorker.schedule(this)
+        WeeklyWorker.schedule(this)
 
         // Póki proces żyje, każda zmiana danych (wpis, synchronizacja) od razu trafia na zegarek.
         val data = RytmData.get(this)
