@@ -209,9 +209,14 @@ class CoachEngine(
         data.dayNotes.filter { it.date == date }.sumOf { it.alcoholDrinks }
 
     private fun habits(data: CoachData, steps: Int?): List<HabitStatus> {
-        // Wpisy automatyczne (kroki) wyliczamy z metryk, żeby nie dublować ich w bazie.
-        val autoLogs = data.habits.filter { it.autoSource == HabitAutoSource.STEPS }.flatMap { habit ->
-            data.metrics.mapNotNull { m -> HabitTracker.autoLog(habit, m.date, m.steps) }
+        // Wpisy automatyczne (kroki, mobilność) wyliczamy z danych, żeby nie dublować ich w bazie.
+        val mobilityByDay = data.activities.filter { it.type == ActivityType.MOBILITY }
+            .groupBy { it.localDate() }.mapValues { (_, list) -> list.sumOf { it.durationMin } }
+        val autoLogs = data.habits.filter { it.autoSource != null }.flatMap { habit ->
+            when (habit.autoSource) {
+                HabitAutoSource.STEPS -> data.metrics.mapNotNull { m -> HabitTracker.autoLog(habit, m.date, m.steps) }
+                else -> mobilityByDay.mapNotNull { (d, min) -> HabitTracker.autoLog(habit, d, null, min) }
+            }
         }
         val logs: List<HabitLog> = data.habitLogs + autoLogs
         return data.habits.filter { HabitTracker.isDueOn(it, data.today, logs) }.map { habit ->

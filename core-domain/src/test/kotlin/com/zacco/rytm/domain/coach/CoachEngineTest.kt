@@ -27,6 +27,20 @@ class CoachEngineTest {
         Activity(id, type, at(date, 19), min, rpe, hr, null, Source.HEALTH_CONNECT)
 
     @Test
+    fun `mobility habit ticks itself after 10 min of stretching but not after a walk`() {
+        val stretch = CoachData(today = wednesday, activities = listOf(activity("m", wednesday, ActivityType.MOBILITY, 12, null)))
+        val m = engine.today(stretch).habits.first { it.habit.id == "mobility-10" }
+        assertTrue(m.done)
+        assertEquals(12, m.value)
+
+        val walk = CoachData(today = wednesday, activities = listOf(activity("w", wednesday, ActivityType.WALK, 40, null)))
+        assertFalse(engine.today(walk).habits.first { it.habit.id == "mobility-10" }.done)
+
+        val short = CoachData(today = wednesday, activities = listOf(activity("s", wednesday, ActivityType.MOBILITY, 6, null)))
+        assertFalse(engine.today(short).habits.first { it.habit.id == "mobility-10" }.done)
+    }
+
+    @Test
     fun `dziś - kroki odhaczają nawyk aktywności, plan to squash`() {
         val data = CoachData(
             today = wednesday,

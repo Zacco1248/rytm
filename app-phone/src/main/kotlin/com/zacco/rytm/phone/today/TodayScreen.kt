@@ -273,7 +273,7 @@ fun HabitsCard(habits: List<HabitStatus>, onToggle: (HabitStatus) -> Unit, showS
 @Composable
 private fun HabitRow(h: HabitStatus, onToggle: (HabitStatus) -> Unit, showStreak: Boolean) {
     val c = Rytm.colors
-    val auto = h.habit.autoSource != null
+    val auto = h.habit.autoOnly
     Row(
         Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -302,6 +302,8 @@ private fun HabitRow(h: HabitStatus, onToggle: (HabitStatus) -> Unit, showStreak
 private fun habitDetail(h: HabitStatus): String = when {
     h.habit.autoSource == HabitAutoSource.STEPS ->
         "${Format.int(h.value ?: 0)} / ${Format.int(h.habit.target ?: 0)} kroków · z Health Connect"
+    h.habit.autoSource == HabitAutoSource.MOBILITY && (h.value ?: 0) > 0 -> "${h.value} min z rozciągania, jogi albo mobilności"
+    h.habit.autoSource == HabitAutoSource.MOBILITY -> "${h.habit.target} min dziennie · odhaczy się samo po rozciąganiu albo jodze"
     h.habit.kind == HabitKind.MINUTES -> "${h.habit.target} min dziennie"
     else -> "codziennie"
 }

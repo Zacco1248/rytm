@@ -61,7 +61,7 @@ object WatchBridge {
         when (event) {
             is WatchEvent.HabitToggle -> {
                 val habit = CoachData(today = date).habits.firstOrNull { it.id == event.habitId } ?: return
-                if (habit.autoSource != null) return
+                if (habit.autoOnly) return
                 val value = when {
                     !event.done -> null
                     habit.kind == HabitKind.YES_NO -> 1
@@ -154,11 +154,11 @@ object WatchBridge {
             bedtime = "%02d:%02d".format(Locale.ROOT, today.bedtime.hour, today.bedtime.minute),
             habits = today.habits.map { s ->
                 val detail = when {
-                    s.habit.autoSource != null -> "${s.value ?: 0} / ${s.habit.target ?: 0}"
+                    s.habit.autoOnly -> "${s.value ?: 0} / ${s.habit.target ?: 0}"
                     s.streak > 0 -> "seria ${s.streak}"
                     else -> ""
                 }
-                WatchHabit(s.habit.id, s.habit.name, s.done, s.habit.autoSource != null, detail)
+                WatchHabit(s.habit.id, s.habit.name, s.done, s.habit.autoOnly, detail)
             },
             toRate = toRate,
             checkInDone = today.checkIn != null,
