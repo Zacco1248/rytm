@@ -34,8 +34,8 @@ import java.util.UUID
 class CoachRepository(private val db: RytmDatabase, private val profiles: ProfileStore) {
 
     /** Okno danych: 28 dni na obciążenie przewlekłe + bieżący tydzień + zapas na średnie wagi. */
-    fun observe(today: LocalDate): Flow<CoachData> {
-        val from = today.minusDays(LOOKBACK_DAYS)
+    fun observe(today: LocalDate, lookbackDays: Long = LOOKBACK_DAYS): Flow<CoachData> {
+        val from = today.minusDays(lookbackDays)
         val to = today.plusDays(7)
         val activities = db.activities().observe(from, to)
         val metrics = db.dailyMetrics().observe(from, today)
@@ -46,7 +46,7 @@ class CoachRepository(private val db: RytmDatabase, private val profiles: Profil
         val cancelled = db.cancellations().observe(from, to)
         val lastSync = db.syncState().observe(HealthConnectSync.KEY_LAST_SYNC)
         val dayNotes = db.dayNotes().observe(from, to)
-        val sets = db.workoutSets().observe(today.minusDays(SETS_LOOKBACK_DAYS), today)
+        val sets = db.workoutSets().observe(today.minusDays(maxOf(SETS_LOOKBACK_DAYS, lookbackDays)), today)
 
         val part1 = combine(activities, metrics, checkIns, nutrition) { a, m, c, n ->
             CoachData(

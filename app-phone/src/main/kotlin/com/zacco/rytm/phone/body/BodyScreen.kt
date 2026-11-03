@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.zacco.rytm.ai.SavedMonthlyReport
 import com.zacco.rytm.domain.coach.BodySnapshot
 import com.zacco.rytm.domain.coach.Macro
 import com.zacco.rytm.domain.coach.WeightPace
@@ -42,7 +43,14 @@ import com.zacco.rytm.phone.ui.theme.Rytm
 import java.time.temporal.ChronoUnit
 
 @Composable
-fun BodyScreen(b: BodySnapshot, kcalTarget: Int, onAddWeighIn: () -> Unit) {
+fun BodyScreen(
+    b: BodySnapshot,
+    kcalTarget: Int,
+    monthly: SavedMonthlyReport? = null,
+    monthlyRunning: Boolean = false,
+    onRunMonthly: () -> Unit = {},
+    onAddWeighIn: () -> Unit,
+) {
     val (paceLabel, paceTone) = when (b.pace) {
         WeightPace.UNKNOWN -> "za mało ważeń" to ChipTone.MUTED
         WeightPace.OK -> "Tempo OK" to ChipTone.GOOD
@@ -90,6 +98,7 @@ fun BodyScreen(b: BodySnapshot, kcalTarget: Int, onAddWeighIn: () -> Unit) {
             },
         )
     }
+    MonthlyReportCard(monthly, monthlyRunning, onRunMonthly)
 }
 
 @Composable

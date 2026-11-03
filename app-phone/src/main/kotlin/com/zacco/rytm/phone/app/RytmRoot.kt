@@ -108,6 +108,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     val morningNotes by vm.morningNotes.collectAsStateWithLifecycle()
     val weeklyReports by vm.weeklyReports.collectAsStateWithLifecycle()
     val weeklyRunning by vm.weeklyRunning.collectAsStateWithLifecycle()
+    val monthlyReports by vm.monthlyReports.collectAsStateWithLifecycle()
+    val monthlyRunning by vm.monthlyRunning.collectAsStateWithLifecycle()
     val aiSpent by vm.aiSpent.collectAsStateWithLifecycle()
     val phoneRun by vm.phoneRun.collectAsStateWithLifecycle()
 
@@ -238,7 +240,13 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         rpeDate = day.date.toString()
                         sheet = Sheet.RPE
                     }
-                    Tab.BODY -> BodyScreen(s.body, s.today.nutritionTargets.kcal - s.today.trainingKcal) { entryDate = null; sheet = Sheet.WEIGH_IN }
+                    Tab.BODY -> BodyScreen(
+                        s.body,
+                        s.today.nutritionTargets.kcal - s.today.trainingKcal,
+                        monthly = monthlyReports.firstOrNull(),
+                        monthlyRunning = monthlyRunning,
+                        onRunMonthly = vm::runMonthly,
+                    ) { entryDate = null; sheet = Sheet.WEIGH_IN }
                     Tab.HABITS -> HabitsTab(s, onToggle = { vm.toggleHabit(it.habit, it.done) })
                     Tab.EVENING -> EveningScreen(
                         s = s,

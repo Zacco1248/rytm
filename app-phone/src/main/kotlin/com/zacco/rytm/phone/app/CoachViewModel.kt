@@ -10,6 +10,8 @@ import com.zacco.rytm.ai.LlmProvider
 import com.zacco.rytm.ai.SavedEveningReview
 import com.zacco.rytm.data.ai.EveningWorker
 import com.zacco.rytm.data.ai.WeeklyWorker
+import com.zacco.rytm.data.ai.MonthlyWorker
+import com.zacco.rytm.ai.SavedMonthlyReport
 import com.zacco.rytm.ai.SavedMorningNote
 import com.zacco.rytm.ai.SavedWeeklyReport
 import com.zacco.rytm.data.healthconnect.HealthConnectPermissions
@@ -136,6 +138,24 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    val monthlyReports: StateFlow<List<SavedMonthlyReport>> = data.ai.monthlyReports
+    private val _monthlyRunning = MutableStateFlow(false)
+    val monthlyRunning: StateFlow<Boolean> = _monthlyRunning.asStateFlow()
+
+    /** Analiza długoterminowa na żądanie: ok. 12 tygodni kończących się dziś. */
+    fun runMonthly() {
+        if (_monthlyRunning.value) return
+        _monthlyRunning.value = true
+        viewModelScope.launch {
+            try {
+                data.ai.monthly(LocalDate.now(RytmTime.zone), force = true)
+            } finally {
+                _monthlyRunning.value = false
+                refreshAiSpent()
+            }
+        }
+    }
+
     private val _aiRunning = MutableStateFlow(false)
     val aiRunning: StateFlow<Boolean> = _aiRunning.asStateFlow()
     private val _aiSpent = MutableStateFlow<Double?>(null)
@@ -149,6 +169,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         data.ai.saveSettings(s)
         EveningWorker.schedule(getApplication(), replace = true)
         WeeklyWorker.schedule(getApplication(), replace = true)
+        MonthlyWorker.schedule(getApplication(), replace = true)
     }
 
     fun saveAiKey(provider: LlmProvider, key: String) = data.ai.saveKey(provider, key)
