@@ -42,3 +42,56 @@ jobs:
             app-phone/build/outputs/apk/debug/*.apk
             app-wear/build/outputs/apk/debug/*.apk
           retention-days: 14
+
+  # Podpisane APK (telefon + zegarek) jako GitHub Release po każdym pushu na main.
+  # Na PR tylko sprawdza, że release się buduje. Klucz: docs/wydania.md.
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      VERSION_NAME: 0.1.${{ github.run_number }}
+      VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Klucz podpisu z sekretów
+        id: key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RYTM_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::Brak sekretu RYTM_KEYSTORE_BASE64, wydanie pominięte (docs/wydania.md)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/rytm-release.jks"
+            echo "RYTM_KEYSTORE_PATH=$RUNNER_TEMP/rytm-release.jks" >> "$GITHUB_ENV"
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release
+        env:
+          RYTM_KEYSTORE_PASSWORD: ${{ secrets.RYTM_KEYSTORE_PASSWORD }}
+        run: >
+          ./gradlew :app-phone:assembleRelease :app-wear:assembleRelease --stacktrace
+          -Prytm.versionCode=$VERSION_CODE -Prytm.versionName=$VERSION_NAME
+
+      - name: Publikuj w Releases
+        if: steps.key.outputs.ok == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir out
+          cp app-phone/build/outputs/apk/release/*.apk "out/rytm-telefon-$VERSION_NAME.apk"
+          cp app-wear/build/outputs/apk/release/*.apk "out/rytm-zegarek-$VERSION_NAME.apk"
+          gh release create "v$VERSION_NAME" out/*.apk \
+            --target "$GITHUB_SHA" --title "Rytm $VERSION_NAME" --generate-notes --latest
