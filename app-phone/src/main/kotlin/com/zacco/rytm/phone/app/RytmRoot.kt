@@ -55,6 +55,7 @@ import com.zacco.rytm.phone.today.HabitsCard
 import com.zacco.rytm.phone.today.NutritionSheet
 import com.zacco.rytm.phone.today.RpeSheet
 import com.zacco.rytm.phone.today.ActivitySheet
+import com.zacco.rytm.phone.today.PhoneWorkoutScreen
 import com.zacco.rytm.phone.today.QuickAddSheet
 import com.zacco.rytm.phone.today.QuickEntry
 import com.zacco.rytm.phone.today.TodayScreen
@@ -90,6 +91,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     var profileOpen by rememberSaveable { mutableStateOf(false) }
     // Na starcie kreator krok po kroku; „Wolę jeden formularz” przełącza na pełny profil.
     var fullForm by rememberSaveable { mutableStateOf(false) }
+    var workoutOpen by rememberSaveable { mutableStateOf(true) }
     var rpeDate by rememberSaveable { mutableStateOf<String?>(null) }
     // Dzień wybrany w arkuszu „+”; dotyczy każdego wpisu.
     var entryDate by rememberSaveable { mutableStateOf<String?>(null) }
@@ -104,6 +106,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     val aiReviews by vm.aiReviews.collectAsStateWithLifecycle()
     val aiRunning by vm.aiRunning.collectAsStateWithLifecycle()
     val aiSpent by vm.aiSpent.collectAsStateWithLifecycle()
+    val phoneRun by vm.phoneRun.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
         vm.refreshHealthConnect()
@@ -157,6 +160,30 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
         return
     }
 
+    phoneRun?.takeIf { workoutOpen }?.let { run ->
+        BackHandler { workoutOpen = false }
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(c.bg)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            PhoneWorkoutScreen(
+                run = run,
+                onUpdate = vm::updatePhoneRun,
+                onFinish = vm::finishPhoneWorkout,
+                onCancel = vm::cancelPhoneWorkout,
+                onClose = { workoutOpen = false },
+            )
+        }
+        return
+    }
+
     Column(Modifier.fillMaxSize().background(c.bg)) {
         // Pociągnij w dół: synchronizacja z Health Connect od razu (np. zaraz po spacerze).
         PullToRefreshBox(
@@ -191,6 +218,11 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onDayOff = vm::toggleDayOff,
                         onAdd = { entryDate = null; sheet = Sheet.ACTIVITY },
                         onLogWorkout = { sheet = Sheet.WORKOUT },
+                        phoneRunActive = phoneRun != null,
+                        onPhoneWorkout = {
+                            vm.startPhoneWorkout()
+                            workoutOpen = true
+                        },
                     )
                     Tab.WEEK -> WeekScreen(s, vm::toggleCancelled) { day ->
                         rpeDate = day.date.toString()

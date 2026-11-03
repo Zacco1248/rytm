@@ -5,6 +5,7 @@
     <!-- Wieczorna analiza AI (Claude/OpenAI) i powiadomienie o niej. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />

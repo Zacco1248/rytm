@@ -70,6 +70,8 @@ fun TodayScreen(
     onDayOff: () -> Unit,
     onAdd: () -> Unit,
     onLogWorkout: () -> Unit = {},
+    phoneRunActive: Boolean = false,
+    onPhoneWorkout: () -> Unit = {},
 ) {
     ScreenHeader(sub = Format.dayLong(s.date), title = greeting()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -87,7 +89,7 @@ fun TodayScreen(
     sync.error?.let { RytmCard { SmallText(it, color = Rytm.colors.bad) } }
 
     ReadinessCard(s, onCheckIn)
-    PlanCard(s, onDayOff, onLogWorkout)
+    PlanCard(s, onDayOff, onLogWorkout, phoneRunActive, onPhoneWorkout)
     NutritionCard(s, sync, onSync, onNutrition)
     HabitsCard(s.habits, onToggleHabit)
 
@@ -196,7 +198,7 @@ private fun ComponentRow(name: String, value: String, score: Int?) {
 }
 
 @Composable
-private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit, onLogWorkout: () -> Unit) {
+private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit, onLogWorkout: () -> Unit, phoneRunActive: Boolean, onPhoneWorkout: () -> Unit) {
     val p = s.plan
     RytmCard {
         CardHeader("Plan na dziś") {
@@ -215,8 +217,14 @@ private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit, onLogWorkout: () ->
                     color = Rytm.colors.good,
                 )
             }
-            RytmButton(if (s.setsToday.isEmpty()) "Zapisz trening" else "Zapisz kolejny trening", Modifier.fillMaxWidth(), onClick = onLogWorkout)
-            SmallText("Na zegarku: „Zacznij trening” prowadzi seria po serii z przerwą i tętnem.")
+            RytmButton(
+                if (phoneRunActive) "Wróć do treningu" else "Zacznij trening na telefonie",
+                Modifier.fillMaxWidth(),
+                primary = true,
+                onClick = onPhoneWorkout,
+            )
+            RytmButton(if (s.setsToday.isEmpty()) "Wpisz trening po fakcie" else "Wpisz kolejny trening", Modifier.fillMaxWidth(), onClick = onLogWorkout)
+            SmallText("Telefon prowadzi seria po serii z przerwą i wibracją. Na zegarku z Wear OS to samo daje „Zacznij trening”.")
         }
         p.cardio?.let { cs ->
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

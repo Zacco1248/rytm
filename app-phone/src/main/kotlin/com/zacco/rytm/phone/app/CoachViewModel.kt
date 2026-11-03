@@ -252,6 +252,40 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Trening prowadzony na telefonie; null, gdy żaden nie trwa. */
+    val phoneRun: StateFlow<com.zacco.rytm.domain.workout.WorkoutRun?> = data.phoneWorkout.run
+
+    fun startPhoneWorkout() {
+        if (data.phoneWorkout.run.value != null) return
+        val today = state.value?.today ?: return
+        val workout = today.plan.workout ?: return
+        val profile = profile.value
+        val step = profile?.weightStepKg ?: profile?.toUserProfile(today.date)?.equipment?.stepKg ?: 1.0
+        data.phoneWorkout.set(
+            com.zacco.rytm.domain.workout.WorkoutRun.start(
+                id = "phone-" + java.util.UUID.randomUUID(),
+                workout = workout,
+                type = WatchBridge.workoutType(today.plan),
+                stepKg = step,
+                nowMs = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    fun updatePhoneRun(f: (com.zacco.rytm.domain.workout.WorkoutRun) -> com.zacco.rytm.domain.workout.WorkoutRun) = data.phoneWorkout.update(f)
+
+    /** Kończy trening z telefonu i zapisuje serie; [rpe] z ekranu końcowego. */
+    fun finishPhoneWorkout(rpe: Int?) {
+        val run = data.phoneWorkout.run.value ?: return
+        data.phoneWorkout.set(null)
+        if (run.sets.none { it.reps > 0 }) return
+        viewModelScope.launch {
+            data.coach.saveWorkout(run.toLog(System.currentTimeMillis(), rpe, null, null, Source.MANUAL))
+        }
+    }
+
+    fun cancelPhoneWorkout() = data.phoneWorkout.set(null)
+
     /** „Popraw z AI” w kreatorze; wynik wraca na główny wątek. */
     fun tweakPlan(p: PersonalProfile, request: String, onResult: (com.zacco.rytm.ai.plan.PlanTweakResult) -> Unit) {
         viewModelScope.launch { onResult(data.ai.tweakPlan(p, request)) }
