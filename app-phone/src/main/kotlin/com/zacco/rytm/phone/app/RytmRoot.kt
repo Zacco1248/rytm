@@ -58,6 +58,8 @@ import com.zacco.rytm.phone.today.RpeSheet
 import com.zacco.rytm.phone.today.ActivitySheet
 import com.zacco.rytm.phone.today.PhoneWorkoutScreen
 import com.zacco.rytm.phone.chat.ChatScreen
+import com.zacco.rytm.phone.entries.EntriesScreen
+import com.zacco.rytm.data.repo.EntryKind
 import com.zacco.rytm.phone.today.QuickAddSheet
 import com.zacco.rytm.phone.today.QuickEntry
 import com.zacco.rytm.phone.today.TodayScreen
@@ -95,6 +97,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     var fullForm by rememberSaveable { mutableStateOf(false) }
     var workoutOpen by rememberSaveable { mutableStateOf(true) }
     var chatOpen by rememberSaveable { mutableStateOf(false) }
+    var entriesOpen by rememberSaveable { mutableStateOf(false) }
+    var replaceWeighIn by rememberSaveable { mutableStateOf<String?>(null) }
     var rpeDate by rememberSaveable { mutableStateOf<String?>(null) }
     // Dzień wybrany w arkuszu „+”; dotyczy każdego wpisu.
     var entryDate by rememberSaveable { mutableStateOf<String?>(null) }
@@ -116,6 +120,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     val aiSpent by vm.aiSpent.collectAsStateWithLifecycle()
     val phoneRun by vm.phoneRun.collectAsStateWithLifecycle()
     val chat by vm.chat.collectAsStateWithLifecycle()
+    val entries by vm.entries.collectAsStateWithLifecycle()
+    val exportStatus by vm.exportStatus.collectAsStateWithLifecycle()
     val chatRunning by vm.chatRunning.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
@@ -199,6 +205,45 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
         return
     }
 
+    if (entriesOpen) {
+        BackHandler { entriesOpen = false }
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(c.bg)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            EntriesScreen(
+                entries = entries,
+                exportStatus = exportStatus,
+                onEdit = { e ->
+                    entriesOpen = false
+                    entryDate = e.date.toString()
+                    when (e.kind) {
+                        EntryKind.WEIGH_IN -> {
+                            // Stare ważenie usuwamy dopiero po zapisaniu nowego.
+                            replaceWeighIn = e.id
+                            sheet = Sheet.WEIGH_IN
+                        }
+                        EntryKind.NUTRITION -> sheet = Sheet.NUTRITION
+                        EntryKind.ALCOHOL -> sheet = Sheet.ALCOHOL
+                        EntryKind.ACTIVITY -> { rpeDate = e.date.toString(); sheet = Sheet.RPE }
+                        EntryKind.CHECK_IN -> sheet = Sheet.CHECK_IN
+                    }
+                },
+                onDelete = vm::deleteEntry,
+                onExport = vm::exportTo,
+                onClose = { entriesOpen = false },
+            )
+        }
+        return
+    }
+
     state?.takeIf { chatOpen }?.let { st ->
         BackHandler { chatOpen = false }
         val chatScroll = rememberScrollState()
@@ -259,6 +304,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onConnect = { permissionLauncher.launch(vm.permissions) },
                         onSync = vm::syncNow,
                         onProfile = { profileOpen = true },
+                        onEntries = { entriesOpen = true },
                         onToggleHabit = { vm.toggleHabit(it.habit, it.done) },
                         onCheckIn = { sheet = Sheet.CHECK_IN },
                         onNutrition = { entryDate = null; sheet = Sheet.NUTRITION },
@@ -355,7 +401,11 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
         Sheet.WORKOUT -> state?.today?.plan?.workout?.let { w ->
             WorkoutLogSheet(w, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveManualWorkout)
         }
-        Sheet.WEIGH_IN -> WeighInSheet(date, onDismiss = { sheet = Sheet.NONE }) { kg, fat, time, comp -> vm.addWeighIn(kg, fat, time, comp, date) }
+        Sheet.WEIGH_IN -> WeighInSheet(date, onDismiss = { sheet = Sheet.NONE; replaceWeighIn = null }) { kg, fat, time, comp ->
+            replaceWeighIn?.let { vm.deleteWeighIn(it) }
+            replaceWeighIn = null
+            vm.addWeighIn(kg, fat, time, comp, date)
+        }
         Sheet.NONE -> Unit
     }
 }

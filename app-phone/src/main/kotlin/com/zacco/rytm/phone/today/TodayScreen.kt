@@ -67,6 +67,7 @@ fun TodayScreen(
     onConnect: () -> Unit,
     onSync: () -> Unit,
     onProfile: () -> Unit,
+    onEntries: () -> Unit = {},
     onToggleHabit: (HabitStatus) -> Unit,
     onCheckIn: () -> Unit,
     onNutrition: () -> Unit,
@@ -87,6 +88,7 @@ fun TodayScreen(
                 else -> "↻ synchronizuj"
             }
             Chip(syncLabel, ChipTone.MUTED, onClick = onSync)
+            Chip("Wpisy", ChipTone.MUTED, onClick = onEntries)
             Chip("Profil", ChipTone.MUTED, onClick = onProfile)
         }
     }

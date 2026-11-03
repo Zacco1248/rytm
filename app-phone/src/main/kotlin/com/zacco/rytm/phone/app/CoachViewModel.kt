@@ -340,6 +340,38 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
 
     fun cancelPhoneWorkout() = data.phoneWorkout.set(null)
 
+    // --- wpisy: przegląd, usuwanie, eksport ---
+    val entries: StateFlow<List<com.zacco.rytm.data.repo.Entry>> = today
+        .flatMapLatest { day -> data.entries.observe(day) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    private val _exportStatus = MutableStateFlow<String?>(null)
+    val exportStatus: StateFlow<String?> = _exportStatus.asStateFlow()
+
+    fun deleteEntry(e: com.zacco.rytm.data.repo.Entry) {
+        viewModelScope.launch {
+            data.entries.delete(e)
+            WatchBridge.publish(getApplication())
+        }
+    }
+
+    fun deleteWeighIn(id: String) {
+        viewModelScope.launch { data.entries.deleteWeighIn(id) }
+    }
+
+    fun exportTo(uri: android.net.Uri) {
+        _exportStatus.value = "Zapisuję…"
+        viewModelScope.launch {
+            _exportStatus.value = runCatching {
+                val json = data.entries.exportJson()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) }
+                        ?: error("nie można otworzyć pliku")
+                }
+                "Zapisano (${json.length / 1024} KB)."
+            }.getOrElse { "Eksport nieudany: ${it.message}" }
+        }
+    }
+
     // --- rozmowa z trenerem ---
     val chat: StateFlow<List<com.zacco.rytm.ai.chat.ChatMessage>> = data.ai.chat
     private val _chatRunning = MutableStateFlow(false)

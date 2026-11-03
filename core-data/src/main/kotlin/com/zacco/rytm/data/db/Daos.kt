@@ -86,6 +86,9 @@ interface CheckInDao {
 
     @Upsert
     suspend fun upsert(checkIn: CheckInEntity)
+
+    @Query("DELETE FROM check_in WHERE date = :date")
+    suspend fun delete(date: LocalDate)
 }
 
 @Dao
