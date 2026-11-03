@@ -25,14 +25,15 @@ class Converters {
         s.split(',').filter { it.isNotBlank() }.mapNotNull { runCatching { BodyArea.valueOf(it) }.getOrNull() }.toSet()
 
     @TypeConverter fun compositionToString(c: BodyComposition?): String? = c?.takeUnless { it.isEmpty }?.let { b ->
-        JSONObject().apply {
-            fun put(k: String, v: Number?) { if (v != null) put(k, v) }
-            put("muscleKg", b.muscleKg); put("musclePct", b.musclePct); put("skeletalMuscleKg", b.skeletalMuscleKg)
-            put("waterKg", b.waterKg); put("waterPct", b.waterPct); put("fatKg", b.fatKg); put("boneKg", b.boneKg)
-            put("proteinKg", b.proteinKg); put("proteinPct", b.proteinPct); put("visceralFat", b.visceralFat)
-            put("bmrKcal", b.bmrKcal); put("leanMassKg", b.leanMassKg); put("waistHipRatio", b.waistHipRatio)
-            put("bmi", b.bmi); put("bodyScore", b.bodyScore); put("heartRate", b.heartRate)
-        }.toString()
+        val o = JSONObject()
+        // Uwaga: lokalna funkcja o nazwie „put” wołała samą siebie (StackOverflowError przy zapisie ważenia ze zrzutu).
+        fun opt(k: String, v: Number?) { if (v != null) o.put(k, v) }
+        opt("muscleKg", b.muscleKg); opt("musclePct", b.musclePct); opt("skeletalMuscleKg", b.skeletalMuscleKg)
+        opt("waterKg", b.waterKg); opt("waterPct", b.waterPct); opt("fatKg", b.fatKg); opt("boneKg", b.boneKg)
+        opt("proteinKg", b.proteinKg); opt("proteinPct", b.proteinPct); opt("visceralFat", b.visceralFat)
+        opt("bmrKcal", b.bmrKcal); opt("leanMassKg", b.leanMassKg); opt("waistHipRatio", b.waistHipRatio)
+        opt("bmi", b.bmi); opt("bodyScore", b.bodyScore); opt("heartRate", b.heartRate)
+        o.toString()
     }
 
     @TypeConverter fun stringToComposition(s: String?): BodyComposition? = s?.let {
