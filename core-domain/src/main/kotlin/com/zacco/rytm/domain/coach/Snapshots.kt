@@ -63,6 +63,8 @@ data class TodaySnapshot(
     val estimatedKcalIds: Set<String> = emptySet(),
     /** Plan dnia zmieniony w rozmowie z trenerem. */
     val planChanged: Boolean = false,
+    /** Ten tydzień lżej (deload) i dlaczego. */
+    val deload: Deload? = null,
 ) {
     /** Kcal z aktywności dnia (bez doliczania mnożnika). */
     val activityKcal: Int get() = activitiesToday.sumOf { it.kcal ?: 0 }
@@ -78,6 +80,7 @@ data class WeekSnapshot(
     val load: LoadSummary,
     val strengthDone: Int,
     val strengthRequired: Int,
+    val deload: Deload? = null,
 )
 
 data class WeekDay(

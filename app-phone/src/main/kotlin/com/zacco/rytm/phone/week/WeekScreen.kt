@@ -68,6 +68,16 @@ fun WeekScreen(
         Chip("${w.strengthDone} / ${w.strengthRequired} siła" + if (w.strengthDone >= w.strengthRequired) " ✓" else "",
             if (w.strengthDone >= w.strengthRequired) ChipTone.GOOD else ChipTone.MUTED)
     }
+    w.deload?.let { d ->
+        RytmCard {
+            CardHeader(
+                "Tydzień lżej",
+                help = "Deload: co jakiś czas tydzień z mniejszą liczbą serii i ok. 10% mniejszym ciężarem. Mięśnie i stawy nadrabiają regenerację, " +
+                    "a potem progresja idzie dalej. Rytm włącza go sam, gdy obciążenie rośnie za szybko (ACWR od 1,4) albo co 6. tydzień po 5 mocnych.",
+            ) { Chip("deload", ChipTone.WARN) }
+            SmallText(d.text)
+        }
+    }
     WeeklyReportCard(state.today.date, weekly, weeklyRunning, onRunWeekly)
     LoadCard(w)
     AcwrCard(w)

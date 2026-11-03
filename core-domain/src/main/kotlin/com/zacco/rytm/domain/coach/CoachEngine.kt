@@ -45,8 +45,9 @@ class CoachEngine(
         val load = load(data)
         val readiness = readiness(data, load)
         val context = context(data, readiness, load)
-        val plan = planned(data, plannerFor(data).planDay(data.today, context))
-        val tomorrow = planned(data, plannerFor(data).planDay(data.today.plusDays(1), context))
+        val deload = Recovery.deload(data.today, load, data.activities, data.profile.planner.planStart)
+        val plan = planned(data, plannerFor(data).planDay(data.today, context), deload)
+        val tomorrow = planned(data, plannerFor(data).planDay(data.today.plusDays(1), context), deload)
         val heavyToday = load.today >= HEAVY_DAY_MIN_LOAD && load.today >= load.chronicDailyAvg * HEAVY_DAY_FACTOR
         val night = data.metrics.firstOrNull { it.date == data.today }
         val steps = night?.steps
@@ -85,13 +86,21 @@ class CoachEngine(
             activitiesToday = data.activities.filter { it.localDate() == data.today }.sortedBy { it.start }
                 .map { a -> if (a.kcal == null) a.copy(kcal = estimateKcal(a, data.profile.weightKg)) else a },
             planChanged = data.overrides.any { it.date == data.today.toString() },
+            deload = deload,
             estimatedKcalIds = data.activities.filter { it.localDate() == data.today && it.kcal == null && it.durationMin > 0 }.map { it.id }.toSet(),
         )
     }
 
     /** Plan z reguł z progresją, a gdy dzień zmieniono w rozmowie z trenerem: wersja z rozmowy (już z ciężarami). */
-    private fun planned(data: CoachData, day: PlannedDay): PlannedDay =
-        data.overrides.lastOrNull { it.date == day.date.toString() }?.applyTo(day) ?: withProgression(data, day)
+    private fun planned(data: CoachData, day: PlannedDay, deload: Deload?): PlannedDay {
+        data.overrides.lastOrNull { it.date == day.date.toString() }?.let { return it.applyTo(day) }
+        var d = withProgression(data, day)
+        if (deload != null && day.date.with(DayOfWeek.MONDAY) == data.today.with(DayOfWeek.MONDAY)) {
+            d = Recovery.applyDeload(d, deload, data.profile.equipment.stepKg)
+        }
+        val sore = data.checkIns.firstOrNull { it.date == day.date }?.soreAreas.orEmpty()
+        return Recovery.avoidSore(d, sore)
+    }
 
     /** Ciężar i powtórzenia sesji siłowej z dziennika serii (mobilność i obwód zostają bez zmian). */
     private fun withProgression(data: CoachData, day: PlannedDay): PlannedDay {
@@ -105,8 +114,10 @@ class CoachEngine(
         val readiness = readiness(data, load)
         val context = context(data, readiness, load)
         val monday = data.today.with(DayOfWeek.MONDAY)
+        val deload = Recovery.deload(data.today, load, data.activities, data.profile.planner.planStart)
         val plan = plannerFor(data).planWeek(data.today, context).map { d ->
-            data.overrides.lastOrNull { it.date == d.date.toString() }?.applyTo(d) ?: d
+            data.overrides.lastOrNull { it.date == d.date.toString() }?.applyTo(d)
+                ?: deload?.let { Recovery.applyDeload(d, it, data.profile.equipment.stepKg) } ?: d
         }
         val hr = hrProfile(data)
 
@@ -131,7 +142,7 @@ class CoachEngine(
             it.localDate() in monday..monday.plusDays(6) &&
                 (it.type == ActivityType.STRENGTH || it.type == ActivityType.PERSONAL_TRAINING)
         }
-        return WeekSnapshot(monday, data.today, days, load, strengthDone, data.profile.planner.minStrengthSessionsPerWeek)
+        return WeekSnapshot(monday, data.today, days, load, strengthDone, data.profile.planner.minStrengthSessionsPerWeek, deload)
     }
 
     fun body(data: CoachData, days: Long = 28): BodySnapshot {
