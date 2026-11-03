@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -56,6 +57,7 @@ import com.zacco.rytm.phone.today.NutritionSheet
 import com.zacco.rytm.phone.today.RpeSheet
 import com.zacco.rytm.phone.today.ActivitySheet
 import com.zacco.rytm.phone.today.PhoneWorkoutScreen
+import com.zacco.rytm.phone.chat.ChatScreen
 import com.zacco.rytm.phone.today.QuickAddSheet
 import com.zacco.rytm.phone.today.QuickEntry
 import com.zacco.rytm.phone.today.TodayScreen
@@ -92,6 +94,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     // Na starcie kreator krok po kroku; „Wolę jeden formularz” przełącza na pełny profil.
     var fullForm by rememberSaveable { mutableStateOf(false) }
     var workoutOpen by rememberSaveable { mutableStateOf(true) }
+    var chatOpen by rememberSaveable { mutableStateOf(false) }
     var rpeDate by rememberSaveable { mutableStateOf<String?>(null) }
     // Dzień wybrany w arkuszu „+”; dotyczy każdego wpisu.
     var entryDate by rememberSaveable { mutableStateOf<String?>(null) }
@@ -112,6 +115,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     val monthlyRunning by vm.monthlyRunning.collectAsStateWithLifecycle()
     val aiSpent by vm.aiSpent.collectAsStateWithLifecycle()
     val phoneRun by vm.phoneRun.collectAsStateWithLifecycle()
+    val chat by vm.chat.collectAsStateWithLifecycle()
+    val chatRunning by vm.chatRunning.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
         vm.refreshHealthConnect()
@@ -194,6 +199,38 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
         return
     }
 
+    state?.takeIf { chatOpen }?.let { st ->
+        BackHandler { chatOpen = false }
+        val chatScroll = rememberScrollState()
+        // Nowa wiadomość: przewiń na dół, do odpowiedzi i pola tekstu.
+        androidx.compose.runtime.LaunchedEffect(chat.size, chatRunning) { chatScroll.animateScrollTo(chatScroll.maxValue) }
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(c.bg)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding()
+                .verticalScroll(chatScroll)
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ChatScreen(
+                messages = chat,
+                plan = st.today.plan,
+                planChanged = st.today.planChanged,
+                running = chatRunning,
+                hasKey = aiHasKey,
+                onSend = vm::sendChat,
+                onResetPlan = vm::resetTodayPlan,
+                onClear = vm::clearChat,
+                onClose = { chatOpen = false },
+            )
+        }
+        return
+    }
+
     Column(Modifier.fillMaxSize().background(c.bg)) {
         // Pociągnij w dół: synchronizacja z Health Connect od razu (np. zaraz po spacerze).
         PullToRefreshBox(
@@ -234,6 +271,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                             workoutOpen = true
                         },
                         morning = morningNotes.firstOrNull { it.date == s.today.date.toString() }?.note,
+                        onCoach = { chatOpen = true },
+                        onResetPlan = vm::resetTodayPlan,
                     )
                     Tab.WEEK -> WeekScreen(
                         s,

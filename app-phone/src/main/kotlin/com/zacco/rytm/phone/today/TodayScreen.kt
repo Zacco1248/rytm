@@ -76,6 +76,8 @@ fun TodayScreen(
     phoneRunActive: Boolean = false,
     onPhoneWorkout: () -> Unit = {},
     morning: MorningNote? = null,
+    onCoach: () -> Unit = {},
+    onResetPlan: () -> Unit = {},
 ) {
     ScreenHeader(sub = Format.dayLong(s.date), title = greeting()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -94,7 +96,7 @@ fun TodayScreen(
 
     ReadinessCard(s, onCheckIn)
     if (morning != null && s.checkIn != null) MorningCard(morning)
-    PlanCard(s, onDayOff, onLogWorkout, phoneRunActive, onPhoneWorkout)
+    PlanCard(s, onDayOff, onLogWorkout, phoneRunActive, onPhoneWorkout, onCoach, onResetPlan)
     NutritionCard(s, sync, onSync, onNutrition)
     HabitsCard(s.habits, onToggleHabit)
 
@@ -222,7 +224,15 @@ private fun ComponentRow(name: String, value: String, score: Int?) {
 }
 
 @Composable
-private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit, onLogWorkout: () -> Unit, phoneRunActive: Boolean, onPhoneWorkout: () -> Unit) {
+private fun PlanCard(
+    s: TodaySnapshot,
+    onDayOff: () -> Unit,
+    onLogWorkout: () -> Unit,
+    phoneRunActive: Boolean,
+    onPhoneWorkout: () -> Unit,
+    onCoach: () -> Unit,
+    onResetPlan: () -> Unit,
+) {
     val p = s.plan
     RytmCard {
         CardHeader("Plan na dziś") {
@@ -232,6 +242,12 @@ private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit, onLogWorkout: () ->
             }
         }
         Text(p.title, style = Rytm.type.planTitle, color = Rytm.colors.ink)
+        if (s.planChanged) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SmallText("Zmienione w rozmowie z trenerem.", Modifier.weight(1f), color = Rytm.colors.accent)
+                Chip("Przywróć plan", ChipTone.MUTED, onClick = onResetPlan)
+            }
+        }
         p.workout?.let { w ->
             WorkoutList(w)
             if (s.setsToday.isNotEmpty()) {
@@ -259,6 +275,7 @@ private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit, onLogWorkout: () ->
         p.warnings.forEach { SmallText("⚠ $it", color = Rytm.colors.warn) }
         if (p.rationale.isNotEmpty()) WhyBox(p.rationale.joinToString(" "))
         SmallText("Jutro: ${s.tomorrow.title.lowercase()}. Pora snu dziś: ${s.bedtime.format(hhmm)}.")
+        RytmButton("Mniej czasu? Coś boli? Zapytaj trenera", Modifier.fillMaxWidth(), onClick = onCoach)
     }
 }
 

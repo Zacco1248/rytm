@@ -50,6 +50,10 @@ data class WorkoutRun(
     /** Koniec przerwy (epoch ms); null, gdy nie ma przerwy. */
     val restUntilMs: Long? = null,
     val skipped: List<String> = emptyList(),
+    /** Górna granica ciężaru sprzętu (np. najcięższy hantel); null: bez limitu (siłownia). */
+    val maxKg: Double? = null,
+    /** Podpowiedź po ostatniej ocenionej serii (autoregulacja). */
+    val advice: SetAdvice? = null,
 ) {
     val current: RunExercise? get() = exercises.getOrNull(exerciseIdx)
     val isFinished: Boolean get() = current == null
@@ -61,19 +65,32 @@ data class WorkoutRun(
     /** Podpowiedź na następną serię: to, co wpisałeś w poprzedniej serii tego ćwiczenia, a na start cel z planu. */
     fun suggestedReps(): Int {
         val ex = current ?: return 0
+        currentAdvice()?.reps?.let { return it }
         return sets.lastOrNull { it.exercise == ex.name }?.reps ?: ex.repsMax
     }
 
     fun suggestedWeight(): Double? {
         val ex = current ?: return null
-        return sets.lastOrNull { it.exercise == ex.name }?.weightKg ?: ex.weightKg
+        val last = sets.lastOrNull { it.exercise == ex.name }
+        currentAdvice()?.takeIf { last?.weightKg != null }?.weightKg?.let { return it }
+        return last?.weightKg ?: ex.weightKg
+    }
+
+    /** Podpowiedź na następną serię bieżącego ćwiczenia (nie ta po ostatniej serii poprzedniego). */
+    fun currentAdvice(): SetAdvice? = advice?.takeIf { a -> a.exercise == current?.name && !a.offerExtraSet && setNo > 1 }
+
+    /** Podpowiedź do pokazania w przerwie: także „dołóż serię” po ostatniej serii poprzedniego ćwiczenia. */
+    fun visibleAdvice(): SetAdvice? = advice?.takeIf { a ->
+        (a.offerExtraSet && exercises.getOrNull(exerciseIdx - 1)?.name == a.exercise && setNo == 1) || currentAdvice() != null
     }
 
     /** Zapisuje serię; po ostatniej serii ćwiczenia przechodzi do następnego. Przerwa po każdej serii poza ostatnią w treningu. */
     fun log(reps: Int, weightKg: Double?, rir: Int?, nowMs: Long): WorkoutRun {
         val ex = current ?: return this
-        val logged = sets + RunSet(ex.name, setNo, reps.coerceAtLeast(0), weightKg, rir, nowMs)
+        val done = RunSet(ex.name, setNo, reps.coerceAtLeast(0), weightKg, rir, nowMs)
+        val logged = sets + done
         val lastOfExercise = setNo >= ex.sets
+        val advice = Autoregulation.afterSet(ex, done, sets, stepKg, maxKg, lastOfExercise)
         val nextIdx = if (lastOfExercise) exerciseIdx + 1 else exerciseIdx
         val finished = nextIdx >= exercises.size
         return copy(
@@ -81,6 +98,32 @@ data class WorkoutRun(
             exerciseIdx = nextIdx,
             setNo = if (lastOfExercise) 1 else setNo + 1,
             restUntilMs = if (finished || ex.restSec <= 0) null else nowMs + ex.restSec * 1000L,
+            advice = advice,
+        )
+    }
+
+    /** „Dołóż serię” po lekkiej ostatniej serii: wraca do poprzedniego ćwiczenia na jedną serię więcej. */
+    fun extraSet(): WorkoutRun {
+        val a = advice?.takeIf { it.offerExtraSet } ?: return this
+        val idx = exerciseIdx - 1
+        val prev = exercises.getOrNull(idx)?.takeIf { it.name == a.exercise } ?: return this
+        return copy(
+            exercises = exercises.mapIndexed { i, e -> if (i == idx) e.copy(sets = prev.sets + 1) else e },
+            exerciseIdx = idx,
+            setNo = prev.sets + 1,
+            advice = a.copy(offerExtraSet = false, reps = sets.lastOrNull { it.exercise == a.exercise }?.reps),
+        )
+    }
+
+    /** Kończy bieżące ćwiczenie przed czasem (np. dwie serie do upadku); nie liczy się jako pominięte. */
+    fun endExercise(): WorkoutRun {
+        val ex = current ?: return this
+        val done = sets.count { it.exercise == ex.name }
+        return copy(
+            exercises = exercises.mapIndexed { i, e -> if (i == exerciseIdx) e.copy(sets = done.coerceAtLeast(1)) else e },
+            exerciseIdx = exerciseIdx + 1,
+            setNo = 1,
+            advice = null,
         )
     }
 
@@ -97,7 +140,7 @@ data class WorkoutRun(
     /** Pomija resztę serii bieżącego ćwiczenia (brak czasu, boli, brak sprzętu). */
     fun skipExercise(): WorkoutRun {
         val ex = current ?: return this
-        return copy(exerciseIdx = exerciseIdx + 1, setNo = 1, restUntilMs = null, skipped = skipped + ex.name)
+        return copy(exerciseIdx = exerciseIdx + 1, setNo = 1, restUntilMs = null, skipped = skipped + ex.name, advice = null)
     }
 
     /** Gotowy wpis do dziennika. Serie z 0 powtórzeń pomijamy. */
@@ -119,8 +162,9 @@ data class WorkoutRun(
     }
 
     companion object {
-        fun start(id: String, workout: StrengthWorkout, type: ActivityType, stepKg: Double, nowMs: Long) = WorkoutRun(
+        fun start(id: String, workout: StrengthWorkout, type: ActivityType, stepKg: Double, nowMs: Long, maxKg: Double? = null) = WorkoutRun(
             id = id,
+            maxKg = maxKg,
             title = workout.name,
             type = type.name,
             startedAtMs = nowMs,

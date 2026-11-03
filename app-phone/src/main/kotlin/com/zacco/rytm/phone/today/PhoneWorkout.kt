@@ -7,6 +7,8 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
@@ -26,9 +28,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.zacco.rytm.domain.exercise.ExerciseGuide
+import com.zacco.rytm.domain.workout.Effort
 import com.zacco.rytm.domain.workout.WorkoutRun
 import com.zacco.rytm.phone.app.Format
 import com.zacco.rytm.phone.ui.components.CardHeader
+import com.zacco.rytm.phone.ui.components.HelpDot
 import com.zacco.rytm.phone.ui.components.Pill
 import com.zacco.rytm.phone.ui.components.Ring
 import com.zacco.rytm.phone.ui.components.RytmButton
@@ -99,6 +103,7 @@ fun PhoneWorkoutScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SetCard(run: WorkoutRun, onUpdate: ((WorkoutRun) -> WorkoutRun) -> Unit) {
     val ex = run.current ?: return
@@ -121,7 +126,11 @@ private fun SetCard(run: WorkoutRun, onUpdate: ((WorkoutRun) -> WorkoutRun) -> U
                 ex.tempo?.let { "tempo $it" },
             ).joinToString(" · "),
         )
-        ex.note?.let { SmallText(it, color = Rytm.colors.accent) }
+        val advice = run.currentAdvice()
+        if (advice != null) SmallText(advice.message, color = Rytm.colors.accent) else ex.note?.let { SmallText(it, color = Rytm.colors.accent) }
+        if (advice?.offerEndExercise == true) {
+            RytmButton("Skończ to ćwiczenie", Modifier.fillMaxWidth()) { onUpdate { it.endExercise() } }
+        }
         Text("Powtórzenia", style = Rytm.type.bodyStrong, color = Rytm.colors.ink)
         Stepper(reps.toString(), onMinus = { reps = (reps - 1).coerceAtLeast(0) }, onPlus = { reps += 1 })
         if (kg != null) {
@@ -132,9 +141,14 @@ private fun SetCard(run: WorkoutRun, onUpdate: ((WorkoutRun) -> WorkoutRun) -> U
                 onPlus = { kg = kg!! + run.stepKg },
             )
         }
-        SmallText("Zapas powtórzeń (opcjonalnie): ile jeszcze dałbyś radę?")
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf(0, 1, 2, 3).forEach { v -> Pill(if (v == 3) "3+" else "$v", rir == v) { rir = if (rir == v) null else v } }
+        var effortHelp by remember { mutableStateOf(false) }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Jak poszło?", style = Rytm.type.bodyStrong, color = Rytm.colors.ink)
+            HelpDot(effortHelp) { effortHelp = !effortHelp }
+        }
+        if (effortHelp) WhyBox(Effort.HELP)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Effort.entries.forEach { e -> Pill(e.label, rir == e.rir) { rir = if (rir == e.rir) null else e.rir } }
         }
         RytmButton(
             "Seria zrobiona" + if (ex.restSec > 0) " · przerwa ${ex.restSec} s" else "",
@@ -151,7 +165,7 @@ private fun SetCard(run: WorkoutRun, onUpdate: ((WorkoutRun) -> WorkoutRun) -> U
         RytmCard {
             CardHeader("Zapisane")
             done.forEach { s ->
-                SmallText("Seria ${s.setIndex}: ${s.reps}" + (s.weightKg?.let { " × ${Format.kg(it)} kg" } ?: "") + (s.rir?.let { " · zapas $it" } ?: ""))
+                SmallText("Seria ${s.setIndex}: ${s.reps}" + (s.weightKg?.let { " × ${Format.kg(it)} kg" } ?: "") + (Effort.of(s.rir)?.let { " · ${it.label.lowercase()}" } ?: ""))
             }
         }
     }
@@ -171,6 +185,11 @@ private fun RestCard(run: WorkoutRun, now: Long, onUpdate: ((WorkoutRun) -> Work
             SmallText("Wibracja 10 s przed końcem i na koniec.")
             Text("Dalej: ${ex.name}, seria ${run.setNo} z ${ex.sets}", style = Rytm.type.body, color = Rytm.colors.ink)
             run.suggestedWeight()?.let { SmallText("${Format.kg(it)} kg") }
+        }
+        run.visibleAdvice()?.let { a ->
+            WhyBox(a.message)
+            if (a.offerExtraSet) RytmButton("Dołóż serię: ${a.exercise}", Modifier.fillMaxWidth()) { onUpdate { it.extraSet() } }
+            if (a.offerEndExercise) RytmButton("Skończ to ćwiczenie", Modifier.fillMaxWidth()) { onUpdate { it.endExercise() } }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             RytmButton("+30 s", Modifier.weight(1f)) { onUpdate { it.addRest(30, System.currentTimeMillis()) } }

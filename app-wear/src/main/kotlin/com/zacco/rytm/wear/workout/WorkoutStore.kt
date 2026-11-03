@@ -54,7 +54,7 @@ object WorkoutStore {
             w.exercises.map { PlannedExercise(it.name, it.sets, it.repsMin..it.repsMax, it.weightKg, it.tempo, it.restSec, it.note) },
         )
         val type = ActivityType.entries.firstOrNull { it.name == w.type } ?: ActivityType.STRENGTH
-        val r = WorkoutRun.start("watch-" + UUID.randomUUID(), plan, type, w.stepKg, nowMs)
+        val r = WorkoutRun.start("watch-" + UUID.randomUUID(), plan, type, w.stepKg, nowMs, w.maxKg)
         hrSum = 0
         hrCount = 0
         live.value = LiveStats()

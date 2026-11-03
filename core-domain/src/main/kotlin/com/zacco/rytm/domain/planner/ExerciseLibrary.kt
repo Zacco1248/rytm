@@ -35,6 +35,9 @@ data class Equipment(
 ) {
     val stepKg: Double get() = stepKgOverride ?: if (kind == EquipmentKind.GYM) 2.5 else 1.0
 
+    /** Górna granica ciężaru w trakcie treningu (najcięższy hantel); na siłowni bez limitu. */
+    val maxKg: Double? get() = if (kind == EquipmentKind.DUMBBELLS) singleMaxKg else null
+
     /** Najlżejsze, co da się ustawić (regulowane hantle zaczynają się od 2 kg). */
     val minKg: Double get() = if (kind == EquipmentKind.GYM) 2.5 else 2.0
 }

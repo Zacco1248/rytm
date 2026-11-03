@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import com.zacco.rytm.domain.workout.Effort
 import com.zacco.rytm.domain.workout.RunExercise
 import com.zacco.rytm.domain.workout.WorkoutRun
 import com.zacco.rytm.sync.WatchWorkout
@@ -142,17 +143,21 @@ private fun RunScreen(r: WorkoutRun, live: LiveStats, onChange: ((WorkoutRun) ->
         Label("${r.exerciseIdx + 1}/${r.exercises.size} · seria ${r.setNo}/${ex.sets}" + (live.hr?.let { " · ♥ $it" } ?: ""))
         Title(ex.name)
         Body("Cel ${reps(ex.repsMin, ex.repsMax)}" + (ex.tempo?.let { " · tempo $it" } ?: ""))
-        ex.note?.takeIf { r.setNo == 1 }?.let { Label(it) }
+        val advice = r.currentAdvice()
+        if (advice != null) Label(advice.message) else ex.note?.takeIf { r.setNo == 1 }?.let { Label(it) }
+        if (advice?.offerEndExercise == true) WideButton("Skończ ćwiczenie", { onChange { it.endExercise() } }, tonal = true)
         Label(if (ex.name.contains("sekundy")) "Sekundy" else "Powtórzenia")
         Stepper(reps, 0..300, { reps = it })
         if (hasWeight) {
             Label("Ciężar")
             Stepper(half, 0..400, { half = it }, step = stepHalf, display = { kg(it / 2.0) + " kg" })
         }
-        Label("Zapas powtórzeń (opcjonalnie)")
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-            listOf(0, 1, 2, 3).forEach { v ->
-                ToggleChip(if (v == 3) "3+" else "$v", rir == v, Modifier.weight(1f)) { rir = if (rir == v) null else v }
+        Label("Jak poszło?")
+        Effort.entries.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                row.forEach { e ->
+                    ToggleChip(e.short, rir == e.rir, Modifier.weight(1f)) { rir = if (rir == e.rir) null else e.rir }
+                }
             }
         }
         WideButton("Seria zrobiona", {
@@ -174,6 +179,11 @@ private fun RestScreen(r: WorkoutRun, next: RunExercise, live: LiveStats, now: L
         live.hr?.let { Body("♥ $it") }
         Label("Dalej: seria ${r.setNo}/${next.sets}")
         Body(next.name + (r.suggestedWeight()?.let { " · ${kg(it)} kg" } ?: ""))
+        r.visibleAdvice()?.let { a ->
+            Label(a.message)
+            if (a.offerExtraSet) WideButton("Dołóż serię", { onChange { it.extraSet() } }, tonal = true)
+            if (a.offerEndExercise) WideButton("Skończ ćwiczenie", { onChange { it.endExercise() } }, tonal = true)
+        }
         WideButton("Pomiń przerwę", { onChange { it.skipRest() } })
         WideButton("+15 s", { onChange { it.addRest(15, System.currentTimeMillis()) } }, tonal = true)
     }

@@ -40,6 +40,8 @@ data class WatchWorkout(
     val exercises: List<WatchExercise>,
     /** Skok ciężaru przy zmianie na zegarku. */
     val stepKg: Double = 1.0,
+    /** Najcięższy hantel; autoregulacja nie podpowie więcej. Null: bez limitu. */
+    val maxKg: Double? = null,
     /** Dziś już zapisano serie tego dnia. */
     val doneToday: Boolean = false,
 )
