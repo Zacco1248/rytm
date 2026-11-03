@@ -47,6 +47,7 @@ import com.zacco.rytm.phone.body.BodyScreen
 import com.zacco.rytm.phone.diagnostics.DiagnosticsScreen
 import com.zacco.rytm.phone.evening.AiUi
 import com.zacco.rytm.phone.evening.EveningScreen
+import com.zacco.rytm.phone.onboarding.OnboardingWizard
 import com.zacco.rytm.phone.profile.ProfileScreen
 import com.zacco.rytm.phone.today.AlcoholSheet
 import com.zacco.rytm.phone.today.CheckInSheet
@@ -87,6 +88,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     var sheet by rememberSaveable { mutableStateOf(Sheet.NONE) }
     var diagnostics by rememberSaveable { mutableStateOf(false) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
+    // Na starcie kreator krok po kroku; „Wolę jeden formularz” przełącza na pełny profil.
+    var fullForm by rememberSaveable { mutableStateOf(false) }
     var rpeDate by rememberSaveable { mutableStateOf<String?>(null) }
     // Dzień wybrany w arkuszu „+”; dotyczy każdego wpisu.
     var entryDate by rememberSaveable { mutableStateOf<String?>(null) }
@@ -132,15 +135,24 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            ProfileScreen(
-                initial = profile,
-                onboarding = onboarding,
-                onSave = {
-                    vm.saveProfile(it)
-                    profileOpen = false
-                },
-                onDiagnostics = if (onboarding) null else ({ profileOpen = false; diagnostics = true }),
-            )
+            if (onboarding && !fullForm) {
+                OnboardingWizard(
+                    initial = null,
+                    onTweak = vm::tweakPlan,
+                    onFullForm = { fullForm = true },
+                    onFinish = { vm.saveProfile(it) },
+                )
+            } else {
+                ProfileScreen(
+                    initial = profile,
+                    onboarding = onboarding,
+                    onSave = {
+                        vm.saveProfile(it)
+                        profileOpen = false
+                    },
+                    onDiagnostics = if (onboarding) null else ({ profileOpen = false; diagnostics = true }),
+                )
+            }
         }
         return
     }

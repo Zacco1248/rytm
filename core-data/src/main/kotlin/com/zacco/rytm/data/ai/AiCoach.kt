@@ -4,6 +4,9 @@ import android.content.Context
 import android.util.Log
 import com.zacco.rytm.ai.AiSettings
 import com.zacco.rytm.ai.CoachLlm
+import com.zacco.rytm.ai.plan.PlanTweakResult
+import com.zacco.rytm.ai.plan.PlanTweakService
+import com.zacco.rytm.domain.profile.PersonalProfile
 import com.zacco.rytm.ai.LlmProvider
 import com.zacco.rytm.ai.SavedEveningReview
 import com.zacco.rytm.ai.claude.ClaudeCoachLlm
@@ -100,6 +103,16 @@ class AiCoach(
         prefs.edit().putString(KEY_REVIEWS, json.encodeToString(ListSerializer(SavedEveningReview.serializer()), list)).apply()
         _reviews.value = list
         return saved
+    }
+
+    /** „Popraw z AI” w kreatorze: zmiana ustawień planu z prośby słowami. Bez klucza zwraca błąd do pokazania. */
+    suspend fun tweakPlan(profile: PersonalProfile, request: String): PlanTweakResult {
+        val llm = llm() ?: return PlanTweakResult(null, error = "Brak klucza AI. Dodasz go później w zakładce Wieczór; na razie popraw kroki ręcznie.")
+        return runCatching { PlanTweakService(llm, costGuard()).tweak(profile, request) }
+            .getOrElse { e ->
+                Log.w(TAG, "Poprawka planu z AI nie powiodła się", e)
+                PlanTweakResult(null, error = e.message)
+            }
     }
 
     private fun llm(): CoachLlm? {

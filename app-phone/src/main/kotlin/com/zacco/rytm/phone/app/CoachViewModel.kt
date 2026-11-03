@@ -252,6 +252,11 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** „Popraw z AI” w kreatorze; wynik wraca na główny wątek. */
+    fun tweakPlan(p: PersonalProfile, request: String, onResult: (com.zacco.rytm.ai.plan.PlanTweakResult) -> Unit) {
+        viewModelScope.launch { onResult(data.ai.tweakPlan(p, request)) }
+    }
+
     fun saveProfile(p: PersonalProfile) {
         data.profiles.save(p)
     }

@@ -388,7 +388,7 @@ private fun goalHint(g: Goal): String = when (g) {
 }
 
 @Composable
-private fun Field(label: String, value: String, type: KeyboardType, modifier: Modifier = Modifier.fillMaxWidth(), onChange: (String) -> Unit) {
+internal fun Field(label: String, value: String, type: KeyboardType, modifier: Modifier = Modifier.fillMaxWidth(), onChange: (String) -> Unit) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
@@ -401,7 +401,7 @@ private fun Field(label: String, value: String, type: KeyboardType, modifier: Mo
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun <T> Pills(options: List<Pair<String, T>>, selected: T, onSelect: (T) -> Unit) {
+internal fun <T> Pills(options: List<Pair<String, T>>, selected: T, onSelect: (T) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         options.forEach { (label, value) -> Pill(label, value == selected) { onSelect(value) } }
     }
