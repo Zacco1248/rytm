@@ -25,6 +25,10 @@ data class UserProfile(
     /** Partie, na których osoba chce się skupić; sesje siłowe dostają na nie dodatkowe ćwiczenie. */
     val focus: Set<Muscle> = emptySet(),
     val mobility: MobilityPrefs = MobilityPrefs(),
+    /** Korekta celu kcal z pętli jedzenie–waga (już zawarta w [nutrition]). */
+    val kcalAdjust: Int = 0,
+    /** Ostatni przegląd celu kcal; null: jeszcze nie ma od czego liczyć. */
+    val kcalReviewedOn: java.time.LocalDate? = null,
 )
 
 /** Cele z Fitatu pod rekompozycję. */
@@ -37,6 +41,10 @@ data class NutritionTargets(
     val weeklyWeightChangeKg: Double = -0.25,
 ) {
     fun proteinPerKg(weightKg: Double): Double = proteinG / weightKg
+
+    /** Korekta z pętli jedzenie–waga: kcal zmieniamy węglowodanami, białko zostaje. */
+    fun adjusted(deltaKcal: Int): NutritionTargets =
+        if (deltaKcal == 0) this else copy(kcal = kcal + deltaKcal, carbsG = (carbsG + deltaKcal / 4).coerceAtLeast(50))
 
     /**
      * Cel dnia z doliczonym treningiem. Jak w Fitatu: dodatkowe kcal rozkładamy na makro w tych samych proporcjach,

@@ -354,6 +354,12 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** „Cofnij korektę” celu kcal z pętli jedzenie–waga; kolejny przegląd za 2 tygodnie. */
+    fun resetKcalAdjust() {
+        val p = data.profiles.profile.value ?: return
+        data.profiles.save(p.copy(kcalAdjust = 0, kcalReviewedOn = LocalDate.now(RytmTime.zone).toString()))
+    }
+
     fun deleteWeighIn(id: String) {
         viewModelScope.launch { data.entries.deleteWeighIn(id) }
     }

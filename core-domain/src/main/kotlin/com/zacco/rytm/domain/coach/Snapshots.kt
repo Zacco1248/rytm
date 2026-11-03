@@ -126,6 +126,9 @@ data class BodySnapshot(
     val macros: List<MacroDay> = emptyList(),
     /** Cel osoby: od niego zależy ocena tempa i opisy na ekranie. */
     val goal: Goal = Goal.RECOMP,
+    /** Korekta celu kcal z pętli jedzenie–waga i kiedy następny przegląd. */
+    val kcalAdjust: Int = 0,
+    val kcalNextReview: java.time.LocalDate? = null,
 )
 
 data class MacroDay(val nutrition: NutritionDay, val target: NutritionTargets) {

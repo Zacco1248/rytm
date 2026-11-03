@@ -21,6 +21,7 @@ import com.zacco.rytm.domain.coach.CoachEngine
 import com.zacco.rytm.domain.coach.Nudge
 import com.zacco.rytm.domain.coach.NudgeKind
 import com.zacco.rytm.domain.coach.Nudges
+import com.zacco.rytm.domain.nutrition.KcalAdjuster
 import com.zacco.rytm.domain.time.RytmTime
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
@@ -34,6 +35,7 @@ import java.util.concurrent.TimeUnit
 class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        runCatching { reviewKcal(applicationContext) }.onFailure { Log.w(TAG, "Przegląd kcal nieudany", it) }
         runCatching { check(applicationContext) }.onFailure { Log.w(TAG, "Podpowiedź nieudana", it) }
         return Result.success()
     }
@@ -47,6 +49,35 @@ class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<NudgeWorker>(1, TimeUnit.HOURS).build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.KEEP, request)
+        }
+
+        /**
+         * Pętla jedzenie–waga: co 2 tygodnie koryguje cel kcal w profilu ([KcalAdjuster]) i mówi o tym powiadomieniem.
+         * Przy pierwszym uruchomieniu tylko zaczyna liczyć 2 tygodnie.
+         */
+        suspend fun reviewKcal(context: Context) {
+            val data = RytmData.get(context)
+            data.profiles.ensureLoaded()
+            val p = data.profiles.current() ?: return
+            val today = LocalDate.now(RytmTime.zone)
+            val last = (p.kcalReviewedOn ?: p.startedOn)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            if (last == null) {
+                data.profiles.save(p.copy(kcalReviewedOn = today.toString()))
+                return
+            }
+            if (!KcalAdjuster.isDue(today, last)) return
+            val coach = data.coach.observe(today).first()
+            val t = coach.profile.nutrition
+            val review = KcalAdjuster.review(today, t.kcal, p.kcalAdjust, t.weeklyWeightChangeKg, coach.weighIns, coach.nutrition)
+                ?: run {
+                    // Za mało ważeń albo wpisów jedzenia: spróbujemy za tydzień.
+                    data.profiles.save(p.copy(kcalReviewedOn = today.minusDays(KcalAdjuster.PERIOD_DAYS / 2).toString()))
+                    return
+                }
+            data.profiles.save(p.copy(kcalAdjust = review.newAdjust, kcalReviewedOn = today.toString()))
+            if (review.change != 0 && data.ai.settings.value.nudgesEnabled) {
+                show(context, Nudge(NudgeKind.PROTEIN, "Nowy cel: ${t.kcal + review.change} kcal", review.reason + " Cofniesz to w Sylwetce."), id = 99)
+            }
         }
 
         suspend fun check(context: Context) {
@@ -79,7 +110,7 @@ class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
         }
 
         @android.annotation.SuppressLint("MissingPermission") // sprawdzane w canNotify
-        private fun show(context: Context, n: Nudge): Boolean {
+        private fun show(context: Context, n: Nudge, id: Int = 100 + n.kind.ordinal): Boolean {
             if (!canNotify(context)) return false
             val nm = context.getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(NotificationChannel(CHANNEL, "Podpowiedzi w ciągu dnia", NotificationManager.IMPORTANCE_DEFAULT))
@@ -94,7 +125,7 @@ class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
                 .setAutoCancel(true)
                 .apply { open?.let { setContentIntent(it) } }
                 .build()
-            return runCatching { NotificationManagerCompat.from(context).notify(100 + n.kind.ordinal, notification) }.isSuccess
+            return runCatching { NotificationManagerCompat.from(context).notify(id, notification) }.isSuccess
         }
     }
 }

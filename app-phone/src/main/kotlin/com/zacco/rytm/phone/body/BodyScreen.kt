@@ -36,6 +36,7 @@ import com.zacco.rytm.phone.ui.components.CardHeader
 import com.zacco.rytm.phone.ui.components.Pill
 import com.zacco.rytm.phone.ui.components.Chip
 import com.zacco.rytm.phone.ui.components.ChipTone
+import com.zacco.rytm.phone.ui.components.RytmButton
 import com.zacco.rytm.phone.ui.components.RytmCard
 import com.zacco.rytm.phone.ui.components.ScreenHeader
 import com.zacco.rytm.phone.ui.components.SmallText
@@ -51,6 +52,7 @@ fun BodyScreen(
     monthlyRunning: Boolean = false,
     onRunMonthly: () -> Unit = {},
     onAddWeighIn: () -> Unit,
+    onResetKcal: () -> Unit = {},
 ) {
     val (paceLabel, paceTone) = when (b.pace) {
         WeightPace.UNKNOWN -> "za mało ważeń" to ChipTone.MUTED
@@ -62,6 +64,7 @@ fun BodyScreen(
     }
     ScreenHeader(sub = Format.goal(b.goal) + " · ostatnie 4 tygodnie", title = "Sylwetka") { Chip(paceLabel, paceTone) }
     WeightCard(b, onAddWeighIn)
+    KcalLoopCard(b, kcalTarget, onResetKcal)
     MacroCard(b)
     RytmCard {
         CardHeader("Siła")
@@ -232,4 +235,24 @@ private fun strengthHint(g: Goal): String = when (g) {
     Goal.MUSCLE_GAIN -> " i sprawdzi, czy razem z wagą rosną ciężary"
     Goal.STRENGTH -> " i pokaże, jak rosną ciężary"
     Goal.ENDURANCE, Goal.HEALTH -> " i pokaże, jak rośnie forma"
+}
+
+/** Pętla jedzenie–waga: aktualna korekta celu kcal i kiedy następny przegląd. */
+@Composable
+private fun KcalLoopCard(b: BodySnapshot, kcalTarget: Int, onReset: () -> Unit) {
+    RytmCard {
+        CardHeader(
+            "Cel kcal według wagi",
+            help = "Co 2 tygodnie Rytm porównuje tempo zmiany wagi (średnie 7-dniowe) z celem i poprawia cel kcal: " +
+                "o połowę różnicy, najwyżej 150 kcal naraz i 500 łącznie. Potrzebuje min. 6 ważeń i 8 dni z wpisanym jedzeniem w 2 tygodniach. " +
+                "Gdy jesz dużo obok celu, najpierw prosi o trzymanie się go. Zmiana idzie z węglowodanów, białko zostaje.",
+        ) {
+            if (b.kcalAdjust != 0) Chip((if (b.kcalAdjust > 0) "+" else "") + "${b.kcalAdjust} kcal", ChipTone.ACCENT)
+        }
+        SmallText(
+            (if (b.kcalAdjust == 0) "Cel $kcalTarget kcal, bez korekty." else "Cel $kcalTarget kcal, w tym korekta ${b.kcalAdjust} kcal z tempa wagi.") +
+                (b.kcalNextReview?.let { " Następny przegląd: ${Format.dayLong(it).lowercase()}." } ?: ""),
+        )
+        if (b.kcalAdjust != 0) RytmButton("Cofnij korektę", Modifier.fillMaxWidth(), onClick = onReset)
+    }
 }

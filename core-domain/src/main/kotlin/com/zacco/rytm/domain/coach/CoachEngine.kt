@@ -186,6 +186,8 @@ class CoachEngine(
             ),
             strength = StrengthHistory.latest(data.sets),
             macros = nutrition.map { MacroDay(it, data.profile.nutrition.withTraining(trainingKcal(data, it.date))) },
+            kcalAdjust = data.profile.kcalAdjust,
+            kcalNextReview = data.profile.kcalReviewedOn?.plusDays(com.zacco.rytm.domain.nutrition.KcalAdjuster.PERIOD_DAYS),
         )
     }
 
