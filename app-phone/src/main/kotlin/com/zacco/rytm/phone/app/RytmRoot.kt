@@ -149,6 +149,11 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                     onTweak = vm::tweakPlan,
                     onFullForm = { fullForm = true },
                     onFinish = { vm.saveProfile(it) },
+                    hasAiKey = aiHasKey,
+                    onSaveAiKey = { provider, key ->
+                        vm.saveAiSettings(aiSettings.copy(provider = provider))
+                        vm.saveAiKey(provider, key)
+                    },
                 )
             } else {
                 ProfileScreen(

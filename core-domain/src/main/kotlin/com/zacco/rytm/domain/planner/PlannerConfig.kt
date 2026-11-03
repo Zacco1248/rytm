@@ -36,6 +36,12 @@ data class PlannerConfig(
     val cardioMinutes: Int = 45,
     /** Bieg i marsz na bieżni. */
     val treadmill: Boolean = false,
+    val indoorBike: Boolean = false,
+    /**
+     * Pierwszy dzień z planem (założenie profilu). Wcześniejsze dni tygodnia nie liczą się jako opuszczone,
+     * więc nowa osoba nie dostaje „odrabiania” treningu z dni, w których jeszcze nie miała planu.
+     */
+    val planStart: LocalDate? = null,
 ) {
     fun hasPersonalTraining(date: LocalDate): Boolean =
         personalTrainingDay != null && date.dayOfWeek == personalTrainingDay &&
@@ -71,7 +77,7 @@ data class PlannerConfig(
         // Dłuższa sesja wypada na ostatni wybrany dzień (zwykle weekend).
         val types = CardioLibrary.typesFor(picked.size)
         return picked.mapIndexed { i, d ->
-            d to CardioLibrary.session(cardioKinds[i % cardioKinds.size], types[i], cardioMinutes, treadmill)
+            d to CardioLibrary.session(cardioKinds[i % cardioKinds.size], types[i], cardioMinutes, treadmill, indoorBike)
         }.toMap()
     }
 

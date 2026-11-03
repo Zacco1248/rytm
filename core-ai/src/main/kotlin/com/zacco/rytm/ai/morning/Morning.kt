@@ -1,5 +1,7 @@
 package com.zacco.rytm.ai.morning
 
+import com.zacco.rytm.ai.CoachPersona
+
 import com.zacco.rytm.ai.CoachLlm
 import com.zacco.rytm.ai.LlmException
 import com.zacco.rytm.ai.LlmRequest
@@ -146,7 +148,8 @@ class MorningService(private val llm: CoachLlm?, private val costGuard: CostGuar
 
     companion object {
         val SYSTEM = """
-            Jesteś coachem w aplikacji Rytm. Po porannym check-inie piszesz po polsku 3 krótkie pola: headline, why, tip.
+            ${CoachPersona.ROLE}
+            Po porannym check-inie piszesz po polsku 3 krótkie pola: headline, why, tip.
             Plan dnia (plan, intensity, planReasons, warnings) ustala silnik reguł: tłumaczysz go, nie zmieniasz.
             Odwołuj się do liczb (sen, tętno spoczynkowe vs średnia, HRV vs średnia, energia). Pole null to brak danych.
             Bez porad medycznych. Gdy calibrating = true, wspomnij o tym krótko. Razem najwyżej 60 słów.

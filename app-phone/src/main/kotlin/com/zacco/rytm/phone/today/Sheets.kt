@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
@@ -498,19 +500,21 @@ fun QuickAddSheet(
         }
         val isToday = date == today
         val tiles = buildList {
-            add(Triple(QuickEntry.ACTIVITY, "Aktywność", "spacer, bieg, rower, joga…"))
+            add(Triple(QuickEntry.ACTIVITY, "Aktywność", "spacer, bieg, remont…"))
             if (isToday && hasWorkout) add(Triple(QuickEntry.WORKOUT, "Trening z planu", "serie i ciężary"))
             add(Triple(QuickEntry.NUTRITION, "Żywienie", "kcal i makro z Fitatu"))
             add(Triple(QuickEntry.WEIGH_IN, "Ważenie", "ręcznie albo zrzut"))
             add(Triple(QuickEntry.ALCOHOL, "Alkohol", "liczba porcji"))
-            if (isToday) add(Triple(QuickEntry.CHECK_IN, "Check-in", "energia, nastrój, co boli"))
+            if (isToday) add(Triple(QuickEntry.CHECK_IN, "Check-in", "energia i co boli"))
         }
         tiles.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Równa wysokość kafelków w rzędzie, niezależnie od długości opisu.
+            Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { (entry, title, sub) ->
                     Column(
                         Modifier
                             .weight(1f)
+                            .fillMaxHeight()
                             .clip(RoundedCornerShape(14.dp))
                             .border(1.dp, c.line, RoundedCornerShape(14.dp))
                             .clickable(role = Role.Button) { onPick(entry) }

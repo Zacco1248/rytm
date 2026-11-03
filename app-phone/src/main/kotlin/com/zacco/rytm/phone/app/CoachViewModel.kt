@@ -63,6 +63,8 @@ data class CoachUiState(
     /** Najbliższy mecz i trening personalny (dziś lub później w tym tygodniu), do przycisków „odwołany”. */
     val nextMatch: LocalDate?,
     val nextPersonal: LocalDate?,
+    /** Nazwa najbliższego stałego sportu (np. „Siatkówka”) do przycisku odwołania. */
+    val nextMatchName: String? = null,
     val cancelled: Set<LocalDate>,
     val personalTrainingUntil: LocalDate?,
     /** Żywienie z ostatnich dni, do wpisu wstecz. */
@@ -106,6 +108,9 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
                 body = engine.body(d),
                 nextMatch = upcoming.firstOrNull { it.dayOfWeek in planner.fixedSports },
                 nextPersonal = upcoming.firstOrNull { planner.hasPersonalTraining(it) },
+                nextMatchName = upcoming.firstOrNull { it.dayOfWeek in planner.fixedSports }?.let { m ->
+                    planner.sportNames[m.dayOfWeek]?.takeIf { it.isNotBlank() } ?: planner.fixedSports[m.dayOfWeek]?.let(Format::activity)
+                },
                 cancelled = d.cancelled,
                 personalTrainingUntil = planner.personalTrainingUntil,
                 recentNutrition = d.nutrition.filter { it.date >= d.today.minusDays(13) },
@@ -339,7 +344,9 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun saveProfile(p: PersonalProfile) {
-        data.profiles.save(p)
+        // Pierwszy zapis (kreator albo formularz): od dziś liczy się plan, wcześniejsze dni nie są „opuszczone”.
+        val first = data.profiles.profile.value == null && p.startedOn == null
+        data.profiles.save(if (first) p.copy(startedOn = LocalDate.now(RytmTime.zone).toString()) else p)
     }
 
     fun toggleDayOff() {

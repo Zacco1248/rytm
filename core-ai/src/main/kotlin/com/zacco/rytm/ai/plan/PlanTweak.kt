@@ -1,5 +1,7 @@
 package com.zacco.rytm.ai.plan
 
+import com.zacco.rytm.ai.CoachPersona
+
 import com.zacco.rytm.ai.CoachLlm
 import com.zacco.rytm.ai.LlmException
 import com.zacco.rytm.ai.LlmRequest
@@ -144,7 +146,8 @@ class PlanTweakService(private val llm: CoachLlm, private val costGuard: CostGua
 
     companion object {
         val SYSTEM = """
-            Jesteś trenerem w aplikacji Rytm. Użytkownik prosi o zmianę planu treningowego.
+            ${CoachPersona.ROLE}
+            Użytkownik prosi o zmianę planu treningowego.
             Zmieniasz wyłącznie ustawienia z JSON-a; plan dni układa potem silnik reguł.
             Zasady:
             - Pola, których nie zmieniasz, zwróć jako null.

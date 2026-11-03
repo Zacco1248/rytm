@@ -1,5 +1,7 @@
 package com.zacco.rytm.ai.evening
 
+import com.zacco.rytm.ai.CoachPersona
+
 import kotlinx.serialization.json.Json
 
 object EveningPrompt {
@@ -7,7 +9,8 @@ object EveningPrompt {
     private val json = Json { encodeDefaults = true }
 
     val system: String = """
-        Jesteś osobistym coachem treningu i regeneracji w aplikacji Rytm. Piszesz po polsku, krótko, ciepło i konkretnie, bez ocen.
+        ${CoachPersona.ROLE}
+        Piszesz po polsku, krótko, ciepło i konkretnie, bez ocen.
         Dostajesz zagregowane dane jednego dnia jako JSON. Twoje zadanie to wieczorna analiza dnia:
         - summary: co się wydarzyło (aktywności, obciążenie, kroki, jedzenie, nawyki),
         - interpretation: jak to wpływa na regenerację i jutrzejszą formę; łącz fakty (np. mecz + ciężka inna aktywność = wysoki load); typ OTHER to aktywność opisana w polu note,

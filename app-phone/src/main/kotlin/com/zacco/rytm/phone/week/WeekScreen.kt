@@ -92,7 +92,7 @@ private fun WeeklyReportCard(today: LocalDate, saved: SavedWeeklyReport?, runnin
             }
         }
         if (fresh == null) {
-            SmallText("Raport liczy się sam w niedzielę o 20:00: trendy, zależności (np. sen po meczach), sylwetka i 1–3 sugestie na kolejny tydzień.")
+            SmallText("Raport liczy się sam w niedzielę o 20:00: trendy, zależności (np. sen po dniach ze sportem), sylwetka i 1–3 sugestie na kolejny tydzień.")
         } else {
             val r = fresh.report
             Text(r.summary, style = Rytm.type.small, color = c.ink)
@@ -159,8 +159,8 @@ private fun LoadCard(w: WeekSnapshot) {
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Legend(c.kindStrength, "siła")
-            Legend(c.kindSport, "mecz")
-            Legend(c.kindPt, "personalny")
+            Legend(c.kindSport, "sport")
+            Legend(c.kindPt, "z trenerem")
             Legend(c.kindMobility, "mobilność")
             Legend(c.kindOther, "inne")
         }
@@ -267,22 +267,30 @@ private fun PlanCard(state: CoachUiState, onToggleCancelled: (LocalDate) -> Unit
                 DayRow(d, d.date == w.today, d.date < w.today, onRate)
             }
         }
-        ButtonRow {
-            val match = state.nextMatch
-            val pt = state.nextPersonal
-            RytmButton(
-                if (match != null && match in state.cancelled) "Przywróć mecz" else "Mecz odwołany",
-                Modifier.weight(1f),
-                enabled = match != null,
-            ) { match?.let(onToggleCancelled) }
-            RytmButton(
-                if (pt != null && pt in state.cancelled) "Przywróć personalny" else "Personalny odwołany",
-                Modifier.weight(1f),
-                enabled = pt != null,
-            ) { pt?.let(onToggleCancelled) }
+        // Przyciski tylko wtedy, gdy w profilu jest stały sport albo trening z trenerem; z nazwą i dniem.
+        val match = state.nextMatch
+        val pt = state.nextPersonal
+        if (match != null || pt != null) {
+            SmallText("Coś wypadło? Plan przeliczy dzień i dobierze zamiennik.")
+            ButtonRow {
+                if (match != null) {
+                    val what = (state.nextMatchName ?: "sport") + " · " + Format.weekdayShort(match.dayOfWeek)
+                    RytmButton(
+                        if (match in state.cancelled) "Przywróć: $what" else "Odwołane: $what",
+                        Modifier.weight(1f),
+                    ) { onToggleCancelled(match) }
+                }
+                if (pt != null) {
+                    val what = "trener · " + Format.weekdayShort(pt.dayOfWeek)
+                    RytmButton(
+                        if (pt in state.cancelled) "Przywróć: $what" else "Odwołane: $what",
+                        Modifier.weight(1f),
+                    ) { onToggleCancelled(pt) }
+                }
+            }
         }
         state.personalTrainingUntil?.let { until ->
-            if (!w.today.isAfter(until)) SmallText("Treningi personalne do ${Format.dayMonth(until)}. Potem piątek wraca do planu: siła B · dół + core.")
+            if (pt != null && !w.today.isAfter(until)) SmallText("Treningi z trenerem do ${Format.dayMonth(until)}. Potem ten dzień wraca do planu Rytmu.")
         }
     }
 }
