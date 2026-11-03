@@ -32,6 +32,9 @@ data class HabitWeekStatus(val done: Int, val required: Int) {
 }
 
 object DefaultHabits {
+    /** Te same nawyki z celem kroków z profilu. */
+    fun withSteps(target: Int): List<Habit> = all.map { if (it.autoSource == HabitAutoSource.STEPS) it.copy(target = target) else it }
+
     /** Startowe nawyki (sekcja 13). Sen i zmęczenie mierzy check-in i zegarek, więc nie są nawykami do odhaczania. */
     val all = listOf(
         Habit("no-screen-2330", "Bez ekranu po 23:30", HabitSchedule.Daily, HabitKind.YES_NO),

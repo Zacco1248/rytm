@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Podgląd kafelka „Nawyki”: dwa przyciski. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="192dp"
+    android:height="192dp"
+    android:viewportWidth="192"
+    android:viewportHeight="192">
+    <path android:fillColor="#101418" android:pathData="M96,0a96,96 0,1 1,0 192a96,96 0,1 1,0 -192z" />
+    <path android:fillColor="#7FD6A8" android:pathData="M44,64h104a16,16 0,0 1,0 32h-104a16,16 0,0 1,0 -32z" />
+    <path android:fillColor="#2A3640" android:pathData="M44,104h104a16,16 0,0 1,0 32h-104a16,16 0,0 1,0 -32z" />
+</vector>

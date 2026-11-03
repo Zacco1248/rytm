@@ -48,15 +48,40 @@ fun BodyScreen(b: BodySnapshot, kcalTarget: Int, onAddWeighIn: () -> Unit) {
     ProteinCard(b, kcalTarget)
     RytmCard {
         CardHeader("Siła")
-        SmallText("Progresja ćwiczeń pojawi się z dziennikiem serii (faza 3). Wtedy Rytm oceni, czy rekompozycja idzie dobrze: waga stoi albo lekko spada, a powtórzenia rosną.")
+        if (b.strength.isEmpty()) {
+            SmallText("Zapisz pierwszy trening (na zegarku albo „Zapisz trening” w planie na dziś). Rytm dobierze z tego ciężar na kolejny raz i oceni, czy rekompozycja idzie dobrze: waga stoi albo lekko spada, a powtórzenia rosną.")
+        } else {
+            b.strength.forEach { e ->
+                Column {
+                    Text(e.exercise, style = Rytm.type.body, color = Rytm.colors.ink)
+                    val arrow = when (e.improved) {
+                        true -> " ↑"
+                        false -> " ="
+                        null -> ""
+                    }
+                    SmallText(
+                        Format.dayMonth(e.lastDate) + ": " + e.last + arrow + (e.previous?.let { " (wcześniej $it)" } ?: ""),
+                    )
+                }
+            }
+        }
     }
     RytmCard {
-        CardHeader("Tkanka tłuszczowa") {
-            if (b.latestBodyFatPct == null) Chip("brak danych w HC", ChipTone.MUTED)
+        CardHeader("Skład ciała") {
+            if (b.latestBodyFatPct == null && b.latestComposition == null) Chip("brak pomiaru", ChipTone.MUTED)
+        }
+        b.latestBodyFatPct?.let { SmallText("Tkanka tłuszczowa: ${Format.dec(it)}%.") }
+        val comp = b.latestComposition
+        val c = comp?.composition
+        if (comp != null && c != null) {
+            SmallText("Pomiar z ${Format.dayMonth(comp.date)}: " + com.zacco.rytm.phone.today.compositionSummary(c) + ".")
         }
         SmallText(
-            b.latestBodyFatPct?.let { "Ostatni pomiar: ${Format.dec(it)}%. Pomiary z wagi łazienkowej mocno się wahają, więc patrzymy na trend z miesięcy." }
-                ?: "Pojawi się, jeśli waga zapisuje tkankę tłuszczową do Health Connect.",
+            if (b.latestBodyFatPct == null && comp == null) {
+                "Dodaj ważenie i wczytaj zrzut ekranu z Xiaomi Home, żeby zapisać mięśnie, wodę, tłuszcz trzewny i resztę pomiarów."
+            } else {
+                "Pomiary z wagi łazienkowej mocno się wahają, więc patrzymy na trend z miesięcy, nie na pojedynczy wynik."
+            },
         )
     }
 }

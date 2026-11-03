@@ -37,6 +37,7 @@ dependencies {
     implementation(project(":core-domain"))
     implementation(project(":core-data"))
     implementation(libs.health.connect.client)
+    implementation(libs.mlkit.text.recognition)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

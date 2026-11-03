@@ -15,10 +15,17 @@ import com.zacco.rytm.domain.coach.WeekSnapshot
 import com.zacco.rytm.domain.habits.Habit
 import com.zacco.rytm.domain.habits.HabitKind
 import com.zacco.rytm.domain.model.BodyArea
+import com.zacco.rytm.domain.model.BodyComposition
+import com.zacco.rytm.domain.model.NutritionDay
 import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.LoadedArea
-import com.zacco.rytm.domain.planner.PlannerConfig
+import com.zacco.rytm.domain.profile.PersonalProfile
 import com.zacco.rytm.domain.time.RytmTime
+import com.zacco.rytm.data.watch.WatchBridge
+import com.zacco.rytm.domain.model.Source
+import com.zacco.rytm.domain.workout.SetLog
+import com.zacco.rytm.domain.workout.WorkoutLog
+import com.zacco.rytm.phone.today.SetEntry
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,6 +56,8 @@ data class CoachUiState(
     val nextPersonal: LocalDate?,
     val cancelled: Set<LocalDate>,
     val personalTrainingUntil: LocalDate?,
+    /** Żywienie z ostatnich dni, do wpisu wstecz. */
+    val recentNutrition: List<NutritionDay>,
 )
 
 /** Jeden ViewModel na trzy ekrany: wszystkie liczą się z tych samych danych i tego samego silnika. */
@@ -57,7 +66,9 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
 
     private val data = RytmData.get(app)
     private val engine = CoachEngine()
-    private val planner = PlannerConfig()
+    /** Profil osoby; null przed kreatorem. */
+    val profile: StateFlow<PersonalProfile?> = data.profiles.profile
+    val profileReady: StateFlow<Boolean> = data.profiles.ready
 
     private val _hc = MutableStateFlow(HcStatus.CHECKING)
     val hc: StateFlow<HcStatus> = _hc.asStateFlow()
@@ -76,6 +87,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<CoachUiState?> = today
         .flatMapLatest { day -> data.coach.observe(day) }
         .map { d ->
+            val planner = d.profile.planner
             val upcoming = (0L..6L).map { d.today.plusDays(it) }.filter { it <= d.today.with(java.time.DayOfWeek.SUNDAY) }
             CoachUiState(
                 today = engine.today(d),
@@ -85,11 +97,13 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
                 nextPersonal = upcoming.firstOrNull { planner.hasPersonalTraining(it) },
                 cancelled = d.cancelled,
                 personalTrainingUntil = planner.personalTrainingUntil,
+                recentNutrition = d.nutrition.filter { it.date >= d.today.minusDays(13) },
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     init {
+        viewModelScope.launch { data.profiles.ensureLoaded() }
         SyncWorker.schedulePeriodic(app)
         refreshHealthConnect()
     }
@@ -114,7 +128,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _sync.update { it.copy(running = true, error = null) }
             val error = runCatching {
-                HealthConnectSync(HealthConnectClient.getOrCreate(getApplication()), data.db).sync()
+                HealthConnectSync(HealthConnectClient.getOrCreate(getApplication()), data.db, planner = data.plannerConfig()).sync()
             }.exceptionOrNull()
             _sync.value = SyncUi(running = false, error = error?.let { "Synchronizacja nieudana: ${it.message ?: it::class.simpleName}" })
         }
@@ -147,13 +161,51 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun saveNutrition(kcal: Int, proteinG: Double, fatG: Double?, carbsG: Double?) {
-        val date = LocalDate.now(RytmTime.zone)
+    fun saveNutrition(date: LocalDate, kcal: Int, proteinG: Double, fatG: Double?, carbsG: Double?) {
         viewModelScope.launch { data.coach.saveNutrition(date, kcal, proteinG, fatG, carbsG) }
     }
 
-    fun addWeighIn(kg: Double, bodyFatPct: Double?) {
-        viewModelScope.launch { data.coach.addWeighIn(kg, bodyFatPct) }
+    fun addWeighIn(kg: Double, bodyFatPct: Double?, time: Instant?, composition: BodyComposition?) {
+        viewModelScope.launch { data.coach.addWeighIn(kg, bodyFatPct, time ?: Instant.now(), composition) }
+    }
+
+    /** Trening wpisany na telefonie (bez zegarka): dziś, kończy się teraz. */
+    fun saveManualWorkout(entries: List<SetEntry>, durationMin: Int, rpe: Int?) {
+        val today = state.value?.today ?: return
+        val workout = today.plan.workout ?: return
+        val end = Instant.now()
+        val id = "manual-" + java.util.UUID.randomUUID()
+        val date = end.atZone(RytmTime.zone).toLocalDate()
+        viewModelScope.launch {
+            data.coach.saveWorkout(
+                WorkoutLog(
+                    id = id,
+                    title = workout.name,
+                    type = WatchBridge.workoutType(today.plan),
+                    start = end.minus(Duration.ofMinutes(durationMin.toLong())),
+                    end = end,
+                    sets = entries.map { SetLog(id, it.exercise, it.setIndex, it.reps, it.weightKg, null, date) },
+                    rpe = rpe,
+                    avgHr = null,
+                    kcal = null,
+                    source = Source.MANUAL,
+                ),
+            )
+        }
+    }
+
+    fun saveProfile(p: PersonalProfile) {
+        data.profiles.save(p)
+    }
+
+    fun toggleDayOff() {
+        val date = LocalDate.now(RytmTime.zone)
+        val off = state.value?.today?.dayOff ?: false
+        viewModelScope.launch { data.coach.setDayOff(date, !off) }
+    }
+
+    fun setAlcohol(date: LocalDate, drinks: Int) {
+        viewModelScope.launch { data.coach.setAlcohol(date, drinks) }
     }
 
     fun setRpe(activityId: String, rpe: Int?) {

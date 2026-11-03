@@ -24,12 +24,17 @@ data class PlanningContext(
     val activities: List<Activity> = emptyList(),
     /** Dni, w które stały sport lub trening personalny wypadł („mecz odwołany”). */
     val cancelled: Set<LocalDate> = emptySet(),
+    /** Dni oznaczone „dziś wolne”: odpoczynek, a brakujące sesje siłowe przechodzą na kolejne dni tygodnia. */
+    val daysOff: Set<LocalDate> = emptySet(),
 )
 
 /**
  * Regułowy planer tygodnia (sekcje 3.1 i 3.2). Źródło prawdy dla planu; LLM tylko go tłumaczy.
  */
-class WeekPlanner(private val config: PlannerConfig = PlannerConfig()) {
+class WeekPlanner(
+    private val config: PlannerConfig = PlannerConfig(),
+    private val exercises: ExerciseLibrary = ExerciseLibrary(),
+) {
 
     fun planWeek(anyDayOfWeek: LocalDate, context: PlanningContext): List<PlannedDay> {
         val monday = anyDayOfWeek.with(DayOfWeek.MONDAY)
@@ -38,7 +43,8 @@ class WeekPlanner(private val config: PlannerConfig = PlannerConfig()) {
         var days = dates.map { template(it, context) }
         days = ensureStrengthMinimum(days, context)
         days = days.map { adjust(it, days, context) }
-        return ensureRestDay(days)
+        // Ćwiczenia na końcu, gdy znany jest ostateczny rodzaj, nacisk i intensywność dnia.
+        return ensureRestDay(days).map { it.copy(workout = exercises.workoutFor(it)) }
     }
 
     fun planDay(date: LocalDate, context: PlanningContext): PlannedDay = planWeek(date, context).first { it.date == date }
@@ -46,26 +52,25 @@ class WeekPlanner(private val config: PlannerConfig = PlannerConfig()) {
     // --- szablon (3.1) ---
 
     internal fun template(date: LocalDate, context: PlanningContext): PlannedDay {
+        if (date in context.daysOff) {
+            return rest(date, "Wolne", "Dzień wolny. Brakującą siłę plan przesuwa na kolejne dni tygodnia.")
+        }
         val cancelled = date in context.cancelled
         config.fixedSports[date.dayOfWeek]?.let { sport ->
-            return if (cancelled) replacement(date, "${sport.pl()} odwołana") else
-                PlannedDay(date, DayKind.FIXED_SPORT, sport.pl(), Intensity.HIGH, rationale = listOf("Stały punkt tygodnia."))
+            val name = config.sportNames[date.dayOfWeek] ?: sport.pl()
+            return if (cancelled) replacement(date, "$name: odwołane") else
+                PlannedDay(date, DayKind.FIXED_SPORT, name, Intensity.HIGH, rationale = listOf("Stały punkt tygodnia."))
         }
         if (config.hasPersonalTraining(date)) {
             return if (cancelled) replacement(date, "Trening personalny odwołany") else
                 PlannedDay(date, DayKind.PERSONAL_TRAINING, "Trening personalny", Intensity.HIGH, rationale = listOf("Grupowy trening personalny."))
         }
-        return when (date.dayOfWeek) {
-            DayOfWeek.MONDAY -> strength(date, StrengthFocus.UPPER)
-            DayOfWeek.FRIDAY -> strength(date, StrengthFocus.LOWER)
-            DayOfWeek.SATURDAY ->
-                if (config.personalTrainingUntil?.let { !date.isAfter(it) } == true) {
-                    strength(date, StrengthFocus.FULL_BODY)
-                } else {
-                    PlannedDay(date, DayKind.FLEX, "Dowolna aktywność", Intensity.MODERATE, rationale = listOf("Dzień elastyczny."))
-                }
-            DayOfWeek.SUNDAY -> rest(date, "Odpoczynek: mobilność 20–30 min i spacer", "Dzień regeneracji.")
-            else -> PlannedDay(date, DayKind.FLEX, "Dowolna aktywność", Intensity.LOW)
+        config.strengthPlan(date)[date.dayOfWeek]?.let { return strength(date, it) }
+        if (date.dayOfWeek == config.restDay) return rest(date, "Odpoczynek: mobilność 20–30 min i spacer", "Dzień regeneracji.")
+        return if (date.dayOfWeek == DayOfWeek.SATURDAY || date.dayOfWeek == DayOfWeek.SUNDAY) {
+            PlannedDay(date, DayKind.FLEX, "Dowolna aktywność", Intensity.MODERATE, rationale = listOf("Dzień elastyczny."))
+        } else {
+            PlannedDay(date, DayKind.FLEX, "Dowolna aktywność", Intensity.LOW)
         }
     }
 
@@ -98,7 +103,7 @@ class WeekPlanner(private val config: PlannerConfig = PlannerConfig()) {
         return result.map { day ->
             if (day.kind == DayKind.FLEX && day.title == "Zamiennik") {
                 if (context.load?.zone == AcwrZone.LOW) {
-                    day.copy(title = "Interwały z hantlami 20–25 min", intensity = Intensity.MODERATE)
+                    day.copy(title = "Interwały 20–25 min", intensity = Intensity.MODERATE)
                         .withRationale("Tygodniowe obciążenie niskie.")
                 } else {
                     day.copy(kind = DayKind.MOBILITY, title = "Mobilność 30 min", intensity = Intensity.LOW)

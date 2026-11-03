@@ -28,6 +28,8 @@ enum class ReadinessFlag {
     HEAVY_YESTERDAY,
     ACWR_HIGH,
     NO_CHECK_IN,
+    /** Alkohol poprzedniego dnia. */
+    ALCOHOL,
 }
 
 /**

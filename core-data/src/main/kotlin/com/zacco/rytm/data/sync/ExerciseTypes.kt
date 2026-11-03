@@ -10,7 +10,7 @@ object ExerciseTypes {
      * Faza 0: Samsung zapisuje trening personalny jako OTHER_WORKOUT (piątki po 16:00).
      * W dni treningu personalnego traktujemy go więc jako PERSONAL_TRAINING, a nie „inną aktywność”.
      */
-    fun toActivityType(exerciseType: Int, date: LocalDate, config: PlannerConfig = PlannerConfig()): ActivityType {
+    fun toActivityType(exerciseType: Int, date: LocalDate, config: PlannerConfig): ActivityType {
         val base = toActivityType(exerciseType)
         val genericWorkout = exerciseType == ExerciseSessionRecord.EXERCISE_TYPE_OTHER_WORKOUT ||
             exerciseType == ExerciseSessionRecord.EXERCISE_TYPE_EXERCISE_CLASS ||

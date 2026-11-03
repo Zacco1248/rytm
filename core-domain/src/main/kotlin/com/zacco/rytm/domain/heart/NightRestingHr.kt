@@ -34,3 +34,25 @@ object NightRestingHr {
         return best?.roundToInt()
     }
 }
+
+/**
+ * Tętno spoczynkowe z dnia, gdy brak nocy (zegarek ładowany w nocy). Najniższa średnia z 30 minut,
+ * pomijając treningi i godzinę po nich. Przy gęstym tętnie (ok. 1 próbka/min) wymagamy 15 próbek w oknie,
+ * żeby pojedyncze odczyty nie dawały zaniżonego wyniku.
+ */
+object DayRestingHr {
+
+    fun compute(
+        samples: List<HrSample>,
+        dayStart: Instant,
+        dayEnd: Instant,
+        workouts: List<Pair<Instant, Instant>>,
+        recovery: Duration = Duration.ofMinutes(60),
+        minSamplesPerWindow: Int = 15,
+    ): Int? {
+        val calm = samples.filter { s ->
+            workouts.none { (start, end) -> s.time >= start && s.time < end.plus(recovery) }
+        }
+        return NightRestingHr.compute(calm, dayStart, dayEnd, minSamplesPerWindow = minSamplesPerWindow)
+    }
+}

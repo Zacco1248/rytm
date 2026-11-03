@@ -27,6 +27,7 @@ ksp {
 dependencies {
     api(project(":core-domain"))
     implementation(project(":core-ai"))
+    api(project(":core-sync"))
     api(libs.health.connect.client)
     implementation(libs.kotlinx.coroutines.android)
 

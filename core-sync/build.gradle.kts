@@ -1,6 +1,7 @@
-// Wspólne DTO i Data Layer (telefon <-> zegarek). Rozbudowa w fazie 2.
+// Wspólne DTO i Wearable Data Layer (telefon <-> zegarek).
 plugins {
     alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -15,4 +16,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    api(libs.play.services.wearable)
+    api(libs.kotlinx.serialization.json)
+    api(libs.kotlinx.coroutines.play.services)
 }

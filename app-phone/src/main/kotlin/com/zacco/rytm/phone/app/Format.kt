@@ -51,6 +51,9 @@ object Format {
     /** 1 980 (spacja niełamliwa jako separator tysięcy). */
     fun int(v: Int): String = String.format(pl, "%,d", v).replace(' ', ' ').replace(',', ' ')
 
+    /** „6”, „6,5”. */
+    fun kg(v: Double): String = if (v % 1.0 == 0.0) v.toLong().toString() else dec(v, 1)
+
     fun dec(v: Double, digits: Int = 1): String = String.format(pl, "%.${digits}f", v)
 
     fun signedKg(v: Double): String = (if (v < 0) "−" else "+") + dec(abs(v), 2)
@@ -89,6 +92,7 @@ object Format {
     fun body(a: BodyArea): String = when (a) {
         BodyArea.SHOULDERS -> "Barki"
         BodyArea.ELBOW -> "Łokieć"
+        BodyArea.THIGHS -> "Uda"
         BodyArea.KNEES -> "Kolana"
         BodyArea.BACK -> "Plecy"
         BodyArea.CALVES -> "Łydki"

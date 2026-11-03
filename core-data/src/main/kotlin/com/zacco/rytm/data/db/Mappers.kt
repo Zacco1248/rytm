@@ -5,6 +5,7 @@ import com.zacco.rytm.domain.model.Activity
 import com.zacco.rytm.domain.model.BodyMetrics
 import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.DailyMetrics
+import com.zacco.rytm.domain.model.DayNote
 import com.zacco.rytm.domain.model.NutritionDay
 import com.zacco.rytm.domain.model.Source
 import com.zacco.rytm.domain.time.RytmTime
@@ -24,11 +25,13 @@ fun Activity.toEntity(origin: String?, title: String? = null) = ActivityEntity(
     loadedAreas = loadedAreas,
 )
 
-fun DailyMetricsEntity.toDomain() = DailyMetrics(date, sleepMin, sleepStart, sleepEnd, nightRestingHr, steps, totalKcal)
+fun DailyMetricsEntity.toDomain() = DailyMetrics(date, sleepMin, sleepStart, sleepEnd, nightRestingHr, steps, totalKcal, dayRestingHr)
 
 fun NutritionDayEntity.toDomain() = NutritionDay(date, kcal, proteinG, fatG, carbsG)
 
-fun WeighInEntity.toDomain() = BodyMetrics(date, weightKg, bodyFatPct)
+fun WeighInEntity.toDomain() = BodyMetrics(date, weightKg, bodyFatPct, composition)
+
+fun DayNoteEntity.toDomain() = DayNote(date, dayOff, alcoholDrinks)
 
 fun CheckInEntity.toDomain() = DailyCheckIn(date, energy, mood, soreAreas, hrvRmssd)
 

@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Rytm</string>
+    <string name="tile_today">Rytm: dziś</string>
+    <string name="tile_habits">Rytm: nawyki</string>
+    <string name="complication_readiness">Gotowość</string>
 </resources>
