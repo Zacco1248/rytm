@@ -26,6 +26,13 @@ object Format {
 
     fun dayMonth(d: LocalDate): String = "${d.dayOfMonth} ${months[d.monthValue - 1]}"
 
+    /** „dziś”, „wczoraj” albo „pon, 2 listopada”. */
+    fun dayShortLabel(d: LocalDate, today: LocalDate): String = when (d) {
+        today -> "dziś"
+        today.minusDays(1) -> "wczoraj"
+        else -> weekdayShort(d.dayOfWeek) + ", " + dayMonth(d)
+    }
+
     fun range(from: LocalDate, to: LocalDate): String = "${dayMonth(from)} – ${dayMonth(to)}"
 
     fun weekdayShort(d: DayOfWeek): String = when (d) {

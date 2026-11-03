@@ -66,10 +66,9 @@ fun TodayScreen(
     onProfile: () -> Unit,
     onToggleHabit: (HabitStatus) -> Unit,
     onCheckIn: () -> Unit,
-    onOtherActivity: () -> Unit,
     onNutrition: () -> Unit,
     onDayOff: () -> Unit,
-    onAlcohol: () -> Unit,
+    onAdd: () -> Unit,
     onLogWorkout: () -> Unit = {},
 ) {
     ScreenHeader(sub = Format.dayLong(s.date), title = greeting()) {
@@ -92,17 +91,7 @@ fun TodayScreen(
     NutritionCard(s, sync, onSync, onNutrition)
     HabitsCard(s.habits, onToggleHabit)
 
-    RytmCard {
-        CardHeader("Szybki wpis")
-        ButtonRow {
-            RytmButton("Zaloguj inną aktywność", Modifier.weight(1f), onClick = onOtherActivity)
-            RytmButton("Check-in", Modifier.weight(1f), onClick = onCheckIn)
-        }
-        ButtonRow {
-            RytmButton("Żywienie (też wstecz)", Modifier.weight(1f), onClick = onNutrition)
-            RytmButton(if (s.alcoholToday + s.alcoholYesterday > 0) "Alkohol ✓" else "Alkohol", Modifier.weight(1f), onClick = onAlcohol)
-        }
-    }
+    ActivityTodayCard(s, onAdd)
 }
 
 private fun greeting(): String {
@@ -401,5 +390,47 @@ private fun CalibrationDetails(cal: CalibrationStatus) {
             }
         }
         SmallText("Dni z tętnem tylko z dnia liczą się osobno: porównujemy je z innymi dniami bez nocy.")
+    }
+}
+
+/** Wszystko, co dziś się ruszało, z kcal: treningi z planu, spacery spoza planu i wpisy ręczne. */
+@Composable
+private fun ActivityTodayCard(s: TodaySnapshot, onAdd: () -> Unit) {
+    val c = Rytm.colors
+    val acts = s.activitiesToday
+    RytmCard {
+        CardHeader("Aktywność dziś") {
+            Chip(if (s.activityKcal > 0) "${Format.int(s.activityKcal)} kcal" else "+ dodaj", if (s.activityKcal > 0) ChipTone.GOOD else ChipTone.ACCENT, onClick = onAdd)
+        }
+        if (acts.isEmpty()) {
+            SmallText("Jeszcze nic. Spacery i treningi z zegarka albo opaski pojawią się po synchronizacji; resztę dodasz przyciskiem „+”.")
+        } else {
+            acts.forEach { a ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        a.start.atZone(RytmTime.zone).format(hhmm),
+                        style = Rytm.type.tiny,
+                        color = c.muted,
+                    )
+                    Column(Modifier.weight(1f)) {
+                        Text(a.notes?.takeIf { it.isNotBlank() } ?: Format.activity(a.type), style = Rytm.type.small.copy(fontWeight = FontWeight.Medium), color = c.ink)
+                        SmallText(
+                            listOfNotNull(
+                                Format.minutes(a.durationMin),
+                                a.avgHr?.let { "śr. tętno $it" },
+                                a.rpe?.let { "RPE $it" },
+                                if (a.source == com.zacco.rytm.domain.model.Source.MANUAL) "wpis ręczny" else null,
+                            ).joinToString(" · "),
+                        )
+                    }
+                    Text(a.kcal?.let { "${Format.int(it)} kcal" } ?: "–", style = Rytm.type.small, color = if (a.kcal != null) c.ink else c.muted)
+                }
+            }
+        }
+        val parts = buildList {
+            if (s.trainingKcal > 0) add("do celu jedzenia doliczono ${Format.int(s.trainingKcal)} kcal (bez spacerów)")
+            s.night?.totalKcal?.takeIf { it > 0 }?.let { add("łącznie z podstawową przemianą ${Format.int(it)} kcal wg zegarka") }
+        }
+        if (parts.isNotEmpty()) SmallText(parts.joinToString("; ").replaceFirstChar { it.uppercase() } + ".")
     }
 }

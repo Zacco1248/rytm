@@ -62,6 +62,8 @@ data class CoachUiState(
     val personalTrainingUntil: LocalDate?,
     /** Żywienie z ostatnich dni, do wpisu wstecz. */
     val recentNutrition: List<NutritionDay>,
+    /** Porcje alkoholu z ostatnich 14 dni, do wpisu na wybrany dzień. */
+    val recentAlcohol: Map<LocalDate, Int> = emptyMap(),
 )
 
 /** Jeden ViewModel na trzy ekrany: wszystkie liczą się z tych samych danych i tego samego silnika. */
@@ -102,6 +104,8 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
                 cancelled = d.cancelled,
                 personalTrainingUntil = planner.personalTrainingUntil,
                 recentNutrition = d.nutrition.filter { it.date >= d.today.minusDays(13) },
+                recentAlcohol = d.dayNotes.filter { it.date >= d.today.minusDays(13) }
+                    .groupBy { it.date }.mapValues { (_, l) -> l.sumOf { it.alcoholDrinks } },
             )
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -197,10 +201,18 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun logOtherActivity(description: String, durationMin: Int, rpe: Int?, areas: Set<LoadedArea>) {
-        val end = Instant.now()
+    /** Aktywność wpisana ręcznie, także wstecz: [end] to koniec, z wybranego dnia i godziny. */
+    fun logActivity(entry: ActivityEntry) {
         viewModelScope.launch {
-            data.coach.logOtherActivity(description, end.minus(Duration.ofMinutes(durationMin.toLong())), durationMin, rpe, areas)
+            data.coach.logOtherActivity(
+                description = entry.description,
+                start = entry.end.minus(Duration.ofMinutes(entry.durationMin.toLong())),
+                durationMin = entry.durationMin,
+                rpe = entry.rpe,
+                loadedAreas = entry.areas,
+                type = entry.type,
+                kcal = entry.kcal,
+            )
         }
     }
 
@@ -208,8 +220,11 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { data.coach.saveNutrition(date, kcal, proteinG, fatG, carbsG) }
     }
 
-    fun addWeighIn(kg: Double, bodyFatPct: Double?, time: Instant?, composition: BodyComposition?) {
-        viewModelScope.launch { data.coach.addWeighIn(kg, bodyFatPct, time ?: Instant.now(), composition) }
+    /** [date]: dzień z arkusza „+”; czas ze zrzutu wygrywa, bo jest dokładny. */
+    fun addWeighIn(kg: Double, bodyFatPct: Double?, time: Instant?, composition: BodyComposition?, date: LocalDate? = null) {
+        val fallback = date?.takeIf { it != LocalDate.now(RytmTime.zone) }
+            ?.atTime(8, 0)?.atZone(RytmTime.zone)?.toInstant() ?: Instant.now()
+        viewModelScope.launch { data.coach.addWeighIn(kg, bodyFatPct, time ?: fallback, composition) }
     }
 
     /** Trening wpisany na telefonie (bez zegarka): dziś, kończy się teraz. */
@@ -260,3 +275,14 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { data.coach.setCancelled(date, !cancelled) }
     }
 }
+
+/** Wpis z arkusza aktywności. */
+data class ActivityEntry(
+    val type: com.zacco.rytm.domain.model.ActivityType,
+    val description: String,
+    val end: Instant,
+    val durationMin: Int,
+    val rpe: Int?,
+    val areas: Set<LoadedArea>,
+    val kcal: Int?,
+)

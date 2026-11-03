@@ -80,6 +80,7 @@ class CoachEngine(
             steps = steps,
             lastSync = data.lastSync,
             setsToday = data.sets.filter { it.date == data.today },
+            activitiesToday = data.activities.filter { it.localDate() == data.today }.sortedBy { it.start },
         )
     }
 

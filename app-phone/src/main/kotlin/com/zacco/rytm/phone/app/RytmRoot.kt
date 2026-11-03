@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -32,10 +33,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,7 +53,9 @@ import com.zacco.rytm.phone.today.CheckInSheet
 import com.zacco.rytm.phone.today.HabitsCard
 import com.zacco.rytm.phone.today.NutritionSheet
 import com.zacco.rytm.phone.today.RpeSheet
-import com.zacco.rytm.phone.today.OtherActivitySheet
+import com.zacco.rytm.phone.today.ActivitySheet
+import com.zacco.rytm.phone.today.QuickAddSheet
+import com.zacco.rytm.phone.today.QuickEntry
 import com.zacco.rytm.phone.today.TodayScreen
 import com.zacco.rytm.phone.today.WeighInSheet
 import com.zacco.rytm.phone.today.WorkoutLogSheet
@@ -61,6 +66,8 @@ import com.zacco.rytm.phone.ui.components.ScreenHeader
 import com.zacco.rytm.phone.ui.components.SmallText
 import com.zacco.rytm.phone.ui.theme.Rytm
 import com.zacco.rytm.phone.week.WeekScreen
+import com.zacco.rytm.domain.time.RytmTime
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 enum class Tab(val label: String, val icon: ImageVector) {
@@ -71,7 +78,7 @@ enum class Tab(val label: String, val icon: ImageVector) {
     EVENING("Wieczór", RytmIcons.evening),
 }
 
-private enum class Sheet { NONE, CHECK_IN, OTHER_ACTIVITY, NUTRITION, RPE, WEIGH_IN, ALCOHOL, WORKOUT }
+private enum class Sheet { NONE, QUICK_ADD, CHECK_IN, ACTIVITY, NUTRITION, RPE, WEIGH_IN, ALCOHOL, WORKOUT }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,6 +88,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     var diagnostics by rememberSaveable { mutableStateOf(false) }
     var profileOpen by rememberSaveable { mutableStateOf(false) }
     var rpeDate by rememberSaveable { mutableStateOf<String?>(null) }
+    // Dzień wybrany w arkuszu „+”; dotyczy każdego wpisu.
+    var entryDate by rememberSaveable { mutableStateOf<String?>(null) }
 
     val state by vm.state.collectAsStateWithLifecycle()
     val hc by vm.hc.collectAsStateWithLifecycle()
@@ -149,7 +158,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 6.dp)
-                .padding(bottom = 12.dp),
+                .padding(bottom = 84.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val s = state
@@ -166,17 +175,16 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onProfile = { profileOpen = true },
                         onToggleHabit = { vm.toggleHabit(it.habit, it.done) },
                         onCheckIn = { sheet = Sheet.CHECK_IN },
-                        onOtherActivity = { sheet = Sheet.OTHER_ACTIVITY },
-                        onNutrition = { sheet = Sheet.NUTRITION },
+                        onNutrition = { entryDate = null; sheet = Sheet.NUTRITION },
                         onDayOff = vm::toggleDayOff,
-                        onAlcohol = { sheet = Sheet.ALCOHOL },
+                        onAdd = { entryDate = null; sheet = Sheet.ACTIVITY },
                         onLogWorkout = { sheet = Sheet.WORKOUT },
                     )
                     Tab.WEEK -> WeekScreen(s, vm::toggleCancelled) { day ->
                         rpeDate = day.date.toString()
                         sheet = Sheet.RPE
                     }
-                    Tab.BODY -> BodyScreen(s.body, s.today.nutritionTargets.kcal - s.today.trainingKcal) { sheet = Sheet.WEIGH_IN }
+                    Tab.BODY -> BodyScreen(s.body, s.today.nutritionTargets.kcal - s.today.trainingKcal) { entryDate = null; sheet = Sheet.WEIGH_IN }
                     Tab.HABITS -> HabitsTab(s, onToggle = { vm.toggleHabit(it.habit, it.done) })
                     Tab.EVENING -> EveningScreen(
                         s = s,
@@ -195,18 +203,43 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                 }
             }
         }
+            if (state != null && tab != Tab.EVENING) {
+                AddButton(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
+                    entryDate = null
+                    sheet = Sheet.QUICK_ADD
+                }
+            }
         }
         TabBar(tab) { tab = it }
     }
 
+    val today = state?.today?.date ?: LocalDate.now(RytmTime.zone)
+    val date = entryDate?.let(LocalDate::parse) ?: today
+
     when (sheet) {
+        Sheet.QUICK_ADD -> QuickAddSheet(
+            today = today,
+            date = date,
+            hasWorkout = state?.today?.plan?.workout != null,
+            onDate = { entryDate = it.toString() },
+            onDismiss = { sheet = Sheet.NONE },
+        ) { entry ->
+            sheet = when (entry) {
+                QuickEntry.ACTIVITY -> Sheet.ACTIVITY
+                QuickEntry.WORKOUT -> Sheet.WORKOUT
+                QuickEntry.NUTRITION -> Sheet.NUTRITION
+                QuickEntry.WEIGH_IN -> Sheet.WEIGH_IN
+                QuickEntry.ALCOHOL -> Sheet.ALCOHOL
+                QuickEntry.CHECK_IN -> Sheet.CHECK_IN
+            }
+        }
         Sheet.CHECK_IN -> CheckInSheet(state?.today?.checkIn, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveCheckIn)
-        Sheet.OTHER_ACTIVITY -> OtherActivitySheet(onDismiss = { sheet = Sheet.NONE }, onSave = vm::logOtherActivity)
+        Sheet.ACTIVITY -> ActivitySheet(date, onDismiss = { sheet = Sheet.NONE }, onSave = vm::logActivity)
         Sheet.NUTRITION -> state?.let { s ->
-            NutritionSheet(s.today.date, s.recentNutrition, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveNutrition)
+            NutritionSheet(s.today.date, s.recentNutrition, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveNutrition, initial = date)
         }
         Sheet.ALCOHOL -> state?.let { s ->
-            AlcoholSheet(s.today.date, s.today.alcoholYesterday, s.today.alcoholToday, onDismiss = { sheet = Sheet.NONE }, onSave = vm::setAlcohol)
+            AlcoholSheet(date, s.recentAlcohol[date] ?: 0, onDismiss = { sheet = Sheet.NONE }, onSave = vm::setAlcohol)
         }
         Sheet.RPE -> {
             val acts = state?.week?.days?.firstOrNull { it.date.toString() == rpeDate }?.activities
@@ -216,7 +249,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
         Sheet.WORKOUT -> state?.today?.plan?.workout?.let { w ->
             WorkoutLogSheet(w, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveManualWorkout)
         }
-        Sheet.WEIGH_IN -> WeighInSheet(onDismiss = { sheet = Sheet.NONE }, onSave = vm::addWeighIn)
+        Sheet.WEIGH_IN -> WeighInSheet(date, onDismiss = { sheet = Sheet.NONE }) { kg, fat, time, comp -> vm.addWeighIn(kg, fat, time, comp, date) }
         Sheet.NONE -> Unit
     }
 }
@@ -276,3 +309,20 @@ private fun HabitsTab(s: CoachUiState, onToggle: (com.zacco.rytm.domain.coach.Ha
     SmallText("Dodawanie własnych nawyków i kafelek na zegarku: faza 2.")
 }
 
+
+/** Pływający przycisk „+”: jedno miejsce na wszystkie wpisy. */
+@Composable
+private fun AddButton(modifier: Modifier, onClick: () -> Unit) {
+    val c = Rytm.colors
+    Box(
+        modifier
+            .size(56.dp)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(c.accent)
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .semantics { contentDescription = "Dodaj wpis" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("+", style = Rytm.type.screenTitle.copy(fontSize = 28.sp), color = c.onAccent)
+    }
+}
