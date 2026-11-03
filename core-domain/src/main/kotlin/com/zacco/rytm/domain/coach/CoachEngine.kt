@@ -1,5 +1,7 @@
 package com.zacco.rytm.domain.coach
 
+import com.zacco.rytm.domain.profile.Goal
+
 import com.zacco.rytm.domain.habits.HabitAutoSource
 import com.zacco.rytm.domain.habits.HabitLog
 import com.zacco.rytm.domain.habits.HabitTracker
@@ -145,7 +147,8 @@ class CoachEngine(
             weightAvg7 = avg,
             currentAvg7 = current,
             kgPerWeek = kgPerWeek,
-            pace = paceOf(kgPerWeek),
+            pace = paceOf(kgPerWeek, data.profile.goal, current ?: data.profile.weightKg),
+            goal = data.profile.goal,
             protein = nutrition.map { it.date to it.proteinG },
             proteinTargetG = target,
             proteinDaysInTarget = nutrition.count { n ->
@@ -275,11 +278,32 @@ class CoachEngine(
             return rpe * minutes
         }
 
-        fun paceOf(kgPerWeek: Double?): WeightPace = when {
-            kgPerWeek == null -> WeightPace.UNKNOWN
-            kgPerWeek < -0.5 -> WeightPace.TOO_FAST
-            kgPerWeek > 0.2 -> WeightPace.GAINING
-            else -> WeightPace.OK
+        /**
+         * Tempo zmiany wagi względem celu. Redukcja: zdrowo do ok. 1% masy tygodniowo w dół; masa: do 0,5% w górę;
+         * pozostałe cele: waga ma mniej więcej stać.
+         */
+        fun paceOf(kgPerWeek: Double?, goal: Goal = Goal.RECOMP, weightKg: Double = 80.0): WeightPace {
+            if (kgPerWeek == null) return WeightPace.UNKNOWN
+            val pct = kgPerWeek / weightKg * 100
+            return when (goal) {
+                Goal.FAT_LOSS -> when {
+                    pct < -1.0 -> WeightPace.TOO_FAST
+                    kgPerWeek > 0.1 -> WeightPace.GAINING
+                    kgPerWeek > -0.1 -> WeightPace.STALLED
+                    else -> WeightPace.OK
+                }
+                Goal.MUSCLE_GAIN -> when {
+                    pct > 0.5 -> WeightPace.TOO_FAST_UP
+                    kgPerWeek < -0.2 -> WeightPace.TOO_FAST
+                    kgPerWeek < 0.05 -> WeightPace.STALLED
+                    else -> WeightPace.OK
+                }
+                else -> when {
+                    kgPerWeek < -0.5 -> WeightPace.TOO_FAST
+                    kgPerWeek > 0.2 -> WeightPace.GAINING
+                    else -> WeightPace.OK
+                }
+            }
         }
     }
 }

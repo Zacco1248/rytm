@@ -1,5 +1,7 @@
 package com.zacco.rytm.domain.coach
 
+import com.zacco.rytm.domain.profile.Goal
+
 import com.zacco.rytm.domain.habits.Habit
 import com.zacco.rytm.domain.load.LoadSummary
 import com.zacco.rytm.domain.model.Activity
@@ -115,6 +117,8 @@ data class BodySnapshot(
     val strength: List<ExerciseProgress> = emptyList(),
     /** Dni z wpisem żywienia i celem tego dnia (z doliczonym treningiem), do karty „Makro”. */
     val macros: List<MacroDay> = emptyList(),
+    /** Cel osoby: od niego zależy ocena tempa i opisy na ekranie. */
+    val goal: Goal = Goal.RECOMP,
 )
 
 data class MacroDay(val nutrition: NutritionDay, val target: NutritionTargets) {
@@ -144,4 +148,5 @@ data class MacroDay(val nutrition: NutritionDay, val target: NutritionTargets) {
 
 enum class Macro { KCAL, PROTEIN, FAT, CARBS }
 
-enum class WeightPace { UNKNOWN, TOO_FAST, OK, GAINING }
+/** TOO_FAST = za szybko w dół, TOO_FAST_UP = za szybko w górę (masa), STALLED = stoi, choć cel wymaga zmiany. */
+enum class WeightPace { UNKNOWN, TOO_FAST, OK, GAINING, STALLED, TOO_FAST_UP }

@@ -187,7 +187,12 @@ private fun AiSettingsCard(
                     onSaveSettings(st.copy(weeklyEnabled = !st.weeklyEnabled))
                 }
             }
-            SmallText("Rano po check-inie AI tłumaczy plan dnia (tani model). Raport tygodniowy liczy mocniejszy model, ok. 0,05 USD.")
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip("Analiza miesiąca: " + if (st.monthlyEnabled) "tak" else "nie", if (st.monthlyEnabled) ChipTone.GOOD else ChipTone.MUTED) {
+                    onSaveSettings(st.copy(monthlyEnabled = !st.monthlyEnabled))
+                }
+            }
+            SmallText("Rano po check-inie AI tłumaczy plan dnia (tani model). Raport tygodniowy liczy mocniejszy model, ok. 0,05 USD, a analizę miesiąca najmocniejszy, ok. 0,3 USD.")
             RytmButton("Zapisz limit", Modifier.fillMaxWidth()) {
                 budget.replace(',', '.').toDoubleOrNull()?.let { onSaveSettings(st.copy(monthlyBudgetUsd = it)) }
             }

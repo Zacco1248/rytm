@@ -9,7 +9,10 @@ import com.zacco.rytm.ai.plan.PlanTweakService
 import com.zacco.rytm.domain.profile.PersonalProfile
 import com.zacco.rytm.ai.LlmProvider
 import com.zacco.rytm.ai.SavedEveningReview
+import com.zacco.rytm.ai.SavedMonthlyReport
 import com.zacco.rytm.ai.SavedMorningNote
+import com.zacco.rytm.ai.monthly.MonthlyInputs
+import com.zacco.rytm.ai.monthly.MonthlyReportService
 import com.zacco.rytm.ai.SavedWeeklyReport
 import com.zacco.rytm.ai.morning.MorningInput
 import com.zacco.rytm.ai.morning.MorningService
@@ -55,6 +58,9 @@ class AiCoach(
 
     private val _weekly = MutableStateFlow(loadList(KEY_WEEKLY, SavedWeeklyReport.serializer()))
     val weeklyReports: StateFlow<List<SavedWeeklyReport>> = _weekly.asStateFlow()
+
+    private val _monthly = MutableStateFlow(loadList(KEY_MONTHLY, SavedMonthlyReport.serializer()))
+    val monthlyReports: StateFlow<List<SavedMonthlyReport>> = _monthly.asStateFlow()
 
     private val _morning = MutableStateFlow(loadList(KEY_MORNING, SavedMorningNote.serializer()))
     val morningNotes: StateFlow<List<SavedMorningNote>> = _morning.asStateFlow()
@@ -189,6 +195,39 @@ class AiCoach(
         return saved
     }
 
+    /**
+     * Analiza długoterminowa za ok. 12 tygodni kończących się [end]. Gotowej analizy z AI z tego dnia
+     * nie liczymy ponownie, chyba że [force].
+     */
+    suspend fun monthly(end: LocalDate, force: Boolean = false): SavedMonthlyReport {
+        val existing = _monthly.value.firstOrNull { it.periodEnd == end.toString() }
+        if (existing != null && !force && existing.source == "LLM") return existing
+        val data = coach.observe(end, lookbackDays = MonthlyInputs.WEEKS * 7L + 28).first()
+        val from = end.minusDays(MonthlyInputs.WEEKS * 7L).toString()
+        val summaries = _weekly.value.filter { it.weekEnd in from..end.toString() }
+            .sortedBy { it.weekEnd }
+            .map { "${it.weekEnd}: ${it.report.summary}" }
+        val input = MonthlyInputs.from(data, end, summaries)
+        val result = runCatching { MonthlyReportService(llm(), costGuard()).report(input) }
+            .getOrElse { e ->
+                Log.w(TAG, "Analiza miesięczna nieudana", e)
+                MonthlyReportService(null, null).report(input).copy(error = e.message)
+            }
+        val saved = SavedMonthlyReport(
+            periodEnd = end.toString(),
+            report = result.report,
+            source = if (result.fromLlm) "LLM" else "RULES",
+            model = result.model,
+            costUsd = result.costUsd,
+            error = result.error,
+            createdAt = System.currentTimeMillis(),
+        )
+        val list = (listOf(saved) + _monthly.value.filterNot { it.periodEnd == saved.periodEnd }).sortedByDescending { it.periodEnd }.take(KEEP_MONTHS)
+        saveList(KEY_MONTHLY, SavedMonthlyReport.serializer(), list)
+        _monthly.value = list
+        return saved
+    }
+
     /** „Popraw z AI” w kreatorze: zmiana ustawień planu z prośby słowami. Bez klucza zwraca błąd do pokazania. */
     suspend fun tweakPlan(profile: PersonalProfile, request: String): PlanTweakResult {
         val llm = llm() ?: return PlanTweakResult(null, error = "Brak klucza AI. Dodasz go później w zakładce Wieczór; na razie popraw kroki ręcznie.")
@@ -235,5 +274,7 @@ class AiCoach(
         const val KEY_MORNING = "morning"
         const val KEEP_DAYS = 14
         const val KEEP_WEEKS = 12
+        const val KEY_MONTHLY = "monthly"
+        const val KEEP_MONTHS = 12
     }
 }

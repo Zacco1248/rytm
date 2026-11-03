@@ -4,6 +4,7 @@ import com.zacco.rytm.domain.model.ActivityType
 import com.zacco.rytm.domain.model.BodyArea
 import com.zacco.rytm.domain.model.Intensity
 import com.zacco.rytm.domain.model.LoadedArea
+import com.zacco.rytm.domain.profile.Goal
 import com.zacco.rytm.domain.readiness.ReadinessLevel
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -31,6 +32,15 @@ object Format {
         today -> "dziś"
         today.minusDays(1) -> "wczoraj"
         else -> weekdayShort(d.dayOfWeek) + ", " + dayMonth(d)
+    }
+
+    fun goal(g: Goal): String = when (g) {
+        Goal.RECOMP -> "Rekompozycja"
+        Goal.FAT_LOSS -> "Redukcja wagi"
+        Goal.MUSCLE_GAIN -> "Masa mięśniowa"
+        Goal.STRENGTH -> "Siła"
+        Goal.ENDURANCE -> "Kondycja"
+        Goal.HEALTH -> "Zdrowie i forma"
     }
 
     fun range(from: LocalDate, to: LocalDate): String = "${dayMonth(from)} – ${dayMonth(to)}"
