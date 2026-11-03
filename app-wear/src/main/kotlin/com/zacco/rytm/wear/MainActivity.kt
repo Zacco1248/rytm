@@ -26,6 +26,8 @@ import com.zacco.rytm.wear.ui.HabitsScreen
 import com.zacco.rytm.wear.ui.HomeScreen
 import com.zacco.rytm.wear.ui.OtherActivityScreen
 import com.zacco.rytm.wear.ui.RpeScreen
+import com.zacco.rytm.wear.workout.WorkoutFlow
+import com.zacco.rytm.wear.workout.WorkoutStore
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -56,6 +58,7 @@ class MainActivity : ComponentActivity() {
         const val SCREEN_RPE = "rpe"
         const val SCREEN_HABITS = "habits"
         const val SCREEN_OTHER = "other"
+        const val SCREEN_WORKOUT = "workout"
     }
 }
 
@@ -78,7 +81,12 @@ private fun RytmWatchApp(nav: MutableState<String>) {
     }
 
     val s = snapshot
+    val activeRun by WorkoutStore.observe(context).collectAsStateWithLifecycle()
     when (nav.value) {
+        MainActivity.SCREEN_WORKOUT -> WorkoutFlow(
+            planned = s?.takeUnless { WatchStore.isStale(it) }?.workout,
+            onExit = home,
+        )
         MainActivity.SCREEN_CHECK_IN -> CheckInScreen(
             draft = draft,
             onChange = { draft = it },
@@ -134,6 +142,8 @@ private fun RytmWatchApp(nav: MutableState<String>) {
             },
             onHabits = { go(MainActivity.SCREEN_HABITS) },
             onOther = { go(MainActivity.SCREEN_OTHER) },
+            workoutRunning = activeRun?.title,
+            onWorkout = { go(MainActivity.SCREEN_WORKOUT) },
         )
     }
 }

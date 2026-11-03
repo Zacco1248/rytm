@@ -48,7 +48,23 @@ fun BodyScreen(b: BodySnapshot, kcalTarget: Int, onAddWeighIn: () -> Unit) {
     ProteinCard(b, kcalTarget)
     RytmCard {
         CardHeader("Siła")
-        SmallText("Progresja ćwiczeń pojawi się z dziennikiem serii (faza 3). Wtedy Rytm oceni, czy rekompozycja idzie dobrze: waga stoi albo lekko spada, a powtórzenia rosną.")
+        if (b.strength.isEmpty()) {
+            SmallText("Zapisz pierwszy trening (na zegarku albo „Zapisz trening” w planie na dziś). Rytm dobierze z tego ciężar na kolejny raz i oceni, czy rekompozycja idzie dobrze: waga stoi albo lekko spada, a powtórzenia rosną.")
+        } else {
+            b.strength.forEach { e ->
+                Column {
+                    Text(e.exercise, style = Rytm.type.body, color = Rytm.colors.ink)
+                    val arrow = when (e.improved) {
+                        true -> " ↑"
+                        false -> " ="
+                        null -> ""
+                    }
+                    SmallText(
+                        Format.dayMonth(e.lastDate) + ": " + e.last + arrow + (e.previous?.let { " (wcześniej $it)" } ?: ""),
+                    )
+                }
+            }
+        }
     }
     RytmCard {
         CardHeader("Skład ciała") {

@@ -12,9 +12,9 @@ import com.zacco.rytm.domain.model.DayKind
 import com.zacco.rytm.domain.model.Intensity
 import com.zacco.rytm.domain.model.PlannedDay
 import com.zacco.rytm.domain.nutrition.NutritionAnalyzer
-import com.zacco.rytm.domain.nutrition.StrengthTrend
 import com.zacco.rytm.domain.planner.ExerciseLibrary
 import com.zacco.rytm.domain.workout.Progression
+import com.zacco.rytm.domain.workout.StrengthHistory
 import com.zacco.rytm.domain.planner.PlanningContext
 import com.zacco.rytm.domain.planner.WeekPlanner
 import com.zacco.rytm.domain.readiness.Readiness
@@ -154,10 +154,10 @@ class CoachEngine(
                 weekEnd = data.today,
                 nutrition = data.nutrition,
                 body = data.weighIns,
-                // Trend siły przyjdzie z dziennika serii (faza 2).
-                strengthTrend = StrengthTrend.UNKNOWN,
+                strengthTrend = StrengthHistory.trend(data.sets, data.today),
                 targets = data.profile.nutrition,
             ),
+            strength = StrengthHistory.latest(data.sets),
         )
     }
 

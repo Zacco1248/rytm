@@ -62,6 +62,7 @@ fun TodayScreen(
     onNutrition: () -> Unit,
     onDayOff: () -> Unit,
     onAlcohol: () -> Unit,
+    onLogWorkout: () -> Unit = {},
 ) {
     ScreenHeader(sub = Format.dayLong(s.date), title = greeting()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -79,7 +80,7 @@ fun TodayScreen(
     sync.error?.let { RytmCard { SmallText(it, color = Rytm.colors.bad) } }
 
     ReadinessCard(s, onCheckIn)
-    PlanCard(s, onDayOff)
+    PlanCard(s, onDayOff, onLogWorkout)
     NutritionCard(s, sync, onSync, onNutrition)
     HabitsCard(s.habits, onToggleHabit)
 
@@ -191,7 +192,7 @@ private fun ComponentRow(name: String, value: String, score: Int?) {
 }
 
 @Composable
-private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit) {
+private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit, onLogWorkout: () -> Unit) {
     val p = s.plan
     RytmCard {
         CardHeader("Plan na dziś") {
@@ -201,7 +202,18 @@ private fun PlanCard(s: TodaySnapshot, onDayOff: () -> Unit) {
             }
         }
         Text(p.title, style = Rytm.type.planTitle, color = Rytm.colors.ink)
-        p.workout?.let { w -> WorkoutList(w) }
+        p.workout?.let { w ->
+            WorkoutList(w)
+            if (s.setsToday.isNotEmpty()) {
+                val volume = s.setsToday.sumOf { x -> x.weightKg?.let { it * x.reps } ?: 0.0 }
+                SmallText(
+                    "✓ Zapisano ${s.setsToday.size} serii" + if (volume > 0) " · objętość ${Format.dec(volume, 0)} kg" else "",
+                    color = Rytm.colors.good,
+                )
+            }
+            RytmButton(if (s.setsToday.isEmpty()) "Zapisz trening" else "Zapisz kolejny trening", Modifier.fillMaxWidth(), onClick = onLogWorkout)
+            SmallText("Na zegarku: „Zacznij trening” prowadzi seria po serii z przerwą i tętnem.")
+        }
         p.warnings.forEach { SmallText("⚠ $it", color = Rytm.colors.warn) }
         if (p.rationale.isNotEmpty()) WhyBox(p.rationale.joinToString(" "))
         SmallText("Jutro: ${s.tomorrow.title.lowercase()}. Pora snu dziś: ${s.bedtime.format(hhmm)}.")
@@ -294,7 +306,7 @@ private fun habitDetail(h: HabitStatus): String = when {
     else -> "codziennie"
 }
 
-/** Ćwiczenia sesji: serie × powtórzenia, ciężar, tempo. Ciężar to punkt startu; progresja przyjdzie z dziennikiem serii. */
+/** Ćwiczenia sesji: serie × powtórzenia, ciężar z progresji, tempo i podpowiedź z ostatniego razu. */
 @Composable
 private fun WorkoutList(w: com.zacco.rytm.domain.model.StrengthWorkout) {
     val c = Rytm.colors
@@ -309,11 +321,12 @@ private fun WorkoutList(w: com.zacco.rytm.domain.model.StrengthWorkout) {
                     SmallText(
                         listOfNotNull(
                             "${e.sets} × $reps",
-                            e.weightKg?.let { "do ${Format.dec(it, 0)} kg" },
+                            e.weightKg?.let { "${Format.kg(it)} kg" },
                             e.tempo?.let { "tempo $it" },
                             e.restSec.takeIf { it > 0 }?.let { "przerwa ${it}s" },
                         ).joinToString(" · "),
                     )
+                    e.note?.let { SmallText(it, color = c.accent) }
                 }
             }
         }

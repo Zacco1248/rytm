@@ -20,6 +20,8 @@ wear-tiles = "1.6.0"
 wear-protolayout = "1.4.0"
 wear-complications = "1.2.1"
 mlkit-text = "16.0.1"
+health-services = "1.1.0"
+wear-ongoing = "1.0.0"
 
 # Wersje SDK wspólne dla modułów Androida
 compileSdk = "37"
@@ -53,6 +55,8 @@ wear-tiles = { module = "androidx.wear.tiles:tiles", version.ref = "wear-tiles" 
 wear-protolayout = { module = "androidx.wear.protolayout:protolayout", version.ref = "wear-protolayout" }
 wear-protolayout-material3 = { module = "androidx.wear.protolayout:protolayout-material3", version.ref = "wear-protolayout" }
 wear-complications-data-source-ktx = { module = "androidx.wear.watchface:watchface-complications-data-source-ktx", version.ref = "wear-complications" }
+health-services-client = { module = "androidx.health:health-services-client", version.ref = "health-services" }
+wear-ongoing = { module = "androidx.wear:wear-ongoing", version.ref = "wear-ongoing" }
 mlkit-text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "mlkit-text" }
 play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "play-services-wearable" }
 

@@ -12,6 +12,7 @@ import com.zacco.rytm.domain.model.PlannedDay
 import com.zacco.rytm.domain.nutrition.NutritionWeekReport
 import com.zacco.rytm.domain.profile.NutritionTargets
 import com.zacco.rytm.domain.readiness.Readiness
+import com.zacco.rytm.domain.workout.ExerciseProgress
 import com.zacco.rytm.domain.workout.SetLog
 import java.time.Instant
 import java.time.LocalDate
@@ -101,6 +102,8 @@ data class BodySnapshot(
     /** Ostatni pełny pomiar składu ciała (np. ze zrzutu Xiaomi Home). */
     val latestComposition: BodyMetrics?,
     val weekReport: NutritionWeekReport,
+    /** Ostatnie sesje ćwiczeń z dziennika serii. */
+    val strength: List<ExerciseProgress> = emptyList(),
 )
 
 enum class WeightPace { UNKNOWN, TOO_FAST, OK, GAINING }

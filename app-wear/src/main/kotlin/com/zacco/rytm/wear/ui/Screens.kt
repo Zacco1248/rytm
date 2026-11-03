@@ -29,8 +29,12 @@ fun HomeScreen(
     onRate: (WatchActivity) -> Unit,
     onHabits: () -> Unit,
     onOther: () -> Unit,
+    /** Tytuł trwającego treningu, jeśli jest. */
+    workoutRunning: String? = null,
+    onWorkout: () -> Unit = {},
 ) {
     ScreenColumn {
+        if (workoutRunning != null) WideButton("Wróć do treningu", onWorkout, secondary = workoutRunning)
         if (s == null) {
             Title("Rytm")
             Body("Czekam na dane z telefonu. Otwórz Rytm na telefonie.")
@@ -44,6 +48,15 @@ fun HomeScreen(
             if (stale) Label("Dane z ${s.date}. Otwórz Rytm na telefonie.")
             Spacer(Modifier.height(4.dp))
             if (!stale) {
+                val w = s.workout
+                if (w != null && workoutRunning == null) {
+                    WideButton(
+                        if (w.doneToday) "Trening ✓" else "Zacznij trening",
+                        onWorkout,
+                        secondary = "${w.exercises.size} ćwiczeń · ${w.title}",
+                        tonal = w.doneToday,
+                    )
+                }
                 if (!s.checkInDone) WideButton("Check-in", onCheckIn)
                 s.toRate.forEach { a -> WideButton("Oceń: ${a.title}", { onRate(a) }, secondary = Labels.minutes(a.durationMin), tonal = true) }
                 WideButton("Nawyki", onHabits, secondary = "${s.habits.count { it.done }}/${s.habits.size} zrobione", tonal = true)

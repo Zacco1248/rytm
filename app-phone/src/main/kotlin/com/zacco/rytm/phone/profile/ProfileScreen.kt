@@ -186,6 +186,12 @@ fun ProfileScreen(
             }
             Pill("Mam też gumy", p.bands) { p = p.copy(bands = !p.bands) }
         }
+        if (p.equipment == EquipmentKind.DUMBBELLS || p.equipment == EquipmentKind.GYM) {
+            SmallText("Najmniejsza zmiana ciężaru (do progresji):")
+            val steps = if (p.equipment == EquipmentKind.GYM) listOf(1.0, 2.0, 2.5, 5.0) else listOf(0.5, 1.0, 2.0)
+            val current = p.weightStepKg ?: if (p.equipment == EquipmentKind.GYM) 2.5 else 1.0
+            Pills(steps.map { Format.kg(it) + " kg" to it }, current) { p = p.copy(weightStepKg = it) }
+        }
         SmallText("Czas na jedną sesję:")
         Pills(listOf(20, 30, 45, 60, 90).map { "$it min" to it }, p.sessionMinutes) { p = p.copy(sessionMinutes = it) }
         SmallText("Dni, w które możesz trenować siłowo (kolejność kliknięć = kolejność preferencji):")

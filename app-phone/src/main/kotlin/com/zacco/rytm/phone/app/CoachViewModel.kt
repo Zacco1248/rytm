@@ -21,6 +21,11 @@ import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.LoadedArea
 import com.zacco.rytm.domain.profile.PersonalProfile
 import com.zacco.rytm.domain.time.RytmTime
+import com.zacco.rytm.data.watch.WatchBridge
+import com.zacco.rytm.domain.model.Source
+import com.zacco.rytm.domain.workout.SetLog
+import com.zacco.rytm.domain.workout.WorkoutLog
+import com.zacco.rytm.phone.today.SetEntry
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -162,6 +167,31 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addWeighIn(kg: Double, bodyFatPct: Double?, time: Instant?, composition: BodyComposition?) {
         viewModelScope.launch { data.coach.addWeighIn(kg, bodyFatPct, time ?: Instant.now(), composition) }
+    }
+
+    /** Trening wpisany na telefonie (bez zegarka): dziś, kończy się teraz. */
+    fun saveManualWorkout(entries: List<SetEntry>, durationMin: Int, rpe: Int?) {
+        val today = state.value?.today ?: return
+        val workout = today.plan.workout ?: return
+        val end = Instant.now()
+        val id = "manual-" + java.util.UUID.randomUUID()
+        val date = end.atZone(RytmTime.zone).toLocalDate()
+        viewModelScope.launch {
+            data.coach.saveWorkout(
+                WorkoutLog(
+                    id = id,
+                    title = workout.name,
+                    type = WatchBridge.workoutType(today.plan),
+                    start = end.minus(Duration.ofMinutes(durationMin.toLong())),
+                    end = end,
+                    sets = entries.map { SetLog(id, it.exercise, it.setIndex, it.reps, it.weightKg, null, date) },
+                    rpe = rpe,
+                    avgHr = null,
+                    kcal = null,
+                    source = Source.MANUAL,
+                ),
+            )
+        }
     }
 
     fun saveProfile(p: PersonalProfile) {

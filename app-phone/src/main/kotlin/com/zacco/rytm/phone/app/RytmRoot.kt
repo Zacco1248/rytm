@@ -51,6 +51,7 @@ import com.zacco.rytm.phone.today.RpeSheet
 import com.zacco.rytm.phone.today.OtherActivitySheet
 import com.zacco.rytm.phone.today.TodayScreen
 import com.zacco.rytm.phone.today.WeighInSheet
+import com.zacco.rytm.phone.today.WorkoutLogSheet
 import com.zacco.rytm.phone.ui.components.CardHeader
 import com.zacco.rytm.phone.ui.components.RytmCard
 import com.zacco.rytm.phone.ui.components.RytmIcons
@@ -69,7 +70,7 @@ enum class Tab(val label: String, val icon: ImageVector) {
     EVENING("Wieczór", RytmIcons.evening),
 }
 
-private enum class Sheet { NONE, CHECK_IN, OTHER_ACTIVITY, NUTRITION, RPE, WEIGH_IN, ALCOHOL }
+private enum class Sheet { NONE, CHECK_IN, OTHER_ACTIVITY, NUTRITION, RPE, WEIGH_IN, ALCOHOL, WORKOUT }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -163,6 +164,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onNutrition = { sheet = Sheet.NUTRITION },
                         onDayOff = vm::toggleDayOff,
                         onAlcohol = { sheet = Sheet.ALCOHOL },
+                        onLogWorkout = { sheet = Sheet.WORKOUT },
                     )
                     Tab.WEEK -> WeekScreen(s, vm::toggleCancelled) { day ->
                         rpeDate = day.date.toString()
@@ -191,6 +193,9 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
             val acts = state?.week?.days?.firstOrNull { it.date.toString() == rpeDate }?.activities
                 ?.filter { it.type != com.zacco.rytm.domain.model.ActivityType.WALK }.orEmpty()
             if (acts.isNotEmpty()) RpeSheet(acts, onDismiss = { sheet = Sheet.NONE }, onSave = vm::setRpe)
+        }
+        Sheet.WORKOUT -> state?.today?.plan?.workout?.let { w ->
+            WorkoutLogSheet(w, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveManualWorkout)
         }
         Sheet.WEIGH_IN -> WeighInSheet(onDismiss = { sheet = Sheet.NONE }, onSave = vm::addWeighIn)
         Sheet.NONE -> Unit

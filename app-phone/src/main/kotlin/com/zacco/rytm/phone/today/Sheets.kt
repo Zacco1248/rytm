@@ -344,3 +344,71 @@ fun compositionSummary(c: BodyComposition): String = listOfNotNull(
     c.waistHipRatio?.let { "talia/biodra ${Format.dec(it, 2)}" },
     c.bmi?.let { "BMI ${Format.dec(it)}" },
 ).joinToString(" · ")
+
+/** Seria wpisana na telefonie. */
+data class SetEntry(val exercise: String, val setIndex: Int, val reps: Int, val weightKg: Double?)
+
+/**
+ * Zapis treningu bez zegarka: serie wypełnione celem z planu (z progresji), do poprawienia.
+ * Ćwiczenie można odznaczyć, gdy go nie było.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun WorkoutLogSheet(
+    workout: com.zacco.rytm.domain.model.StrengthWorkout,
+    onDismiss: () -> Unit,
+    onSave: (List<SetEntry>, Int, Int?) -> Unit,
+) {
+    val reps = remember {
+        androidx.compose.runtime.mutableStateMapOf<String, String>().apply {
+            workout.exercises.forEachIndexed { i, e -> (1..e.sets).forEach { n -> put("$i-$n", e.reps.last.toString()) } }
+        }
+    }
+    val kgs = remember {
+        androidx.compose.runtime.mutableStateMapOf<String, String>().apply {
+            workout.exercises.forEachIndexed { i, e -> e.weightKg?.let { put("$i", Format.kg(it)) } }
+        }
+    }
+    var skipped by remember { mutableStateOf(emptySet<Int>()) }
+    var minutes by remember { mutableIntStateOf(45) }
+    var rpe by remember { mutableStateOf<Int?>(null) }
+
+    RytmSheet("Zapisz trening", onDismiss) {
+        SmallText("Wpisane są cele z planu. Popraw powtórzenia i ciężar tam, gdzie zrobiłeś inaczej. Na tej podstawie Rytm dobierze ciężar na następny raz.")
+        workout.exercises.forEachIndexed { i, e ->
+            val off = i in skipped
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Pill(if (off) "Pominięte" else "Zrobione", !off) { skipped = if (off) skipped - i else skipped + i }
+                Label(e.name)
+            }
+            if (!off) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    (1..e.sets).forEach { n ->
+                        NumberField("Seria $n", reps["$i-$n"].orEmpty(), Modifier.fillMaxWidth(0.3f)) { reps["$i-$n"] = it.filter(Char::isDigit) }
+                    }
+                    if (e.weightKg != null || kgs.containsKey("$i")) {
+                        NumberField("kg", kgs["$i"].orEmpty(), Modifier.fillMaxWidth(0.3f)) { kgs["$i"] = it }
+                    }
+                }
+            }
+        }
+        Label("Ile trwał?")
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf(20, 30, 45, 60, 75).forEach { m -> Pill("$m min", minutes == m) { minutes = m } }
+        }
+        Label("Jak ciężko było? (RPE)")
+        Scale(1..5, rpe) { rpe = it }
+        Scale(6..10, rpe) { rpe = it }
+        RytmButton("Zapisz", Modifier.fillMaxWidth(), primary = true) {
+            val entries = workout.exercises.flatMapIndexed { i, e ->
+                if (i in skipped) emptyList() else (1..e.sets).mapNotNull { n ->
+                    val r = reps["$i-$n"]?.toIntOrNull() ?: return@mapNotNull null
+                    if (r <= 0) return@mapNotNull null
+                    SetEntry(e.name, n, r, kgs["$i"]?.replace(',', '.')?.toDoubleOrNull())
+                }
+            }
+            onSave(entries, minutes, rpe)
+            onDismiss()
+        }
+    }
+}

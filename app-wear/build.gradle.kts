@@ -67,6 +67,8 @@ dependencies {
     implementation(libs.wear.protolayout)
     implementation(libs.wear.protolayout.material3)
     implementation(libs.wear.complications.data.source.ktx)
+    implementation(libs.health.services.client)
+    implementation(libs.wear.ongoing)
     debugImplementation(libs.compose.ui.tooling)
 
     if (hasSensorSdk) {
