@@ -52,6 +52,7 @@ import com.zacco.rytm.phone.app.Format
 import com.zacco.rytm.phone.ui.components.Pill
 import com.zacco.rytm.phone.ui.components.RytmButton
 import com.zacco.rytm.phone.ui.components.SmallText
+import com.zacco.rytm.phone.ui.components.WhyBox
 import com.zacco.rytm.phone.ui.theme.Rytm
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -309,7 +310,7 @@ private fun NumberField(label: String, value: String, modifier: Modifier, onChan
 fun RpeSheet(activities: List<com.zacco.rytm.domain.model.Activity>, onDismiss: () -> Unit, onSave: (String, Int) -> Unit) {
     var selected by remember { mutableStateOf(activities.associate { it.id to it.rpe }) }
     RytmSheet("Jak ciężko było? (RPE)", onDismiss) {
-        SmallText("1 = bardzo lekko, 5 = umiarkowanie, 7 = ciężko, 10 = maksimum.")
+        WhyBox("RPE to Twoja ocena, jak ciężki był wysiłek, w skali 1–10: 1 to bardzo lekko, 5 umiarkowanie (da się rozmawiać zdaniami), 7 ciężko (pojedyncze słowa), 9–10 prawie maksimum. Zegarek nie wie, jak się czujesz, a samo tętno często zaniża siłowe treningi, więc ta ocena mówi Rytmowi najwięcej.")
         activities.forEach { a ->
             Label(Format.activity(a.type) + " · " + Format.minutes(a.durationMin))
             Scale(1..5, selected[a.id]) { v -> selected = selected + (a.id to v) }
