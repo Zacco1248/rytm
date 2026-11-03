@@ -38,6 +38,7 @@ object LoadCalculator {
             zone = AcwrZone.of(acwr),
             // ACWR ma sens dopiero przy pełnym oknie przewlekłym.
             reliable = historyDays >= 28,
+            historyDays = historyDays,
         )
     }
 }
@@ -51,6 +52,8 @@ data class LoadSummary(
     val acwr: Double?,
     val zone: AcwrZone,
     val reliable: Boolean,
+    /** Od ilu dni mamy jakiekolwiek treningi (ACWR wiarygodny od 28). */
+    val historyDays: Int = 0,
 ) {
     /** Średnie dzienne obciążenie przewlekłe, punkt odniesienia dla „ciężkiego dnia”. */
     val chronicDailyAvg: Double get() = chronicWeeklyAvg / 7.0

@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,9 +27,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.zacco.rytm.domain.coach.HabitStatus
+import com.zacco.rytm.domain.exercise.ExerciseGuide
+import com.zacco.rytm.domain.exercise.ExerciseInfo
 import com.zacco.rytm.domain.coach.TodaySnapshot
 import com.zacco.rytm.domain.habits.HabitAutoSource
 import com.zacco.rytm.domain.habits.HabitKind
+import com.zacco.rytm.domain.readiness.CalibrationGap
+import com.zacco.rytm.domain.readiness.CalibrationStatus
 import com.zacco.rytm.domain.readiness.ReadinessComponent
 import com.zacco.rytm.domain.readiness.ReadinessLevel
 import com.zacco.rytm.domain.time.RytmTime
@@ -127,10 +135,17 @@ private fun ReadinessCard(s: TodaySnapshot, onCheckIn: () -> Unit) {
         ReadinessLevel.MODERATE -> c.warn
         ReadinessLevel.LOW -> c.bad
     }
+    var showCalibration by remember { mutableStateOf(false) }
     RytmCard {
         CardHeader("Gotowość") {
-            if (r.calibrating) Chip("Kalibracja ${s.baselineDays}/14", ChipTone.WARN)
+            val cal = s.calibration
+            if (r.calibrating && cal != null) {
+                Chip("Kalibracja ${cal.restingHrDays.coerceAtMost(cal.needDays)}/${cal.needDays} " + if (showCalibration) "▴" else "▾", ChipTone.WARN) {
+                    showCalibration = !showCalibration
+                }
+            }
         }
+        s.calibration?.takeIf { showCalibration && r.calibrating }?.let { CalibrationDetails(it) }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Ring(r.score / 100f, ringColor) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -312,13 +327,19 @@ private fun habitDetail(h: HabitStatus): String = when {
 @Composable
 private fun WorkoutList(w: com.zacco.rytm.domain.model.StrengthWorkout) {
     val c = Rytm.colors
+    var info by remember { mutableStateOf<ExerciseInfo?>(null) }
+    info?.let { ExerciseSheet(it) { info = null } }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        SmallText(w.name)
+        SmallText(w.name + " · dotknij ćwiczenia, żeby zobaczyć opis")
         w.exercises.forEachIndexed { i, e ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val guide = ExerciseGuide.find(e.name)
+            Row(
+                Modifier.fillMaxWidth().then(if (guide != null) Modifier.clickable { info = guide } else Modifier),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 Text("${i + 1}.", style = Rytm.type.small, color = c.muted)
                 Column(Modifier.weight(1f)) {
-                    Text(e.name, style = Rytm.type.small.copy(fontWeight = FontWeight.Medium), color = c.ink)
+                    Text(e.name + if (guide != null) "  ⓘ" else "", style = Rytm.type.small.copy(fontWeight = FontWeight.Medium), color = c.ink)
                     val reps = if (e.reps.first == e.reps.last) "${e.reps.first}" else "${e.reps.first}–${e.reps.last}"
                     SmallText(
                         listOfNotNull(
@@ -335,5 +356,50 @@ private fun WorkoutList(w: com.zacco.rytm.domain.model.StrengthWorkout) {
         if (w.exercises.size > 3 && w.name != "Mobilność") {
             SmallText("Mało czasu? Zrób 3 pierwsze ćwiczenia po 2 serie (ok. 20 min). Plan tygodnia się dostosuje.")
         }
+    }
+}
+
+/** Co weszło do kalibracji i czego brakowało, dzień po dniu. */
+@Composable
+private fun CalibrationDetails(cal: CalibrationStatus) {
+    val c = Rytm.colors
+    Column(
+        Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).background(c.soft).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("Czego jeszcze brakuje", style = Rytm.type.bodyStrong, color = c.ink)
+        val lines = buildList {
+            add(
+                (if (cal.restingHrReady) "✓ " else "• ") +
+                    "Tętno spoczynkowe: ${cal.restingHrDays} z ${cal.needDays} potrzebnych dni (z ostatnich ${CalibrationStatus.WINDOW_DAYS}).",
+            )
+            cal.hrvDays?.let { add((if (cal.hrvReady) "✓ " else "• ") + "HRV: $it z ${cal.needDays} pomiarów. Mierz rano w check-inie.") }
+            add(
+                (if (cal.loadReliable) "✓ " else "• ") +
+                    "Obciążenie treningowe: ${cal.loadHistoryDays.coerceAtMost(CalibrationStatus.LOAD_DAYS)} z ${CalibrationStatus.LOAD_DAYS} dni historii." +
+                    if (cal.loadReliable) "" else " Do tego czasu ACWR jest orientacyjny.",
+            )
+        }
+        lines.forEach { SmallText(it) }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            cal.days.forEach { d ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        Format.weekdayShort(d.date.dayOfWeek) + " " + Format.dayMonth(d.date),
+                        style = Rytm.type.tiny,
+                        color = c.muted,
+                        modifier = Modifier.weight(0.38f),
+                    )
+                    val (text, color) = when (d.gap) {
+                        null -> "✓ noc, tętno ${d.nightRestingHr}" + (if (d.hrv) " · HRV" else "") to c.good
+                        CalibrationGap.DAY_ONLY -> "◐ brak nocy (ładowarka?), tętno z dnia ${d.dayRestingHr}" to c.warn
+                        CalibrationGap.NO_HR -> "✕ sen bez tętna, sprawdź uprawnienia Health Connect" to c.bad
+                        CalibrationGap.NO_DATA -> "✕ brak danych z zegarka" to c.bad
+                    }
+                    Text(text, style = Rytm.type.tiny, color = color, modifier = Modifier.weight(0.62f))
+                }
+            }
+        }
+        SmallText("Dni z tętnem tylko z dnia liczą się osobno: porównujemy je z innymi dniami bez nocy.")
     }
 }

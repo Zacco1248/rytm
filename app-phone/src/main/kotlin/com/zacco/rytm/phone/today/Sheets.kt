@@ -41,6 +41,7 @@ import com.zacco.rytm.domain.model.NutritionDay
 import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.LoadedArea
 import com.zacco.rytm.phone.app.Format
+import com.zacco.rytm.phone.ui.components.Pill
 import com.zacco.rytm.phone.ui.components.RytmButton
 import com.zacco.rytm.phone.ui.components.SmallText
 import com.zacco.rytm.phone.ui.theme.Rytm
@@ -92,21 +93,6 @@ private fun Scale(range: IntRange, selected: Int?, onSelect: (Int) -> Unit) {
     }
 }
 
-@Composable
-private fun Pill(text: String, on: Boolean, onClick: () -> Unit) {
-    val c = Rytm.colors
-    Text(
-        text,
-        style = Rytm.type.small,
-        color = if (on) c.bg else c.ink,
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(if (on) c.ink else c.surface)
-            .border(1.dp, if (on) c.ink else c.line, CircleShape)
-            .clickable(role = Role.Checkbox, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-    )
-}
 
 @Composable
 private fun Label(text: String) = Text(text, style = Rytm.type.body, color = Rytm.colors.ink)
@@ -410,5 +396,22 @@ fun WorkoutLogSheet(
             onSave(entries, minutes, rpe)
             onDismiss()
         }
+    }
+}
+
+/** Opis ćwiczenia: jak je zrobić, wskazówki, najczęstszy błąd i wideo z sieci. */
+@Composable
+fun ExerciseSheet(info: com.zacco.rytm.domain.exercise.ExerciseInfo, onDismiss: () -> Unit) {
+    val c = Rytm.colors
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    RytmSheet(info.name, onDismiss) {
+        if (info.muscles.isNotEmpty()) SmallText("Pracują: " + info.muscles.joinToString { Format.muscle(it).lowercase() })
+        Text(info.how, style = Rytm.type.body, color = c.ink)
+        Text("Wskazówki", style = Rytm.type.bodyStrong, color = c.ink)
+        info.tips.forEach { SmallText("• $it") }
+        Text("Najczęstszy błąd", style = Rytm.type.bodyStrong, color = c.ink)
+        SmallText(info.mistake, color = c.warn)
+        RytmButton("Zobacz wideo (YouTube)", Modifier.fillMaxWidth(), primary = true) { runCatching { uri.openUri(info.videoUrl) } }
+        RytmButton("Zamknij", Modifier.fillMaxWidth(), onClick = onDismiss)
     }
 }

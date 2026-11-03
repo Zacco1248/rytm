@@ -91,12 +91,27 @@ object Format {
 
     fun body(a: BodyArea): String = when (a) {
         BodyArea.SHOULDERS -> "Barki"
+        BodyArea.CHEST -> "Klatka"
+        BodyArea.ARMS -> "Ramiona"
         BodyArea.ELBOW -> "Łokieć"
+        BodyArea.ABS -> "Brzuch"
         BodyArea.THIGHS -> "Uda"
         BodyArea.KNEES -> "Kolana"
         BodyArea.BACK -> "Plecy"
         BodyArea.CALVES -> "Łydki"
         BodyArea.ANKLES -> "Kostki"
+    }
+
+    fun muscle(m: com.zacco.rytm.domain.exercise.Muscle): String = when (m) {
+        com.zacco.rytm.domain.exercise.Muscle.ABS -> "Brzuch"
+        com.zacco.rytm.domain.exercise.Muscle.CHEST -> "Klatka"
+        com.zacco.rytm.domain.exercise.Muscle.BACK -> "Plecy"
+        com.zacco.rytm.domain.exercise.Muscle.SHOULDERS -> "Barki"
+        com.zacco.rytm.domain.exercise.Muscle.BICEPS -> "Biceps"
+        com.zacco.rytm.domain.exercise.Muscle.TRICEPS -> "Triceps"
+        com.zacco.rytm.domain.exercise.Muscle.GLUTES -> "Pośladki"
+        com.zacco.rytm.domain.exercise.Muscle.LEGS -> "Nogi"
+        com.zacco.rytm.domain.exercise.Muscle.CALVES -> "Łydki"
     }
 
     fun roundInt(v: Double): Int = v.roundToInt()

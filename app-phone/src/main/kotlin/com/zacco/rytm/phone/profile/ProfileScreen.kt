@@ -37,6 +37,7 @@ import com.zacco.rytm.domain.profile.Sex
 import com.zacco.rytm.domain.time.RytmTime
 import com.zacco.rytm.phone.app.Format
 import com.zacco.rytm.phone.ui.components.CardHeader
+import com.zacco.rytm.phone.ui.components.Pill
 import com.zacco.rytm.phone.ui.components.RytmButton
 import com.zacco.rytm.phone.ui.components.RytmCard
 import com.zacco.rytm.phone.ui.components.ScreenHeader
@@ -326,18 +327,3 @@ private fun <T> Pills(options: List<Pair<String, T>>, selected: T, onSelect: (T)
     }
 }
 
-@Composable
-private fun Pill(text: String, on: Boolean, onClick: () -> Unit) {
-    val c = Rytm.colors
-    Text(
-        text,
-        style = Rytm.type.small,
-        color = if (on) c.bg else c.ink,
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(if (on) c.ink else c.surface)
-            .border(1.dp, if (on) c.ink else c.line, CircleShape)
-            .clickable(role = Role.Checkbox, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-    )
-}

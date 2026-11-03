@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -22,10 +26,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.zacco.rytm.domain.coach.BodySnapshot
+import com.zacco.rytm.domain.coach.Macro
 import com.zacco.rytm.domain.coach.WeightPace
 import com.zacco.rytm.domain.nutrition.NutritionSuggestion
 import com.zacco.rytm.phone.app.Format
 import com.zacco.rytm.phone.ui.components.CardHeader
+import com.zacco.rytm.phone.ui.components.Pill
 import com.zacco.rytm.phone.ui.components.Chip
 import com.zacco.rytm.phone.ui.components.ChipTone
 import com.zacco.rytm.phone.ui.components.RytmCard
@@ -45,7 +51,7 @@ fun BodyScreen(b: BodySnapshot, kcalTarget: Int, onAddWeighIn: () -> Unit) {
     }
     ScreenHeader(sub = "Rekompozycja · ostatnie 4 tygodnie", title = "Sylwetka") { Chip(paceLabel, paceTone) }
     WeightCard(b, onAddWeighIn)
-    ProteinCard(b, kcalTarget)
+    MacroCard(b)
     RytmCard {
         CardHeader("Siła")
         if (b.strength.isEmpty()) {
@@ -134,35 +140,60 @@ private fun WeightCard(b: BodySnapshot, onAddWeighIn: () -> Unit) {
 }
 
 @Composable
-private fun ProteinCard(b: BodySnapshot, kcalTarget: Int) {
+private fun MacroCard(b: BodySnapshot) {
     val c = Rytm.colors
+    var macro by rememberSaveable { mutableStateOf(Macro.KCAL) }
     val last7 = (6 downTo 0).map { b.to.minusDays(it.toLong()) }
-    val byDate = b.protein.toMap()
-    val target = b.proteinTargetG
+    val byDate = b.macros.associateBy { it.date }
+    val unit = if (macro == Macro.KCAL) " kcal" else " g"
     RytmCard {
-        CardHeader("Białko") { SmallText("cel $target g dziennie") }
+        CardHeader("Makro") { SmallText("ostatnie 7 dni") }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Macro.entries.forEach { m -> Pill(macroLabel(m), m == macro) { macro = m } }
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             last7.forEach { d ->
-                val p = byDate[d] ?: 0.0
+                val day = byDate[d]
+                val v = day?.actual(macro) ?: 0.0
+                val t = day?.target(macro)?.toDouble() ?: 1.0
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Canvas(Modifier.width(18.dp).height(56.dp)) {
-                        val h = size.height * (p / (target * 1.15)).toFloat().coerceIn(0f, 1f)
+                        val h = size.height * (v / (t * 1.25)).toFloat().coerceIn(0f, 1f)
                         val color = when {
-                            p <= 0 -> c.track
-                            p >= target * 0.95 -> c.good
+                            day == null || v <= 0 -> c.track
+                            day.inTarget(macro) -> c.good
                             else -> c.warn
                         }
-                        val hh = if (p <= 0) 3.dp.toPx() else h
+                        val hh = if (day == null || v <= 0) 3.dp.toPx() else h
                         drawRoundRect(color, Offset(0f, size.height - hh), Size(size.width, hh), CornerRadius(4.dp.toPx()))
+                        // kreska celu
+                        val ty = size.height - size.height / 1.25f
+                        drawLine(c.muted, Offset(-2.dp.toPx(), ty), Offset(size.width + 2.dp.toPx(), ty), 1.dp.toPx())
                     }
                     Text(Format.weekdayShort(d.dayOfWeek), style = Rytm.type.tiny, color = c.muted)
                 }
             }
         }
-        SmallText(
-            "${b.proteinDaysInTarget} z ${b.protein.size} dni w celu (4 tyg.)" +
-                (b.avgKcal?.let { " · śr. kcal ${Format.int(it)} / ${Format.int(kcalTarget)}" } ?: ""),
-        )
+        val week = b.macros.filter { it.date in last7 }
+        if (week.isEmpty()) {
+            SmallText("Brak wpisów żywienia z ostatniego tygodnia. Dane przychodzą z Fitatu przez Health Connect albo z ręcznego wpisu.")
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Macro.entries.forEach { m ->
+                    val avg = week.map { it.actual(m) }.average()
+                    val target = week.map { it.target(m) }.average()
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(macroLabel(m), style = Rytm.type.tiny, color = c.muted)
+                        Text(Format.roundInt(avg).toString(), style = Rytm.type.bodyStrong, color = if (m == macro) c.accent else c.ink)
+                        Text("/ ${Format.roundInt(target)}", style = Rytm.type.tiny, color = c.muted)
+                    }
+                }
+            }
+            SmallText(
+                "${macroLabel(macro)}: ${week.count { it.inTarget(macro) }} z ${week.size} dni w celu. Kreska to cel dnia, z doliczonym treningiem" +
+                    (if (macro == Macro.PROTEIN) "; białko liczy się od 90% celu." else "; w celu znaczy ±10%."),
+            )
+        }
         val tips = b.weekReport.suggestions.mapNotNull {
             when (it) {
                 NutritionSuggestion.PROTEIN_LOW -> "W tym tygodniu białko częściej poniżej celu. Dorzuć porcję skyru albo odżywki."
@@ -173,4 +204,11 @@ private fun ProteinCard(b: BodySnapshot, kcalTarget: Int) {
         }
         if (tips.isNotEmpty()) WhyBox(tips.joinToString(" "))
     }
+}
+
+private fun macroLabel(m: Macro) = when (m) {
+    Macro.KCAL -> "Kcal"
+    Macro.PROTEIN -> "Białko"
+    Macro.FAT -> "Tłuszcz"
+    Macro.CARBS -> "Węgle"
 }
