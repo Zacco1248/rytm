@@ -20,13 +20,29 @@ android {
         applicationId = "com.zacco.rytm"
         minSdk = libs.versions.minSdkWear.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "0.0.1"
+        // CI podaje numer builda, żeby każde wydanie instalowało się jako aktualizacja.
+        versionCode = providers.gradleProperty("rytm.versionCode").orNull?.toInt() ?: 1
+        versionName = providers.gradleProperty("rytm.versionName").orNull ?: "0.0.1"
+    }
+
+    // Stały klucz wydań z sekretów repo (patrz docs/wydania.md). Bez niego release
+    // buduje się niepodpisany, a lokalne buildy debug działają jak dotąd.
+    val releaseKeystore = System.getenv("RYTM_KEYSTORE_PATH")?.let(::file)?.takeIf { it.exists() }
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("RYTM_KEYSTORE_PASSWORD")
+                keyAlias = "rytm"
+                keyPassword = System.getenv("RYTM_KEYSTORE_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 
