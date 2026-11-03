@@ -137,6 +137,7 @@ object WatchBridge {
                 WatchExercise(it.name, it.sets, it.reps.first, it.reps.last, it.weightKg, it.tempo, it.restSec, it.note)
             },
             stepKg = data.profile.equipment.stepKg,
+            maxKg = data.profile.equipment.maxKg,
             doneToday = today.setsToday.isNotEmpty(),
         )
     }

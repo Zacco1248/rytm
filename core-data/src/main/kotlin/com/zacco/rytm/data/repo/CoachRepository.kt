@@ -31,7 +31,11 @@ import java.time.LocalDate
 import java.util.UUID
 
 /** Zbiera dane z bazy w [CoachData] i zapisuje ręczne wpisy użytkownika. */
-class CoachRepository(private val db: RytmDatabase, private val profiles: ProfileStore) {
+class CoachRepository(
+    private val db: RytmDatabase,
+    private val profiles: ProfileStore,
+    private val overrides: DayOverrideStore? = null,
+) {
 
     /** Okno danych: 28 dni na obciążenie przewlekłe + bieżący tydzień + zapas na średnie wagi. */
     fun observe(today: LocalDate, lookbackDays: Long = LOOKBACK_DAYS): Flow<CoachData> {
@@ -65,7 +69,8 @@ class CoachRepository(private val db: RytmDatabase, private val profiles: Profil
                 lastSync = sync?.toLongOrNull()?.let(Instant::ofEpochMilli),
             )
         }
-        return combine(part2, dayNotes, profiles.profile, sets) { base, notes, profile, s ->
+        val overrideFlow = overrides?.all ?: kotlinx.coroutines.flow.flowOf(emptyList())
+        return combine(part2, dayNotes, profiles.profile, sets, overrideFlow) { base, notes, profile, s, o ->
             // Bez profilu (przed kreatorem) silnik liczy na wartościach domyślnych; ekran i tak pokazuje kreator.
             val p = profile ?: PersonalProfile()
             base.copy(
@@ -73,6 +78,7 @@ class CoachRepository(private val db: RytmDatabase, private val profiles: Profil
                 profile = p.toUserProfile(today),
                 habits = p.habits(),
                 sets = s.map { SetLog(it.workoutId, it.exercise, it.setIndex, it.reps, it.weightKg, it.rir, it.date) },
+                overrides = o,
             )
         }
     }

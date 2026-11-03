@@ -17,9 +17,10 @@ class RytmData private constructor(context: Context) {
     private val appContext = context.applicationContext
     val db: RytmDatabase = RytmDatabase.create(context)
     val profiles = ProfileStore(context, db)
-    val coach = CoachRepository(db, profiles)
+    val dayOverrides = com.zacco.rytm.data.repo.DayOverrideStore(appContext)
+    val coach = CoachRepository(db, profiles, dayOverrides)
     val usageStore = RoomUsageStore(db.llmUsage())
-    val ai = AiCoach(appContext, coach, usageStore)
+    val ai = AiCoach(appContext, coach, usageStore, dayOverrides)
     val phoneWorkout = com.zacco.rytm.data.workout.PhoneWorkoutStore(appContext)
 
     /** Tydzień z profilu (do mapowania treningów z Health Connect). */

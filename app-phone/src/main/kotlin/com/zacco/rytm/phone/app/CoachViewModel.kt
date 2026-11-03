@@ -312,7 +312,8 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         val today = state.value?.today ?: return
         val workout = today.plan.workout ?: return
         val profile = profile.value
-        val step = profile?.weightStepKg ?: profile?.toUserProfile(today.date)?.equipment?.stepKg ?: 1.0
+        val eq = profile?.toUserProfile(today.date)?.equipment
+        val step = profile?.weightStepKg ?: eq?.stepKg ?: 1.0
         data.phoneWorkout.set(
             com.zacco.rytm.domain.workout.WorkoutRun.start(
                 id = "phone-" + java.util.UUID.randomUUID(),
@@ -320,6 +321,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
                 type = WatchBridge.workoutType(today.plan),
                 stepKg = step,
                 nowMs = System.currentTimeMillis(),
+                maxKg = eq?.maxKg,
             ),
         )
     }
@@ -337,6 +339,32 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun cancelPhoneWorkout() = data.phoneWorkout.set(null)
+
+    // --- rozmowa z trenerem ---
+    val chat: StateFlow<List<com.zacco.rytm.ai.chat.ChatMessage>> = data.ai.chat
+    private val _chatRunning = MutableStateFlow(false)
+    val chatRunning: StateFlow<Boolean> = _chatRunning.asStateFlow()
+
+    fun sendChat(text: String) {
+        if (_chatRunning.value || text.isBlank()) return
+        _chatRunning.value = true
+        viewModelScope.launch {
+            try {
+                if (data.ai.chat(text)) WatchBridge.publish(getApplication())
+            } finally {
+                _chatRunning.value = false
+                refreshAiSpent()
+            }
+        }
+    }
+
+    fun clearChat() = data.ai.clearChat()
+
+    /** Wraca do planu z reguł na dziś (usuwa zmianę z rozmowy). */
+    fun resetTodayPlan() {
+        data.ai.resetToday()
+        viewModelScope.launch { WatchBridge.publish(getApplication()) }
+    }
 
     /** „Popraw z AI” w kreatorze; wynik wraca na główny wątek. */
     fun tweakPlan(p: PersonalProfile, request: String, onResult: (com.zacco.rytm.ai.plan.PlanTweakResult) -> Unit) {

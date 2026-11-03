@@ -37,6 +37,8 @@ data class CoachData(
     val sets: List<SetLog> = emptyList(),
     val habits: List<Habit> = DefaultHabits.all,
     val profile: UserProfile = UserProfile(),
+    /** Dni zmienione w rozmowie z trenerem AI. */
+    val overrides: List<DayOverride> = emptyList(),
     /** Kiedy ostatnio udała się synchronizacja z Health Connect. */
     val lastSync: Instant? = null,
 )

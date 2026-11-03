@@ -4,6 +4,10 @@ import android.content.Context
 import android.util.Log
 import com.zacco.rytm.ai.AiSettings
 import com.zacco.rytm.ai.CoachLlm
+import com.zacco.rytm.ai.chat.ChatContext
+import com.zacco.rytm.ai.chat.ChatMessage
+import com.zacco.rytm.ai.chat.ChatResult
+import com.zacco.rytm.ai.chat.CoachChatService
 import com.zacco.rytm.ai.plan.PlanTweakResult
 import com.zacco.rytm.ai.plan.PlanTweakService
 import com.zacco.rytm.domain.profile.PersonalProfile
@@ -45,6 +49,7 @@ class AiCoach(
     context: Context,
     private val coach: CoachRepository,
     private val usage: UsageStore,
+    private val overrides: com.zacco.rytm.data.repo.DayOverrideStore? = null,
 ) {
     private val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -64,6 +69,10 @@ class AiCoach(
 
     private val _morning = MutableStateFlow(loadList(KEY_MORNING, SavedMorningNote.serializer()))
     val morningNotes: StateFlow<List<SavedMorningNote>> = _morning.asStateFlow()
+
+    private val _chat = MutableStateFlow(loadList(KEY_CHAT, ChatMessage.serializer()))
+    /** Rozmowa z trenerem (ostatnie wiadomości). */
+    val chat: StateFlow<List<ChatMessage>> = _chat.asStateFlow()
 
     /** Zmienia się przy zapisie i usunięciu klucza, żeby ekran od razu wiedział, czy AI jest aktywne. */
     private val _hasKey = MutableStateFlow(keys.has(_settings.value.provider))
@@ -228,6 +237,56 @@ class AiCoach(
         return saved
     }
 
+    /**
+     * Wiadomość do trenera. Trener zna dane z dziś i tygodnia; gdy zmienia plan dnia, zapisujemy zmianę
+     * (plan, zegarek i trening od razu jej używają). Zwraca true, gdy plan dnia się zmienił.
+     */
+    suspend fun chat(message: String): Boolean {
+        val text = message.trim().take(1000)
+        if (text.isEmpty()) return false
+        val now = System.currentTimeMillis()
+        val history = _chat.value
+        appendChat(ChatMessage(CoachChatService.USER, text, now))
+        val llm = llm()
+        if (llm == null) {
+            appendChat(ChatMessage(CoachChatService.COACH, "Brak klucza AI. Dodaj go w zakładce Wieczór, a trener odpowie na podstawie Twoich danych.", now, error = true))
+            return false
+        }
+        val date = LocalDate.now(com.zacco.rytm.domain.time.RytmTime.zone)
+        val data = coach.observe(date).first()
+        val engine = CoachEngine()
+        val ctx = ChatContext.from(
+            data, engine.today(data), engine.week(data),
+            java.time.LocalTime.now(com.zacco.rytm.domain.time.RytmTime.zone).withNano(0).withSecond(0).toString(),
+        )
+        val result = runCatching { CoachChatService(llm, costGuard()).send(ctx, history, text, now) }
+            .getOrElse { e ->
+                Log.w(TAG, "Czat z trenerem nieudany", e)
+                ChatResult("Nie udało się zapytać trenera: ${e.message}", error = e.message)
+            }
+        var changed = false
+        result.override?.let { overrides?.set(it); changed = overrides != null }
+        if (result.reset) { overrides?.clear(date); changed = overrides != null }
+        appendChat(ChatMessage(CoachChatService.COACH, result.reply, System.currentTimeMillis(), changedPlan = changed, error = result.error != null))
+        return changed
+    }
+
+    fun clearChat() {
+        saveList(KEY_CHAT, ChatMessage.serializer(), emptyList())
+        _chat.value = emptyList()
+    }
+
+    /** „Przywróć plan”: usuwa zmianę z rozmowy na dziś. */
+    fun resetToday() {
+        overrides?.clear(LocalDate.now(com.zacco.rytm.domain.time.RytmTime.zone))
+    }
+
+    private fun appendChat(m: ChatMessage) {
+        val list = (_chat.value + m).takeLast(KEEP_CHAT)
+        saveList(KEY_CHAT, ChatMessage.serializer(), list)
+        _chat.value = list
+    }
+
     /** „Popraw z AI” w kreatorze: zmiana ustawień planu z prośby słowami. Bez klucza zwraca błąd do pokazania. */
     suspend fun tweakPlan(profile: PersonalProfile, request: String): PlanTweakResult {
         val llm = llm() ?: return PlanTweakResult(null, error = "Brak klucza AI. Dodasz go później w zakładce Wieczór; na razie popraw kroki ręcznie.")
@@ -276,5 +335,7 @@ class AiCoach(
         const val KEEP_WEEKS = 12
         const val KEY_MONTHLY = "monthly"
         const val KEEP_MONTHS = 12
+        const val KEY_CHAT = "chat"
+        const val KEEP_CHAT = 60
     }
 }
