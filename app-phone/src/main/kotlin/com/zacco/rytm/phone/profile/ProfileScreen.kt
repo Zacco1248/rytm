@@ -221,23 +221,32 @@ fun ProfileScreen(
     RytmCard {
         CardHeader("Stałe sporty i zajęcia")
         SmallText("Np. siatkówka we wtorki. Plan nie da ciężkich nóg dzień wcześniej, a dzień po nim będzie lżejszy.")
-        p.fixedSports.forEachIndexed { i, s ->
+        // Jeden sport może być w kilka dni: wpisy z tą samą nazwą i typem pokazujemy razem, dzień to przełącznik.
+        val groups = p.fixedSports.groupBy { it.name to it.type }.toList()
+        groups.forEach { (key, entries) ->
+            val (name, type) = key
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Field("Nazwa", s.name, KeyboardType.Text, Modifier.weight(1f)) { v ->
-                        p = p.copy(fixedSports = p.fixedSports.toMutableList().also { it[i] = s.copy(name = v.take(30)) })
+                    Field("Nazwa", name, KeyboardType.Text, Modifier.weight(1f)) { v ->
+                        p = p.copy(fixedSports = p.fixedSports.map { if (it.name == name && it.type == type) it.copy(name = v.take(30)) else it })
                     }
-                    RytmButton("Usuń") { p = p.copy(fixedSports = p.fixedSports.filterIndexed { j, _ -> j != i }) }
+                    RytmButton("Usuń") { p = p.copy(fixedSports = p.fixedSports.filterNot { it.name == name && it.type == type }) }
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     (1..7).forEach { d ->
-                        Pill(dayNames[d - 1], s.day == d) {
-                            p = p.copy(fixedSports = p.fixedSports.toMutableList().also { it[i] = s.copy(day = d) })
+                        val on = entries.any { it.day == d }
+                        Pill(dayNames[d - 1], on) {
+                            p = when {
+                                on && entries.size > 1 -> p.copy(fixedSports = p.fixedSports.filterNot { it.name == name && it.type == type && it.day == d })
+                                on -> p
+                                else -> p.copy(fixedSports = p.fixedSports + FixedSportEntry(d, name, type))
+                            }
                         }
                     }
                 }
             }
         }
+        if (groups.isNotEmpty()) SmallText("Zaznacz wszystkie dni, w które grasz; ten sam sport może być kilka razy w tygodniu.")
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             sportPresets.forEach { (name, type) ->
                 Pill("+ $name", false) {
@@ -285,13 +294,7 @@ fun ProfileScreen(
             Field("Cel kroków", steps, KeyboardType.Number, Modifier.weight(1f)) { steps = it.filter(Char::isDigit).take(5) }
             Field("Tętno max (jeśli znasz)", maxHr, KeyboardType.Number, Modifier.weight(1f)) { maxHr = it.filter(Char::isDigit).take(3) }
         }
-        SmallText("Pora zaśnięcia:")
-        Pills(
-            listOf("22–23" to 22 * 60, "23–24" to 23 * 60, "24–01" to 24 * 60, "01–02" to 25 * 60),
-            p.sleepOnsetFromMin,
-        ) { p = p.copy(sleepOnsetFromMin = it, sleepOnsetToMin = it + 60) }
-        SmallText("Ile snu:")
-        Pills(listOf("6–7 h" to 6, "7–8 h" to 7, "8–9 h" to 8), p.sleepHoursMin) { p = p.copy(sleepHoursMin = it, sleepHoursMax = it + 1) }
+        SleepPicker(p) { p = it }
     }
 
     RytmCard {
@@ -325,6 +328,9 @@ fun ProfileScreen(
         ) { p = p.copy(kcalFactorOverride = it) }
     }
 
+    if (!onboarding && initial != null && built != null && built != initial) {
+        SmallText("Masz niezapisane zmiany. Cele na ekranie Dziś zmienią się dopiero po zapisaniu.", color = Rytm.colors.warn)
+    }
     RytmButton(
         if (onboarding) "Zaczynamy" else "Zapisz profil",
         Modifier.fillMaxWidth(),

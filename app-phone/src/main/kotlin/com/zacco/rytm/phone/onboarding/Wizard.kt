@@ -51,6 +51,7 @@ import com.zacco.rytm.phone.profile.ActivityLevelPicker
 import com.zacco.rytm.phone.profile.Field
 import com.zacco.rytm.phone.profile.FocusPicker
 import com.zacco.rytm.phone.profile.GearChecklist
+import com.zacco.rytm.phone.profile.SleepPicker
 import com.zacco.rytm.phone.profile.Pills
 import com.zacco.rytm.phone.profile.activityLabel
 import com.zacco.rytm.phone.ui.components.CardHeader
@@ -345,6 +346,7 @@ private fun SummaryStep(
             }
         }
         ActivityLevelPicker(p, onChange)
+        SleepPicker(p, onChange)
         val t = NutritionCalculator.targets(p, today)
         WhyBox("Na dzień bez treningu: ${Format.int(t.kcal)} kcal · białko ${t.proteinG} g · tłuszcz ${t.fatG} g · węgle ${t.carbsG} g. Własne cele (np. z Fitatu) wpiszesz w profilu.")
     }

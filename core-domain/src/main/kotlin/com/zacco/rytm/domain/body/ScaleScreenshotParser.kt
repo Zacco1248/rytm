@@ -32,26 +32,27 @@ object ScaleScreenshotParser {
 
     private enum class Unit { KG, PCT, KCAL, PLAIN }
 
-    private data class Field(val key: String, val unit: Unit)
+    /** [range]: wartości poza zakresem odrzucamy (OCR potrafi przypisać liczbę z sąsiedniego kafelka). */
+    private data class Field(val key: String, val unit: Unit, val range: ClosedFloatingPointRange<Double> = 0.0..10_000.0)
 
     private val fields = mapOf(
-        "fatPct" to Field("procentowa zawartosc tkanki", Unit.PCT),
-        "bmi" to Field("bmi", Unit.PLAIN),
-        "score" to Field("punkt", Unit.PLAIN),
-        "waterKg" to Field("masa wody", Unit.KG),
-        "fatKg" to Field("masa tluszczu", Unit.KG),
-        "boneKg" to Field("zawartosc mineralow kosci", Unit.KG),
-        "proteinKg" to Field("masa bialka", Unit.KG),
-        "muscleKg" to Field("masa miesniowa", Unit.KG),
-        "musclePct" to Field("procent miesni", Unit.PCT),
-        "waterPct" to Field("woda w organizmie", Unit.PCT),
-        "proteinPct" to Field("bialko procentowe", Unit.PCT),
-        "skeletalKg" to Field("miesni szkieletowych", Unit.KG),
-        "visceral" to Field("tluszczu trzewnego", Unit.PLAIN),
-        "bmr" to Field("metabolizmu", Unit.KCAL),
-        "whr" to Field("obwodu pasa", Unit.PLAIN),
-        "leanKg" to Field("bez tkanki", Unit.KG),
-        "hr" to Field("tetno", Unit.PLAIN),
+        "fatPct" to Field("procentowa zawartosc tkanki", Unit.PCT, 2.0..70.0),
+        "bmi" to Field("bmi", Unit.PLAIN, 10.0..70.0),
+        "score" to Field("punkt", Unit.PLAIN, 0.0..100.0),
+        "waterKg" to Field("masa wody", Unit.KG, 10.0..150.0),
+        "fatKg" to Field("masa tluszczu", Unit.KG, 1.0..150.0),
+        "boneKg" to Field("zawartosc mineralow kosci", Unit.KG, 0.5..10.0),
+        "proteinKg" to Field("masa bialka", Unit.KG, 2.0..40.0),
+        "muscleKg" to Field("masa miesniowa", Unit.KG, 15.0..150.0),
+        "musclePct" to Field("procent miesni", Unit.PCT, 20.0..95.0),
+        "waterPct" to Field("woda w organizmie", Unit.PCT, 30.0..80.0),
+        "proteinPct" to Field("bialko procentowe", Unit.PCT, 5.0..30.0),
+        "skeletalKg" to Field("miesni szkieletowych", Unit.KG, 10.0..90.0),
+        "visceral" to Field("tluszczu trzewnego", Unit.PLAIN, 1.0..60.0),
+        "bmr" to Field("metabolizmu", Unit.KCAL, 800.0..4000.0),
+        "whr" to Field("obwodu pasa", Unit.PLAIN, 0.5..1.6),
+        "leanKg" to Field("bez tkanki", Unit.KG, 20.0..200.0),
+        "hr" to Field("tetno", Unit.PLAIN, 30.0..220.0),
     )
 
     private val number = """(\d{1,4}(?:[.,]\d{1,2})?)"""
@@ -72,12 +73,12 @@ object ScaleScreenshotParser {
             valueNear(lines, norm, idx, field)?.let { values[name] = it }
         }
 
-        val weight = weight(lines) ?: run {
-            // Zapasowo: masa beztłuszczowa + masa tłuszczu.
-            val lean = values["leanKg"]
-            val fat = values["fatKg"]
-            if (lean != null && fat != null) round1(lean + fat) else null
-        }
+        // Masa beztłuszczowa + masa tłuszczu = waga; służy do sprawdzenia odczytu dużej liczby na górze.
+        val lean = values["leanKg"]
+        val fat = values["fatKg"]
+        val sum = if (lean != null && fat != null) round1(lean + fat) else null
+        val taken = KG_FIELDS.mapNotNull { values[it] }.toSet()
+        val weight = weight(lines, taken, sum) ?: sum
 
         val composition = BodyComposition(
             muscleKg = values["muscleKg"],
@@ -125,7 +126,7 @@ object ScaleScreenshotParser {
                 Unit.KCAL -> kcal.find(lines[i])
                 Unit.PLAIN -> plain.find(lines[i])
             } ?: return null
-            return m.groupValues[1].replace(',', '.').toDoubleOrNull()
+            return m.groupValues[1].replace(',', '.').toDoubleOrNull()?.takeIf { it in field.range }
         }
 
         // Dwa kafelki w wierszu dają układ „wartość A, wartość B, etykieta A, etykieta B”:
@@ -148,20 +149,28 @@ object ScaleScreenshotParser {
         return null
     }
 
-    /** Duża liczba na górze ekranu: „78,7” albo rozbita przez OCR na „78” i „,7”. */
-    private fun weight(lines: List<String>): Double? {
-        val top = lines.take(12)
-        top.forEach { l ->
+    /**
+     * Duża liczba na górze ekranu: „78,7” albo rozbita przez OCR na „78” i „,7”. Kafelki składu ciała też mają
+     * liczby w kg (np. masa mięśniowa 60,9 kg), więc pomijamy wartości przypisane już do pól, a gdy znamy
+     * masę beztłuszczową i tłuszcz, bierzemy kandydata zgodnego z ich sumą (±1,5 kg).
+     */
+    private fun weight(lines: List<String>, taken: Set<Double>, sum: Double?): Double? {
+        val candidates = mutableListOf<Double>()
+        val split = Regex("""^(\d{2,3})\s*(kg)?$""", RegexOption.IGNORE_CASE)
+        val frac = Regex("""^(kg\s*)?[,.](\d)\s*(kg)?$""", RegexOption.IGNORE_CASE)
+        lines.forEachIndexed { i, l ->
+            val whole = split.find(l)?.groupValues?.get(1) ?: return@forEachIndexed
+            lines.drop(i + 1).take(3).firstNotNullOfOrNull { frac.find(it)?.groupValues?.get(2) }
+                ?.let { candidates += "$whole.$it".toDouble() }
+        }
+        lines.forEach { l ->
             Regex("""^(\d{2,3})[,.](\d)\s*(kg)?$""", RegexOption.IGNORE_CASE).find(l)?.let { m ->
-                return "${m.groupValues[1]}.${m.groupValues[2]}".toDouble().takeIf { it in 30.0..250.0 }
+                candidates += "${m.groupValues[1]}.${m.groupValues[2]}".toDouble()
             }
         }
-        top.forEachIndexed { i, l ->
-            val whole = Regex("""^(\d{2,3})\s*(kg)?$""", RegexOption.IGNORE_CASE).find(l)?.groupValues?.get(1) ?: return@forEachIndexed
-            val frac = top.drop(i + 1).take(3).firstNotNullOfOrNull { Regex("""^(kg\s*)?[,.](\d)\s*(kg)?$""", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(2) }
-            if (frac != null) return "$whole.$frac".toDouble().takeIf { it in 30.0..250.0 }
-        }
-        return null
+        val plausible = candidates.filter { it in 30.0..250.0 && it !in taken }
+        if (sum != null) return plausible.firstOrNull { kotlin.math.abs(it - sum) <= 1.5 }
+        return plausible.firstOrNull()
     }
 
     private fun measuredAt(text: String): LocalDateTime? = dateTime.find(text)?.let { m ->
@@ -176,4 +185,6 @@ object ScaleScreenshotParser {
             .trim()
 
     private fun round1(v: Double) = Math.round(v * 10) / 10.0
+
+    private val KG_FIELDS = listOf("waterKg", "fatKg", "boneKg", "proteinKg", "muscleKg", "skeletalKg", "leanKg")
 }

@@ -150,7 +150,7 @@ private fun LoadCard(w: WeekSnapshot) {
     val c = Rytm.colors
     val max = (w.days.maxOfOrNull { maxOf(it.actualLoad, it.plannedLoad) } ?: 0).coerceAtLeast(300).toFloat()
     RytmCard {
-        CardHeader("Obciążenie") { SmallText("sRPE = RPE × min") }
+        CardHeader("Obciążenie", help = "Obciążenie (sRPE) = RPE × minuty. Godzina na RPE 8 to 480, a 30 min spokojnego spaceru na RPE 2 to 60. Słupki pokazują dni tygodnia; jaśniejsze z „~” to plan, pełne to to, co już zrobione. RPE to ocena wysiłku 1–10 po treningu.") { SmallText("sRPE = RPE × min") }
         Row(
             Modifier.fillMaxWidth().semantics { contentDescription = "Obciążenie dzienne sRPE w tym tygodniu" },
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -221,7 +221,7 @@ private fun AcwrCard(w: WeekSnapshot) {
         AcwrZone.HIGH -> "wysokie" to ChipTone.BAD
     }
     RytmCard {
-        CardHeader("ACWR") {
+        CardHeader("ACWR", help = "ACWR porównuje obciążenie z ostatnich 7 dni ze średnim tygodniem z 28 dni. 0,8–1,3 to strefa bezpieczna: organizm jest przyzwyczajony do takiej pracy. Powyżej 1,5 obciążenie rośnie za szybko i rośnie ryzyko przeciążenia, więc plan wymusza lżejsze dni. Poniżej 0,8 forma może spadać.") {
             Chip((load.acwr?.let { Format.dec(it, 2) + " · " } ?: "") + label, tone)
         }
         val lo = 0.5f

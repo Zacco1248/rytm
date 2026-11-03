@@ -124,6 +124,38 @@ class ScaleScreenshotParserTest {
     }
 
     @Test
+    fun `tiles read before the big weight do not become the weight`() {
+        // OCR zaczyna od kafelków, a duża waga trafia na koniec i jest rozbita na „78” i „7” bez przecinka.
+        val text = """
+            60,9kg
+            Masa mięśniowa
+            14,2kg
+            Masa tłuszczu
+            64,5kg
+            Waga ciała bez tkanki tłuszczowej
+            80
+            Punkty
+            22,5 ↓0,2
+            BMI
+            1,1 ↓0,1
+            Szacowane proporcje obwodu pasa do bioder
+            18,50
+            78,7 kg
+        """.trimIndent()
+        val r = assertNotNull(ScaleScreenshotParser.parse(text))
+        assertEquals(78.7, r.weightKg)
+        assertEquals(60.9, r.composition.muscleKg)
+        assertEquals(22.5, r.composition.bmi)
+        assertEquals(1.1, r.composition.waistHipRatio)
+    }
+
+    @Test
+    fun `weight without big number comes from lean plus fat, not from muscle`() {
+        val r = assertNotNull(ScaleScreenshotParser.parse("60,9kg\nMasa mięśniowa\n14,2kg\nMasa tłuszczu\n64,5kg\nWaga ciała bez tkanki tłuszczowej"))
+        assertEquals(78.7, r.weightKg)
+    }
+
+    @Test
     fun `unrelated text gives nothing`() {
         assertNull(ScaleScreenshotParser.parse("Lista zakupów\nmleko\nchleb"))
     }

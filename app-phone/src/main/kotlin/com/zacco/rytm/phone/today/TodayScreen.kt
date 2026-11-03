@@ -46,6 +46,7 @@ import com.zacco.rytm.phone.ui.components.Bar
 import com.zacco.rytm.phone.ui.components.ButtonRow
 import com.zacco.rytm.phone.ui.components.CardHeader
 import com.zacco.rytm.phone.ui.components.Chip
+import com.zacco.rytm.phone.ui.components.Divider
 import com.zacco.rytm.phone.ui.components.ChipTone
 import com.zacco.rytm.phone.ui.components.Ring
 import com.zacco.rytm.phone.ui.components.RytmButton
@@ -132,7 +133,7 @@ private fun ReadinessCard(s: TodaySnapshot, onCheckIn: () -> Unit) {
     }
     var showCalibration by remember { mutableStateOf(false) }
     RytmCard {
-        CardHeader("Gotowość") {
+        CardHeader("Gotowość", help = "Gotowość 0–100 mówi, na ile organizm jest dziś gotowy na wysiłek. Składa się ze snu, tętna spoczynkowego i HRV na tle Twoich ostatnich dni, check-inu (energia, nastrój, co boli) i wczorajszego obciążenia. Powyżej 70 pełny trening, 40–70 umiarkowanie, poniżej 40 lżej albo odpoczynek. Pierwsze dni to kalibracja, bo Rytm uczy się Twoich norm.") {
             val cal = s.calibration
             if (r.calibrating && cal != null) {
                 Chip("Kalibracja ${cal.restingHrDays.coerceAtMost(cal.needDays)}/${cal.needDays} " + if (showCalibration) "▴" else "▾", ChipTone.WARN) {
@@ -187,6 +188,14 @@ private fun ReadinessCard(s: TodaySnapshot, onCheckIn: () -> Unit) {
             )
         }
         if (s.restingHrFromDay) SmallText("Brak snu z zegarka, więc tętno spoczynkowe liczę z najspokojniejszych 30 min dnia.")
+    }
+}
+
+@Composable
+private fun KcalRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = Rytm.type.small, color = Rytm.colors.muted)
+        Text(value, style = Rytm.type.small, color = Rytm.colors.ink)
     }
 }
 
@@ -428,7 +437,11 @@ private fun ActivityTodayCard(s: TodaySnapshot, onAdd: () -> Unit) {
     val c = Rytm.colors
     val acts = s.activitiesToday
     RytmCard {
-        CardHeader("Aktywność dziś") {
+        CardHeader(
+            "Aktywność dziś",
+            help = "Do celu jedzenia doliczam ${(s.trainingKcalFactor * 100).toInt()}% kcal z treningów (zegarki zwykle zawyżają spalanie), bez spacerów, bo te są już w ruchu z profilu. " +
+                "Kcal z „~” to szacunek z czasu i RPE, gdy zegarek ich nie podał. „Cały dzień” to całe spalanie dnia, razem z przemianą spoczynkową.",
+        ) {
             Chip(if (s.activityKcal > 0) "${Format.int(s.activityKcal)} kcal" else "+ dodaj", if (s.activityKcal > 0) ChipTone.GOOD else ChipTone.ACCENT, onClick = onAdd)
         }
         if (acts.isEmpty()) {
@@ -458,21 +471,10 @@ private fun ActivityTodayCard(s: TodaySnapshot, onAdd: () -> Unit) {
             }
         }
         if (acts.isNotEmpty()) {
-            val pct = (s.trainingKcalFactor * 100).toInt()
-            SmallText(
-                buildString {
-                    append("Aktywności dziś: ok. ${Format.int(s.activityKcal)} kcal. ")
-                    if (s.trainingKcal > 0) {
-                        append("Do celu jedzenia doliczam ${Format.int(s.trainingKcal)} kcal: $pct% kcal z treningów, bez spacerów, bo zegarki zwykle zawyżają spalanie.")
-                    } else {
-                        append("Spacery nie podnoszą celu jedzenia, bo są już w poziomie ruchu z profilu.")
-                    }
-                    if (s.estimatedKcalIds.isNotEmpty()) append(" Kcal z „~” to szacunek z czasu i RPE.")
-                },
-            )
-        }
-        s.night?.totalKcal?.takeIf { it > 0 }?.let {
-            SmallText("Zegarek liczy na dziś łącznie ${Format.int(it)} kcal, razem z przemianą spoczynkową (to, co spalasz, nic nie robiąc).")
+            Divider()
+            KcalRow("W aktywnościach", "${Format.int(s.activityKcal)} kcal")
+            KcalRow("Doliczone do celu jedzenia", if (s.trainingKcal > 0) "+${Format.int(s.trainingKcal)} kcal" else "0 kcal")
+            s.night?.totalKcal?.takeIf { it > 0 }?.let { KcalRow("Cały dzień wg zegarka", "${Format.int(it)} kcal") }
         }
     }
 }

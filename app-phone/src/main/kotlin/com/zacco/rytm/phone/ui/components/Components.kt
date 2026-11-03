@@ -4,6 +4,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,10 +53,31 @@ fun RytmCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() 
 
 /** Nagłówek karty (wersaliki, muted) z opcjonalnym elementem po prawej. */
 @Composable
-fun CardHeader(title: String, trailing: @Composable RowScope.() -> Unit = {}) {
+fun CardHeader(title: String, help: String? = null, trailing: @Composable RowScope.() -> Unit = {}) {
+    var open by androidx.compose.runtime.saveable.rememberSaveable(title) { androidx.compose.runtime.mutableStateOf(false) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(title.uppercase(), style = Rytm.type.cardTitle, color = Rytm.colors.muted)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(title.uppercase(), style = Rytm.type.cardTitle, color = Rytm.colors.muted)
+            if (help != null) HelpDot(open) { open = !open }
+        }
         Row(verticalAlignment = Alignment.CenterVertically, content = trailing)
+    }
+    if (help != null && open) WhyBox(help)
+}
+
+/** Mały znak zapytania obok nazwy; po dotknięciu pokazuje wyjaśnienie pojęcia. */
+@Composable
+fun HelpDot(open: Boolean, onClick: () -> Unit) {
+    val c = Rytm.colors
+    Box(
+        Modifier
+            .size(22.dp)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(if (open) c.accent else c.soft)
+            .clickable(onClickLabel = "Wyjaśnienie", onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("?", style = Rytm.type.tiny, color = if (open) c.bg else c.ink)
     }
 }
 

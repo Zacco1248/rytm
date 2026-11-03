@@ -83,3 +83,16 @@ internal fun ActivityLevelPicker(p: PersonalProfile, onChange: (PersonalProfile)
         }
     }
 }
+
+/** Cel snu: pora zaśnięcia (okno 1 h) i ile godzin. Z niego gotowość ocenia noc i liczy porę „do łóżka”. */
+@Composable
+internal fun SleepPicker(p: PersonalProfile, onChange: (PersonalProfile) -> Unit) {
+    Text("Sen", style = Rytm.type.bodyStrong, color = Rytm.colors.ink)
+    SmallText("Kiedy zwykle zasypiasz:")
+    Pills(
+        listOf("22–23" to 22 * 60, "23–24" to 23 * 60, "24–01" to 24 * 60, "01–02" to 25 * 60),
+        p.sleepOnsetFromMin,
+    ) { onChange(p.copy(sleepOnsetFromMin = it, sleepOnsetToMin = it + 60)) }
+    SmallText("Ile snu potrzebujesz:")
+    Pills(listOf("6–7 h" to 6, "7–8 h" to 7, "8–9 h" to 8), p.sleepHoursMin) { onChange(p.copy(sleepHoursMin = it, sleepHoursMax = it + 1)) }
+}
