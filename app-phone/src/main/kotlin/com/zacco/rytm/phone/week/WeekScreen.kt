@@ -102,16 +102,19 @@ private fun WeeklyReportCard(today: LocalDate, saved: SavedWeeklyReport?, runnin
             }
         }
         if (fresh == null) {
-            SmallText("Raport liczy się sam w niedzielę o 20:00: trendy, zależności (np. sen po dniach ze sportem), sylwetka i 1–3 sugestie na kolejny tydzień.")
+            SmallText("Raport liczy się sam w niedzielę o 20:00: co poszło, co nie, trendy, zależności (np. sen po dniach ze sportem), sylwetka i plan na kolejny tydzień.")
         } else {
             val r = fresh.report
             Text(r.summary, style = Rytm.type.small, color = c.ink)
             if (expanded) {
+                if (r.wins.isNotEmpty()) ReportList("Co poszło", r.wins)
+                if (r.misses.isNotEmpty()) ReportList("Co nie wyszło", r.misses)
                 if (r.trends.isNotEmpty()) ReportList("Trendy", r.trends)
                 if (r.correlations.isNotEmpty()) ReportList("Zależności", r.correlations)
                 Text("Sylwetka i siła", style = Rytm.type.bodyStrong, color = c.ink)
                 SmallText(r.body)
                 Text("Na kolejny tydzień", style = Rytm.type.bodyStrong, color = c.ink)
+                if (r.nextWeek.isNotBlank()) SmallText(r.nextWeek)
                 r.suggestions.forEachIndexed { i, t -> WhyBox("${i + 1}. $t") }
                 fresh.error?.let { SmallText("AI niedostępne, raport z reguł: $it", color = c.warn) }
                 if (fresh.costUsd > 0) SmallText("Koszt: %.3f USD".format(java.util.Locale.ROOT, fresh.costUsd))

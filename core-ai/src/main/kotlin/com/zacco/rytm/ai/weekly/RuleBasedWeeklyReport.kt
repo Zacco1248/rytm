@@ -45,8 +45,27 @@ object RuleBasedWeeklyReport {
             if (i.strengthSessions < i.strengthRequired) add("Zabrakło ${i.strengthRequired - i.strengthSessions} sesji siłowych: w przyszłym tygodniu zaplanuj je na początek tygodnia.")
             if (i.avgSleepMin != null && i.avgSleepMin < 420) add("Sen poniżej 7 h: kładź się 20–30 min wcześniej, najlepiej o stałej porze.")
             if (i.nutritionDaysLogged < 5) add("Zapisuj jedzenie przez co najmniej 5 dni, żeby wnioski o żywieniu były pewne.")
-            if (isEmpty()) add("Dobry tydzień: utrzymaj rytm i zwiększ ciężar tam, gdzie zrobiłeś górę zakresu powtórzeń.")
+            if (isEmpty()) add("Dobry tydzień: utrzymaj rytm i zwiększ ciężar tam, gdzie wpada górny zakres powtórzeń.")
         }.take(3)
-        return WeeklyReport(summary, trends, correlations.take(4), body.ifBlank { "Brak danych o sylwetce." }, suggestions)
+        val wins = buildList {
+            if (i.strengthRequired > 0 && i.strengthSessions >= i.strengthRequired) add("Wszystkie sesje siłowe z planu: ${i.strengthSessions}/${i.strengthRequired}.")
+            if (i.avgSleepMin != null && i.avgSleepMin >= 420) add("Sen średnio ${h(i.avgSleepMin)}, w normie.")
+            if (i.avgSteps != null && i.stepsTarget > 0 && i.avgSteps >= i.stepsTarget) add("Kroki średnio ${i.avgSteps} dziennie, powyżej celu.")
+            if (i.nutritionDaysLogged >= 5 && i.proteinDaysBelowTarget <= 1) add("Białko w celu prawie codziennie.")
+            if (i.strengthTrend == "UP") add("Siła rośnie.")
+        }.take(3).ifEmpty { listOf("Tydzień zapisany: z tych danych Rytm lepiej dopasuje plan.") }
+        val misses = buildList {
+            if (i.strengthSessions < i.strengthRequired) add("Siła ${i.strengthSessions}/${i.strengthRequired}: zabrakło ${i.strengthRequired - i.strengthSessions}.")
+            if (i.avgSleepMin != null && i.avgSleepMin < 420) add("Sen średnio ${h(i.avgSleepMin)}, poniżej 7 h.")
+            if (i.nutritionDaysLogged >= 3 && i.proteinDaysBelowTarget >= 3) add("Białko poniżej celu w ${i.proteinDaysBelowTarget} dni.")
+            if (i.avgSteps != null && i.stepsTarget > 0 && i.avgSteps < i.stepsTarget * 0.8) add("Kroki średnio ${i.avgSteps}, cel ${i.stepsTarget}.")
+        }.take(3)
+        val nextWeek = buildString {
+            val key = i.nextWeekPlan.filterNot { it.substringAfter(": ").lowercase().let { t -> t.startsWith("odpoczynek") || t.startsWith("regeneracja") } }
+            if (key.isNotEmpty()) append("W planie: ${key.joinToString("; ")}.")
+            i.nextWeekDeload?.let { append(" $it") }
+            i.goals.firstOrNull()?.let { append(" Cel: $it") }
+        }.trim().ifBlank { "Plan na kolejny tydzień pojawi się w zakładce Tydzień." }
+        return WeeklyReport(summary, trends, correlations.take(4), body.ifBlank { "Brak danych o sylwetce." }, suggestions, wins, misses, nextWeek)
     }
 }

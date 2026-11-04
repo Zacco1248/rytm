@@ -40,6 +40,9 @@ class WeeklyTest {
         val report = RuleBasedWeeklyReport.build(input).validate()
         assertTrue(report.suggestions.isNotEmpty())
         assertTrue(report.correlations.any { it.contains("dniach ze sportem") }, report.correlations.toString())
+        assertTrue(report.wins.isNotEmpty())
+        assertTrue(report.misses.any { it.startsWith("Siła 1/") }, report.misses.toString())
+        assertTrue(report.nextWeek.startsWith("W planie:"), report.nextWeek)
     }
 
     @Test

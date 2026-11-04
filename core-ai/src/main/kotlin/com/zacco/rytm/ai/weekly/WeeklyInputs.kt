@@ -118,6 +118,11 @@ object WeeklyInputs {
             reflections = reflections.map { it.take(300) }.take(7),
             nutritionFlags = nutrition.suggestions.map { it.name },
             nextWeekPlan = nextWeek.days.map { it.date.dayOfWeek.getDisplayName(TextStyle.SHORT, pl) + ": " + it.plan.title },
+            nextWeekDeload = nextWeek.deload?.text,
+            goals = data.profile.goals.map { g ->
+                val p = com.zacco.rytm.domain.goals.Goals.progress(g, weekEnd, data.weighIns, data.sets)
+                "${g.title}: ${(p.share * 100).roundToInt()}%. ${p.note}"
+            },
         )
     }
 }

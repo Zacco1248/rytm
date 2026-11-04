@@ -64,4 +64,8 @@ data class WeeklyInput(
     /** Sugestie z silnika żywienia (PROTEIN_LOW, INCREASE_CALORIES…). */
     val nutritionFlags: List<String>,
     val nextWeekPlan: List<String>,
+    /** Lżejszy tydzień w planie na kolejny tydzień (powód), jeśli wypada. */
+    val nextWeekDeload: String? = null,
+    /** Cele użytkownika z postępem, np. „10 × Podciąganie: 60%, prognoza 12 stycznia”. */
+    val goals: List<String> = emptyList(),
 )
