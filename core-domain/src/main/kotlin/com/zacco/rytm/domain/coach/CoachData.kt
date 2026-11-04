@@ -39,6 +39,8 @@ data class CoachData(
     val profile: UserProfile = UserProfile(),
     /** Dni zmienione w rozmowie z trenerem AI. */
     val overrides: List<DayOverride> = emptyList(),
+    /** Plany siłowe tygodni od trenera AI (obowiązują, gdy zatwierdzone). */
+    val weekPlans: List<WeekPlan> = emptyList(),
     /** Kiedy ostatnio udała się synchronizacja z Health Connect. */
     val lastSync: Instant? = null,
 )

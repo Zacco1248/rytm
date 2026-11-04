@@ -61,6 +61,9 @@ fun WeekScreen(
     weekly: SavedWeeklyReport? = null,
     weeklyRunning: Boolean = false,
     onRunWeekly: () -> Unit = {},
+    weekPlans: List<com.zacco.rytm.domain.coach.WeekPlan> = emptyList(),
+    onAcceptPlan: (String, Boolean) -> Unit = { _, _ -> },
+    onDropPlan: (String) -> Unit = {},
     onRate: (WeekDay) -> Unit,
 ) {
     val w = state.week
@@ -79,9 +82,56 @@ fun WeekScreen(
         }
     }
     WeeklyReportCard(state.today.date, weekly, weeklyRunning, onRunWeekly)
+    // Plan na ten albo kolejny tydzień (w niedzielę propozycja dotyczy następnego).
+    weekPlans.firstOrNull { p -> runCatching { !LocalDate.parse(p.weekStart).plusDays(6).isBefore(state.today.date) }.getOrDefault(false) }
+        ?.let { WeekPlanCard(it, state.today.date, onAcceptPlan, onDropPlan) }
     LoadCard(w)
     AcwrCard(w)
     PlanCard(state, onToggleCancelled, onRate)
+}
+
+// --- plan siłowy od trenera ---
+
+@Composable
+private fun WeekPlanCard(
+    p: com.zacco.rytm.domain.coach.WeekPlan,
+    today: LocalDate,
+    onAccept: (String, Boolean) -> Unit,
+    onDrop: (String) -> Unit,
+) {
+    val c = Rytm.colors
+    var expanded by remember(p.createdAt) { mutableStateOf(!p.accepted) }
+    val start = LocalDate.parse(p.weekStart)
+    RytmCard {
+        CardHeader(
+            "Plan siłowy od trenera",
+            help = "W niedzielę trener AI proponuje sesje siłowe na kolejny tydzień: dobiera ćwiczenia i liczbę serii pod Twoje cele, zastoje " +
+                "i to, jak minął tydzień. Ćwiczenia wybiera tylko z tych, na które masz sprzęt, a ciężar i tak liczy progresja z dziennika serii. " +
+                "Plan obowiązuje dopiero po przyjęciu; bez tego zostaje plan z reguł.",
+        ) {
+            Chip(
+                (if (p.accepted) "przyjęty" else "propozycja") + if (expanded) " ▴" else " ▾",
+                if (p.accepted) ChipTone.GOOD else ChipTone.ACCENT,
+            ) { expanded = !expanded }
+        }
+        SmallText(Format.range(start, start.plusDays(6)) + ". " + p.reason)
+        if (expanded) {
+            p.days.forEach { d ->
+                val date = runCatching { LocalDate.parse(d.date) }.getOrNull()
+                Text((date?.let { Format.dayShortLabel(it, today) + " · " } ?: "") + d.title, style = Rytm.type.bodyStrong, color = c.ink)
+                if (d.note.isNotBlank()) SmallText(d.note)
+                d.exercises.forEach { e -> SmallText("• ${e.name}: ${e.sets} × ${e.repsMin}–${e.repsMax}" + (e.note?.let { " · $it" } ?: "")) }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (p.accepted) {
+                RytmButton("Wróć do planu z reguł", Modifier.weight(1f)) { onAccept(p.weekStart, false) }
+            } else {
+                RytmButton("Przyjmij", Modifier.weight(1f), primary = true) { onAccept(p.weekStart, true) }
+                RytmButton("Odrzuć", Modifier.weight(1f)) { onDrop(p.weekStart) }
+            }
+        }
+    }
 }
 
 // --- raport tygodniowy ---
