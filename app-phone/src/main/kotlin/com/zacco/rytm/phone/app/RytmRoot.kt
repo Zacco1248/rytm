@@ -98,7 +98,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     var profileOpen by rememberSaveable { mutableStateOf(false) }
     // Na starcie kreator krok po kroku; „Wolę jeden formularz” przełącza na pełny profil.
     var fullForm by rememberSaveable { mutableStateOf(false) }
-    var workoutOpen by rememberSaveable { mutableStateOf(true) }
+    // Po włączeniu aplikacji zawsze ekran główny; trwający trening otwiera się z karty planu.
+    var workoutOpen by rememberSaveable { mutableStateOf(false) }
     var chatOpen by rememberSaveable { mutableStateOf(false) }
     var entriesOpen by rememberSaveable { mutableStateOf(false) }
     var replaceWeighIn by rememberSaveable { mutableStateOf<String?>(null) }
@@ -118,6 +119,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     val morningNotes by vm.morningNotes.collectAsStateWithLifecycle()
     val weeklyReports by vm.weeklyReports.collectAsStateWithLifecycle()
     val weeklyRunning by vm.weeklyRunning.collectAsStateWithLifecycle()
+    val weekPlans by vm.weekPlans.collectAsStateWithLifecycle()
     val monthlyReports by vm.monthlyReports.collectAsStateWithLifecycle()
     val monthlyRunning by vm.monthlyRunning.collectAsStateWithLifecycle()
     val aiSpent by vm.aiSpent.collectAsStateWithLifecycle()
@@ -331,6 +333,9 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         weekly = weeklyReports.firstOrNull(),
                         weeklyRunning = weeklyRunning,
                         onRunWeekly = vm::runWeekly,
+                        weekPlans = weekPlans,
+                        onAcceptPlan = vm::acceptWeekPlan,
+                        onDropPlan = vm::dropWeekPlan,
                     ) { day ->
                         rpeDate = day.date.toString()
                         sheet = Sheet.RPE

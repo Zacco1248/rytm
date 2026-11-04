@@ -201,7 +201,31 @@ class AiCoach(
         val list = (listOf(saved) + _weekly.value.filterNot { it.weekEnd == saved.weekEnd }).sortedByDescending { it.weekEnd }.take(KEEP_WEEKS)
         saveList(KEY_WEEKLY, SavedWeeklyReport.serializer(), list)
         _weekly.value = list
+        if (result.fromLlm) runCatching { proposeWeekPlan(data, weekEnd, input) }.onFailure { Log.w(TAG, "Plan tygodnia nieudany", it) }
         return saved
+    }
+
+    /** Propozycje planu siłowego od trenera (ostatnie tygodnie); obowiązują po zatwierdzeniu. */
+    val weekPlans: StateFlow<List<com.zacco.rytm.domain.coach.WeekPlan>> =
+        overrides?.weekPlans ?: MutableStateFlow(emptyList<com.zacco.rytm.domain.coach.WeekPlan>()).asStateFlow()
+
+    fun acceptWeekPlan(weekStart: String, accepted: Boolean) { overrides?.setAccepted(weekStart, accepted) }
+
+    fun dropWeekPlan(weekStart: String) { overrides?.removePlan(weekStart) }
+
+    /**
+     * Plan siłowy na tydzień po [weekEnd] od trenera AI (model tygodniowy). Gdy propozycja na ten tydzień
+     * już jest zatwierdzona, nie liczymy jej ponownie.
+     */
+    private suspend fun proposeWeekPlan(data: com.zacco.rytm.domain.coach.CoachData, weekEnd: LocalDate, week: com.zacco.rytm.ai.weekly.WeeklyInput) {
+        val store = overrides ?: return
+        val l = llm() ?: return
+        val nextMonday = weekEnd.plusDays(1).with(java.time.DayOfWeek.MONDAY)
+        if (store.weekPlans.value.any { it.weekStart == nextMonday.toString() && it.accepted }) return
+        val service = com.zacco.rytm.ai.weekplan.WeekPlanService(l, costGuard())
+        val r = service.propose(com.zacco.rytm.ai.weekplan.WeekPlanService.input(data, weekEnd, week), nextMonday)
+        r.error?.let { Log.w(TAG, "Plan tygodnia: $it") }
+        r.plan?.let { store.putPlan(it) }
     }
 
     /**

@@ -30,10 +30,12 @@ data class ScaleReading(
  */
 object ScaleScreenshotParser {
 
-    private enum class Unit { KG, PCT, KCAL, PLAIN }
+    internal enum class Unit { KG, PCT, KCAL, PLAIN }
 
     /** [range]: wartości poza zakresem odrzucamy (OCR potrafi przypisać liczbę z sąsiedniego kafelka). */
-    private data class Field(val key: String, val unit: Unit, val range: ClosedFloatingPointRange<Double> = 0.0..10_000.0)
+    internal data class Field(val key: String, val unit: Unit, val range: ClosedFloatingPointRange<Double> = 0.0..10_000.0)
+
+    internal val fieldSpecs get() = fields
 
     private val fields = mapOf(
         "fatPct" to Field("procentowa zawartosc tkanki", Unit.PCT, 2.0..70.0),
@@ -62,8 +64,22 @@ object ScaleScreenshotParser {
     private val plain = Regex("""^\s*$number(?![.,\d])(?!\s*(?:kg|%|kcal))""", RegexOption.IGNORE_CASE)
     private val dateTime = Regex("""(\d{2})[/.](\d{2})[/.](\d{4})\s+(\d{1,2}):(\d{2})""")
 
+    /** Wartość z linii w jednostce pola i w jego zakresie. */
+    internal fun read(line: String, field: Field): Double? {
+        val m = when (field.unit) {
+            Unit.KG -> kg.find(line)
+            Unit.PCT -> pct.find(line)
+            Unit.KCAL -> kcal.find(line)
+            Unit.PLAIN -> plain.find(line)
+        } ?: return null
+        return m.groupValues[1].replace(',', '.').toDoubleOrNull()?.takeIf { it in field.range }
+    }
+
     fun parse(text: String): ScaleReading? {
-        val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        // „Sugestie dotyczące wagi ciała” (np. „Standardowa waga 74,9 kg”) to nie pomiar: odcinamy je.
+        val all = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val cut = all.indexOfFirst { normalize(it).startsWith("sugestie") || normalize(it).startsWith("standardowa waga") }
+        val lines = if (cut > 0) all.take(cut) else all
         if (lines.isEmpty()) return null
         val norm = lines.map(::normalize)
         val values = mutableMapOf<String, Double>()
@@ -118,16 +134,7 @@ object ScaleScreenshotParser {
         i in norm.indices && fields.values.any { f -> if (f.key == "bmi") norm[i] == "bmi" else norm[i].contains(f.key) }
 
     private fun valueNear(lines: List<String>, norm: List<String>, idx: Int, field: Field): Double? {
-        fun read(i: Int): Double? {
-            if (i !in lines.indices) return null
-            val m = when (field.unit) {
-                Unit.KG -> kg.find(lines[i])
-                Unit.PCT -> pct.find(lines[i])
-                Unit.KCAL -> kcal.find(lines[i])
-                Unit.PLAIN -> plain.find(lines[i])
-            } ?: return null
-            return m.groupValues[1].replace(',', '.').toDoubleOrNull()?.takeIf { it in field.range }
-        }
+        fun read(i: Int): Double? = if (i in lines.indices) read(lines[i], field) else null
 
         // Dwa kafelki w wierszu dają układ „wartość A, wartość B, etykieta A, etykieta B”:
         // dla k-tej etykiety z ciągu etykiet bierzemy k-tą wartość z ciągu tuż nad nim.
@@ -157,7 +164,7 @@ object ScaleScreenshotParser {
     private fun weight(lines: List<String>, taken: Set<Double>, sum: Double?): Double? {
         val candidates = mutableListOf<Double>()
         val split = Regex("""^(\d{2,3})\s*(kg)?$""", RegexOption.IGNORE_CASE)
-        val frac = Regex("""^(kg\s*)?[,.](\d)\s*(kg)?$""", RegexOption.IGNORE_CASE)
+        val frac = Regex("""^(kg\s*)?[,.]\s*(\d)\s*(kg)?$""", RegexOption.IGNORE_CASE)
         lines.forEachIndexed { i, l ->
             val whole = split.find(l)?.groupValues?.get(1) ?: return@forEachIndexed
             lines.drop(i + 1).take(3).firstNotNullOfOrNull { frac.find(it)?.groupValues?.get(2) }

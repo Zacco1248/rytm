@@ -70,7 +70,8 @@ class CoachRepository(
                 lastSync = sync?.toLongOrNull()?.let(Instant::ofEpochMilli),
             )
         }
-        val overrideFlow = overrides?.all ?: kotlinx.coroutines.flow.flowOf(emptyList())
+        val overrideFlow = overrides?.let { o -> combine(o.all, o.weekPlans) { a, b -> a to b } }
+            ?: kotlinx.coroutines.flow.flowOf(emptyList<com.zacco.rytm.domain.coach.DayOverride>() to emptyList())
         return combine(part2, dayNotes, profiles.profile, sets, overrideFlow) { base, notes, profile, s, o ->
             // Bez profilu (przed kreatorem) silnik liczy na wartościach domyślnych; ekran i tak pokazuje kreator.
             val p = profile ?: PersonalProfile()
@@ -79,7 +80,8 @@ class CoachRepository(
                 profile = p.toUserProfile(today),
                 habits = p.habits(),
                 sets = s.map { SetLog(it.workoutId, it.exercise, it.setIndex, it.reps, it.weightKg, it.rir, it.date) },
-                overrides = o,
+                overrides = o.first,
+                weekPlans = o.second.filter { it.accepted },
             )
         }
     }

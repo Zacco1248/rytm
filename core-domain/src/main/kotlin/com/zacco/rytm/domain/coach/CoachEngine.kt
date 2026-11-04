@@ -94,13 +94,18 @@ class CoachEngine(
     /** Plan z reguł z progresją, a gdy dzień zmieniono w rozmowie z trenerem: wersja z rozmowy (już z ciężarami). */
     private fun planned(data: CoachData, day: PlannedDay, deload: Deload?): PlannedDay {
         data.overrides.lastOrNull { it.date == day.date.toString() }?.let { return it.applyTo(day) }
-        var d = withProgression(data, day)
+        // Zatwierdzony plan od trenera AI uwzględnia już cele i zastoje; inaczej dostrajają je reguły.
+        val base = data.weekPlans.firstNotNullOfOrNull { it.applyTo(day) } ?: StrengthTuning.apply(day, goalProgress(data), data.sets, data.today)
+        var d = withProgression(data, base)
         if (deload != null && day.date.with(DayOfWeek.MONDAY) == data.today.with(DayOfWeek.MONDAY)) {
             d = Recovery.applyDeload(d, deload, data.profile.equipment.stepKg)
         }
         val sore = data.checkIns.firstOrNull { it.date == day.date }?.soreAreas.orEmpty()
         return Recovery.avoidSore(d, sore)
     }
+
+    private fun goalProgress(data: CoachData) =
+        data.profile.goals.map { com.zacco.rytm.domain.goals.Goals.progress(it, data.today, data.weighIns, data.sets) }
 
     /** Ciężar i powtórzenia sesji siłowej z dziennika serii (mobilność i obwód zostają bez zmian). */
     private fun withProgression(data: CoachData, day: PlannedDay): PlannedDay {
@@ -116,8 +121,9 @@ class CoachEngine(
         val monday = data.today.with(DayOfWeek.MONDAY)
         val deload = Recovery.deload(data.today, load, data.activities, data.profile.planner.planStart)
         val plan = plannerFor(data).planWeek(data.today, context).map { d ->
+            val fromPlan = data.weekPlans.firstNotNullOfOrNull { it.applyTo(d) } ?: d
             data.overrides.lastOrNull { it.date == d.date.toString() }?.applyTo(d)
-                ?: deload?.let { Recovery.applyDeload(d, it, data.profile.equipment.stepKg) } ?: d
+                ?: deload?.let { Recovery.applyDeload(fromPlan, it, data.profile.equipment.stepKg) } ?: fromPlan
         }
         val hr = hrProfile(data)
 

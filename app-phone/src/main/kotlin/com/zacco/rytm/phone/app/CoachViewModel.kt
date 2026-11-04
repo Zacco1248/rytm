@@ -126,6 +126,18 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
     val aiReviews: StateFlow<List<SavedEveningReview>> = data.ai.reviews
     val morningNotes: StateFlow<List<SavedMorningNote>> = data.ai.morningNotes
     val weeklyReports: StateFlow<List<SavedWeeklyReport>> = data.ai.weeklyReports
+    val weekPlans: StateFlow<List<com.zacco.rytm.domain.coach.WeekPlan>> = data.ai.weekPlans
+
+    /** Zatwierdzenie albo cofnięcie planu siłowego od trenera; zegarek dostaje nowy plan. */
+    fun acceptWeekPlan(weekStart: String, accepted: Boolean) {
+        data.ai.acceptWeekPlan(weekStart, accepted)
+        viewModelScope.launch { WatchBridge.publish(getApplication()) }
+    }
+
+    fun dropWeekPlan(weekStart: String) {
+        data.ai.dropWeekPlan(weekStart)
+        viewModelScope.launch { WatchBridge.publish(getApplication()) }
+    }
     private val _weeklyRunning = MutableStateFlow(false)
     val weeklyRunning: StateFlow<Boolean> = _weeklyRunning.asStateFlow()
 

@@ -391,6 +391,8 @@ fun WeighInSheet(date: LocalDate, onDismiss: () -> Unit, onSave: (Double, Double
     var fat by remember { mutableStateOf("") }
     var reading by remember { mutableStateOf<ScaleReading?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
+    var ocrDump by remember { mutableStateOf<String?>(null) }
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     val value = kg.replace(',', '.').toDoubleOrNull()?.takeIf { it in 30.0..250.0 }
     val fatValue = fat.replace(',', '.').toDoubleOrNull()?.takeIf { it in 3.0..60.0 }
 
@@ -398,7 +400,9 @@ fun WeighInSheet(date: LocalDate, onDismiss: () -> Unit, onSave: (Double, Double
         if (uri == null) return@rememberLauncherForActivityResult
         status = "Czytam zrzut…"
         scope.launch {
-            val r = runCatching { ScaleOcr.read(context, uri) }.getOrNull()
+            val scan = runCatching { ScaleOcr.read(context, uri) }.getOrNull()
+            ocrDump = scan?.dump?.takeIf { it.isNotBlank() }
+            val r = scan?.reading
             if (r == null) {
                 status = "Nie udało się odczytać zrzutu. Wpisz wynik ręcznie."
             } else {
@@ -416,6 +420,13 @@ fun WeighInSheet(date: LocalDate, onDismiss: () -> Unit, onSave: (Double, Double
             picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
         status?.let { SmallText(it) }
+        ocrDump?.let { d ->
+            // Gdy odczyt się myli: tekst z położeniem linii do wklejenia w rozmowie, z tego powstaje test.
+            RytmButton("Kopiuj rozpoznany tekst", Modifier.fillMaxWidth()) {
+                clipboard.setText(androidx.compose.ui.text.AnnotatedString(d))
+                status = "Skopiowano tekst z OCR. Wklej go w rozmowie, jeśli coś się nie zgadza."
+            }
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             NumberField("Waga (kg)", kg, Modifier.weight(1f)) { kg = it }
             NumberField("Tłuszcz (%)", fat, Modifier.weight(1f)) { fat = it }

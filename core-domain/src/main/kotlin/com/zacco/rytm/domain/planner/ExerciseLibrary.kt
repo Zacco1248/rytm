@@ -50,6 +50,26 @@ class ExerciseLibrary(
     private val mobility: MobilityPrefs = MobilityPrefs(),
 ) {
 
+    /**
+     * Ćwiczenia, z których trener AI może układać plan: wszystko, co biblioteka daje przy tym sprzęcie
+     * (oba bloki, każdy rodzaj sesji), plus opisane ćwiczenia, które nie wymagają brakującego sprzętu.
+     */
+    fun allowedNames(): List<String> {
+        val own = StrengthFocus.entries.flatMap { f -> (0..1).flatMap { b -> strength(f, Intensity.MODERATE, b).exercises.map { it.name } } }
+        val gym = eq.kind == EquipmentKind.GYM
+        val extra = ExerciseGuide.all().map { it.name }.filter { n ->
+            val l = n.lowercase()
+            val needsGym = listOf("sztang", "maszyn", "wyciąg", "suwnic", "ławce").any { it in l }
+            val needsBand = "gum" in l || "band" in l
+            val needsBar = "drążk" in l || "zwis" in l
+            val needsDumbbell = "hantl" in l || "sztangielk" in l || "arnolda" in l || "thruster" in l || "wymachy" in l
+            (!needsGym || gym) && (!needsBand || eq.bands || gym) && (!needsBar || eq.pullUpBar || gym) &&
+                (!needsDumbbell || eq.kind == EquipmentKind.DUMBBELLS || gym)
+        }
+        val mobilityNames = mobility().exercises.map { ExerciseGuide.key(it.name) }.toSet()
+        return (own + extra).distinctBy { ExerciseGuide.key(it) }.filter { ExerciseGuide.key(it) !in mobilityNames }
+    }
+
     fun workoutFor(day: PlannedDay): StrengthWorkout? = when (day.kind) {
         DayKind.STRENGTH -> strength(day.focus ?: StrengthFocus.FULL_BODY, day.intensity, block(day.date))
         DayKind.MOBILITY -> mobility()
@@ -339,6 +359,15 @@ class ExerciseLibrary(
     companion object {
         private val LOWER_MUSCLES = setOf(Muscle.GLUTES, Muscle.LEGS, Muscle.CALVES)
         private const val BLOCK_WEEKS = 4
+
+        /** Zamiennik przy zastoju: wariant z drugiego bloku albo z powrotem ćwiczenie podstawowe. */
+        fun alternative(name: String): String? {
+            val k = ExerciseGuide.key(name)
+            VARIANTS[k]?.let { return it }
+            return VARIANTS.entries.firstOrNull { ExerciseGuide.key(it.value) == k }?.key?.let { base ->
+                ExerciseGuide.find(base)?.name ?: base.replaceFirstChar { it.uppercase() }
+            }
+        }
 
         /** Warianty na drugi blok: klucz ćwiczenia → nazwa wariantu. */
         private val VARIANTS: Map<String, String> = mapOf(
