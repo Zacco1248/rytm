@@ -81,8 +81,10 @@ fun TodayScreen(
     onResetPlan: () -> Unit = {},
     onAddSleep: () -> Unit = {},
 ) {
-    ScreenHeader(sub = Format.dayLong(s.date), title = greeting()) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    ScreenHeader(sub = Format.dayLong(s.date), title = greeting())
+    // Chipy pod tytułem: obok długiego „Dobry wieczór” się nie mieściły.
+    run {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             val syncLabel = when {
                 sync.running -> "↻ …"
                 s.lastSync != null -> "↻ " + s.lastSync!!.atZone(RytmTime.zone).format(hhmm)

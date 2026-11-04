@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -214,6 +215,18 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         refreshAiSpent()
         SyncWorker.schedulePeriodic(app)
         refreshHealthConnect()
+        // Notka „Na dziś” powstaje po check-inie; gdy gotowość potem wyraźnie się zmieni (np. dopisany sen,
+        // nowe tętno z synchronizacji), liczymy ją od nowa, żeby nie pokazywała starej liczby.
+        viewModelScope.launch {
+            state.mapNotNull { it?.today }.map { it.date to it.readiness.score }.distinctUntilChanged().collect { (date, score) ->
+                val note = data.ai.morningFor(date) ?: return@collect
+                val was = note.checkInKey.substringAfterLast('|').toIntOrNull() ?: return@collect
+                if (kotlin.math.abs(was - score) >= MORNING_REFRESH_POINTS) {
+                    runCatching { data.ai.morning(date) }
+                    refreshAiSpent()
+                }
+            }
+        }
     }
 
     val permissions: Set<String> = HealthConnectPermissions.all
@@ -482,3 +495,6 @@ data class ActivityEntry(
     val areas: Set<LoadedArea>,
     val kcal: Int?,
 )
+
+/** Od tylu punktów zmiany gotowości notka „Na dziś” liczy się od nowa. */
+private const val MORNING_REFRESH_POINTS = 8
