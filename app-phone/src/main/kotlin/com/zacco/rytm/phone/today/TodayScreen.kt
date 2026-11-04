@@ -216,8 +216,8 @@ private fun ReadinessCard(s: TodaySnapshot, onCheckIn: () -> Unit, onAddSleep: (
 @Composable
 private fun KcalRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = Rytm.type.small, color = Rytm.colors.muted)
-        Text(value, style = Rytm.type.small, color = Rytm.colors.ink)
+        Text(label, style = Rytm.type.small, color = Rytm.colors.muted, modifier = Modifier.weight(1f))
+        Text(value, style = Rytm.type.small, color = Rytm.colors.ink, maxLines = 1, softWrap = false)
     }
 }
 
@@ -235,9 +235,12 @@ private fun MorningCard(n: MorningNote) {
 @Composable
 private fun ComponentRow(name: String, value: String, score: Int?) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(name, style = Rytm.type.small, color = Rytm.colors.ink)
-            Text(value, style = Rytm.type.small, color = Rytm.colors.muted)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+            Text(name, style = Rytm.type.small, color = Rytm.colors.ink, maxLines = 1, softWrap = false)
+            Text(
+                value, style = Rytm.type.small, color = Rytm.colors.muted, modifier = Modifier.weight(1f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            )
         }
         Bar((score ?: 0) / 100f, Rytm.colors.accent)
     }
@@ -331,10 +334,9 @@ private fun NutritionCard(s: TodaySnapshot, sync: SyncUi, onSync: () -> Unit, on
 private fun Macro(name: String, value: Int, goal: Int, unit: String, color: Color, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(name, style = Rytm.type.tiny, color = Rytm.colors.muted)
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(Format.int(value), style = Rytm.type.bodyStrong, color = Rytm.colors.ink)
-            Text(" / ${Format.int(goal)}$unit", style = Rytm.type.tiny, color = Rytm.colors.muted)
-        }
+        // Wartość i cel w dwóch liniach: „2 550 / 2 623” nie mieści się w ćwiartce szerokości.
+        Text(Format.int(value), style = Rytm.type.bodyStrong, color = Rytm.colors.ink, maxLines = 1, softWrap = false)
+        Text("z ${Format.int(goal)}$unit", style = Rytm.type.tiny, color = Rytm.colors.muted, maxLines = 1, softWrap = false)
         Bar(if (goal > 0) value.toFloat() / goal else 0f, color, height = 6.dp)
     }
 }
@@ -503,7 +505,10 @@ private fun ActivityTodayCard(s: TodaySnapshot, onAdd: () -> Unit) {
                         )
                     }
                     val est = a.id in s.estimatedKcalIds
-                    Text(a.kcal?.let { (if (est) "~" else "") + "${Format.int(it)} kcal" } ?: "–", style = Rytm.type.small, color = if (a.kcal != null && !est) c.ink else c.muted)
+                    Text(
+                        a.kcal?.let { (if (est) "~" else "") + "${Format.int(it)} kcal" } ?: "–",
+                        style = Rytm.type.small, color = if (a.kcal != null && !est) c.ink else c.muted, maxLines = 1, softWrap = false,
+                    )
                 }
             }
         }

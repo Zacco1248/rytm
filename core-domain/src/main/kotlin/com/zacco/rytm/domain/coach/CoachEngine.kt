@@ -105,7 +105,7 @@ class CoachEngine(
     }
 
     private fun goalProgress(data: CoachData) =
-        data.profile.goals.map { com.zacco.rytm.domain.goals.Goals.progress(it, data.today, data.weighIns, data.sets) }
+        data.profile.goals.map { com.zacco.rytm.domain.goals.Goals.progress(it, data.today, data.weighIns, data.sets, data.activities) }
 
     /** Ciężar i powtórzenia sesji siłowej z dziennika serii (mobilność i obwód zostają bez zmian). */
     private fun withProgression(data: CoachData, day: PlannedDay): PlannedDay {
@@ -194,7 +194,7 @@ class CoachEngine(
             macros = nutrition.map { MacroDay(it, data.profile.nutrition.withTraining(trainingKcal(data, it.date))) },
             kcalAdjust = data.profile.kcalAdjust,
             kcalNextReview = data.profile.kcalReviewedOn?.plusDays(com.zacco.rytm.domain.nutrition.KcalAdjuster.PERIOD_DAYS),
-            goals = data.profile.goals.map { com.zacco.rytm.domain.goals.Goals.progress(it, data.today, data.weighIns, data.sets) },
+            goals = data.profile.goals.map { com.zacco.rytm.domain.goals.Goals.progress(it, data.today, data.weighIns, data.sets, data.activities) },
         )
     }
 

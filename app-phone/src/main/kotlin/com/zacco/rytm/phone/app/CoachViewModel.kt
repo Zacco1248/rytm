@@ -397,6 +397,11 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         data.profiles.save(p.copy(goals = p.goals + g.copy(start = start)))
     }
 
+    fun updateGoal(g: com.zacco.rytm.domain.goals.UserGoal) {
+        val p = data.profiles.profile.value ?: return
+        data.profiles.save(p.copy(goals = p.goals.map { if (it.id == g.id) g else it }))
+    }
+
     fun removeGoal(id: String) {
         val p = data.profiles.profile.value ?: return
         data.profiles.save(p.copy(goals = p.goals.filterNot { it.id == id }))
