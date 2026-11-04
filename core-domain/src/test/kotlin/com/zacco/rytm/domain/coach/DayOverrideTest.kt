@@ -8,7 +8,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DayOverrideTest {
-    private val day = LocalDate.of(2026, 11, 4)
+    /** Poniedziałek: bez stałego sportu w domyślnym profilu. */
+    private val day = LocalDate.of(2026, 11, 2)
+    /** Środa: squash w domyślnym profilu. */
+    private val sportDay = LocalDate.of(2026, 11, 4)
 
     @Test
     fun `override replaces only its own day`() {
@@ -33,5 +36,15 @@ class DayOverrideTest {
         assertNull(s.plan.workout)
         val w = CoachEngine().week(CoachData(today = day, overrides = listOf(o)))
         assertEquals("Odpoczynek", w.days.first { it.plan.date == day }.plan.title)
+    }
+
+    @Test
+    fun `planned sport wins over a trainer change`() {
+        val o = DayOverride(sportDay.toString(), "Szybkie 20 minut", "STRENGTH", "MODERATE",
+            exercises = listOf(OverrideExercise("Przysiad", 2, 12, 15, 6.0, 45)), reason = "mało czasu")
+        val s = CoachEngine().today(CoachData(today = sportDay, overrides = listOf(o)))
+        assertEquals(DayKind.FIXED_SPORT, s.plan.kind)
+        assertNull(s.plan.workout)
+        assertTrue(s.plan.rationale.last().contains("pierwszeństwo"))
     }
 }

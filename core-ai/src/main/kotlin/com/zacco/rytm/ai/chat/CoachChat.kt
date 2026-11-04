@@ -313,7 +313,7 @@ class CoachChatService(private val llm: CoachLlm, private val costGuard: CostGua
             - Przy bólu omijaj obciążanie bolącej partii; przy ostrym bólu, drętwieniu albo urazie zaproponuj odpoczynek i konsultację z lekarzem lub fizjoterapeutą.
             - RESET_TODAY: osoba chce wrócić do planu z reguł (todayChanged = true).
             - NONE: zwykła odpowiedź bez zmiany planu (wtedy pozostałe pola change = null).
-            Gdy zmieniasz plan, w reply napisz krótko, co zmieniasz. Nie zmieniaj innych dni; o stałych ustawieniach (dni treningów, sprzęt) powiedz, że zmienia się je w Profilu.
+            Gdy zmieniasz plan, w reply napisz krótko, co zmieniasz. Gdy dziś jest zaplanowany sport (mecz, stały trening drużyny), nie zastępuj go innym treningiem: sport ma pierwszeństwo, możesz najwyżej doradzić rozgrzewkę albo lżejszy dzień obok. Nie zmieniaj innych dni; o stałych ustawieniach (dni treningów, sprzęt) powiedz, że zmienia się je w Profilu.
             Bez diagnoz medycznych. Gdy pytanie nie dotyczy treningu, snu, regeneracji ani jedzenia, odpowiedz krótko i wróć do tematu.
         """.trimIndent()
     }

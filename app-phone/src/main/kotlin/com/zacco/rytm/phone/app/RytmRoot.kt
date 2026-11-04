@@ -98,7 +98,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     var profileOpen by rememberSaveable { mutableStateOf(false) }
     // Na starcie kreator krok po kroku; „Wolę jeden formularz” przełącza na pełny profil.
     var fullForm by rememberSaveable { mutableStateOf(false) }
-    var workoutOpen by rememberSaveable { mutableStateOf(true) }
+    // Po włączeniu aplikacji zawsze ekran główny; trwający trening otwiera się z karty planu.
+    var workoutOpen by rememberSaveable { mutableStateOf(false) }
     var chatOpen by rememberSaveable { mutableStateOf(false) }
     var entriesOpen by rememberSaveable { mutableStateOf(false) }
     var replaceWeighIn by rememberSaveable { mutableStateOf<String?>(null) }

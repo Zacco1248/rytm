@@ -26,6 +26,10 @@ data class DayOverride(
     val createdAt: Long = 0,
 ) {
     fun applyTo(day: PlannedDay): PlannedDay {
+        // Zaplanowany sport ma pierwszeństwo: trening od trenera go nie zastępuje (odpoczynek, np. przy bólu, tak).
+        if (day.kind == DayKind.FIXED_SPORT && kind != "REST") {
+            return day.copy(rationale = day.rationale + "Trener proponował: $title. Dziś pierwszeństwo ma zaplanowany sport.")
+        }
         val k = when (kind) {
             "REST" -> DayKind.REST
             "MOBILITY" -> DayKind.MOBILITY
