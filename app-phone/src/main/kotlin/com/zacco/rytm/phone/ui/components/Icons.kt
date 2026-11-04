@@ -14,6 +14,11 @@ object RytmIcons {
     val week = icon("M6 5h12a2.5 2.5 0 0 1 2.5 2.5v10a2.5 2.5 0 0 1 -2.5 2.5h-12a2.5 2.5 0 0 1 -2.5 -2.5v-10a2.5 2.5 0 0 1 2.5 -2.5zM3.5 10h17M8 3v4M16 3v4")
     val body = icon("M4 18l5-6 4 3 7-9M15 6h5v5")
     val habits = icon("M5 12.5l4 4 10-10")
+    val chevron = icon("M9 6l6 6-6 6")
+    val back = icon("M15 6l-6 6 6 6")
+    val plus = icon("M12 5v14M5 12h14")
+    val edit = icon("M4 20h4L19 9l-4-4L4 16z")
+    val trash = icon("M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3")
     val evening = icon("M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z")
 
     private fun icon(path: String): ImageVector =

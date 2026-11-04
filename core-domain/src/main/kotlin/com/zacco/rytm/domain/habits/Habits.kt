@@ -2,6 +2,7 @@ package com.zacco.rytm.domain.habits
 
 import java.time.DayOfWeek
 import java.time.LocalDate
+import kotlinx.serialization.Serializable
 
 sealed interface HabitSchedule {
     data object Daily : HabitSchedule
@@ -29,6 +30,34 @@ data class Habit(
 ) {
     /** Kroki liczy tylko Health Connect; resztę można też odhaczyć ręcznie. */
     val autoOnly: Boolean get() = autoSource == HabitAutoSource.STEPS
+}
+
+/**
+ * Nawyk zapisany w profilu: lista jest edytowalna (dodawanie, zmiana, usuwanie, także domyślnych).
+ * Cel kroków bierzemy zawsze z profilu ([toHabit]).
+ */
+@Serializable
+data class HabitSpec(
+    val id: String,
+    val name: String,
+    val kind: HabitKind = HabitKind.YES_NO,
+    val target: Int? = null,
+    val auto: HabitAutoSource? = null,
+    /** null: codziennie; liczba: tyle razy w tygodniu. */
+    val timesPerWeek: Int? = null,
+) {
+    fun toHabit(stepsTarget: Int): Habit = Habit(
+        id = id,
+        name = name,
+        schedule = timesPerWeek?.let { HabitSchedule.TimesPerWeek(it.coerceIn(1, 7)) } ?: HabitSchedule.Daily,
+        kind = kind,
+        target = if (auto == HabitAutoSource.STEPS) stepsTarget else target,
+        autoSource = auto,
+    )
+
+    companion object {
+        fun of(h: Habit): HabitSpec = HabitSpec(h.id, h.name, h.kind, h.target, h.autoSource, (h.schedule as? HabitSchedule.TimesPerWeek)?.times)
+    }
 }
 
 data class HabitLog(val habitId: String, val date: LocalDate, val value: Int)

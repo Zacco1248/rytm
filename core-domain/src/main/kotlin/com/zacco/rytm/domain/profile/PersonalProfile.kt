@@ -102,6 +102,8 @@ data class PersonalProfile(
     val kcalReviewedOn: String? = null,
     /** Cele z kamieniami milowymi (waga, powtórzenia, ciężar). */
     val goals: List<com.zacco.rytm.domain.goals.UserGoal> = emptyList(),
+    /** Własna lista nawyków; null: domyślne trzy. Pusta lista: wszystkie usunięte. */
+    val habitList: List<com.zacco.rytm.domain.habits.HabitSpec>? = null,
 ) {
     val hasDumbbells: Boolean get() = ownsDumbbells ?: (equipment == EquipmentKind.DUMBBELLS)
     val hasGym: Boolean get() = equipment == EquipmentKind.GYM
@@ -152,7 +154,11 @@ data class PersonalProfile(
         mobility = MobilityPrefs(mobilityOff, mobilityCustom),
     )
 
-    fun habits(): List<Habit> = DefaultHabits.withSteps(stepsTarget)
+    fun habits(): List<Habit> = habitList?.map { it.toHabit(stepsTarget) } ?: DefaultHabits.withSteps(stepsTarget)
+
+    /** Lista do edycji: zapisana albo domyślna. */
+    fun habitSpecs(): List<com.zacco.rytm.domain.habits.HabitSpec> =
+        habitList ?: DefaultHabits.all.map(com.zacco.rytm.domain.habits.HabitSpec::of)
 
     /** Siła jest w planie, gdy wybrano ją w kreatorze albo profil jest sprzed wyboru aktywności. */
     val wantsStrength: Boolean

@@ -62,7 +62,7 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun RytmSheet(title: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun RytmSheet(title: String, onDismiss: () -> Unit, content: @Composable () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -82,7 +82,7 @@ private fun RytmSheet(title: String, onDismiss: () -> Unit, content: @Composable
 
 /** Skala 1–N jako rząd przycisków (check-in, RPE). */
 @Composable
-private fun Scale(range: IntRange, selected: Int?, onSelect: (Int) -> Unit) {
+internal fun Scale(range: IntRange, selected: Int?, onSelect: (Int) -> Unit) {
     val c = Rytm.colors
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         range.forEach { v ->
@@ -110,10 +110,16 @@ private fun Label(text: String) = Text(text, style = Rytm.type.body, color = Ryt
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun CheckInSheet(current: DailyCheckIn?, onDismiss: () -> Unit, onSave: (Int, Int, Set<BodyArea>) -> Unit) {
+fun CheckInSheet(
+    current: DailyCheckIn?,
+    alcoholYesterday: Int,
+    onDismiss: () -> Unit,
+    onSave: (energy: Int, mood: Int, sore: Set<BodyArea>, drinksYesterday: Int) -> Unit,
+) {
     var energy by remember { mutableIntStateOf(current?.energy ?: 3) }
     var mood by remember { mutableIntStateOf(current?.mood ?: 3) }
     var sore by remember { mutableStateOf(current?.soreAreas ?: emptySet()) }
+    var drinks by remember { mutableIntStateOf(alcoholYesterday) }
     RytmSheet("Poranny check-in", onDismiss) {
         Label("Energia")
         Scale(1..5, energy) { energy = it }
@@ -123,7 +129,10 @@ fun CheckInSheet(current: DailyCheckIn?, onDismiss: () -> Unit, onSave: (Int, In
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             BodyArea.entries.forEach { a -> Pill(Format.body(a), a in sore) { sore = if (a in sore) sore - a else sore + a } }
         }
-        RytmButton("Zapisz", Modifier.fillMaxWidth(), primary = true) { onSave(energy, mood, sore); onDismiss() }
+        // Alkohol tylko jako czynnik gotowości: ile porcji wczoraj (piwo 0,5 l, kieliszek wina, kieliszek wódki = 1).
+        Label("Alkohol wczoraj (porcje)")
+        Scale(0..5, drinks.coerceAtMost(5)) { drinks = it }
+        RytmButton("Zapisz", Modifier.fillMaxWidth(), primary = true) { onSave(energy, mood, sore, drinks); onDismiss() }
     }
 }
 
@@ -572,7 +581,6 @@ fun QuickAddSheet(
             if (isToday && hasWorkout) add(Triple(QuickEntry.WORKOUT, "Trening z planu", "serie i ciężary"))
             add(Triple(QuickEntry.NUTRITION, "Żywienie", "kcal i makro z Fitatu"))
             add(Triple(QuickEntry.WEIGH_IN, "Ważenie", "ręcznie albo zrzut"))
-            add(Triple(QuickEntry.ALCOHOL, "Alkohol", "liczba porcji"))
             add(Triple(QuickEntry.SLEEP, "Sen", "gdy zegarek nie zapisał"))
             if (isToday) add(Triple(QuickEntry.CHECK_IN, "Check-in", "energia i co boli"))
         }

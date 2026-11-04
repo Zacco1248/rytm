@@ -63,7 +63,8 @@ object WatchBridge {
         val date = LocalDate.parse(event.date)
         when (event) {
             is WatchEvent.HabitToggle -> {
-                val habit = CoachData(today = date).habits.firstOrNull { it.id == event.habitId } ?: return
+                val habits = RytmData.get(context).profiles.current()?.habits() ?: CoachData(today = date).habits
+                val habit = habits.firstOrNull { it.id == event.habitId } ?: return
                 if (habit.autoOnly) return
                 val value = when {
                     !event.done -> null

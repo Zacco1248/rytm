@@ -55,6 +55,7 @@ class CoachEngine(
         val previous = data.metrics.filter { it.date in week }
         val fromDay = night?.nightRestingHr == null && night?.dayRestingHr != null
         val trainingKcal = trainingKcal(data, data.today)
+        val habitRows = habits(data, steps)
 
         return TodaySnapshot(
             date = data.today,
@@ -79,7 +80,8 @@ class CoachEngine(
             dayOff = data.dayNotes.any { it.date == data.today && it.dayOff },
             alcoholYesterday = alcoholOn(data, data.today.minusDays(1)),
             alcoholToday = alcoholOn(data, data.today),
-            habits = habits(data, steps),
+            habits = habitRows.filter { it.due }.map { it.status },
+            habitsAll = habitRows.map { it.status },
             steps = steps,
             lastSync = data.lastSync,
             setsToday = data.sets.filter { it.date == data.today },
@@ -251,7 +253,7 @@ class CoachEngine(
     private fun alcoholOn(data: CoachData, date: LocalDate): Int =
         data.dayNotes.filter { it.date == date }.sumOf { it.alcoholDrinks }
 
-    private fun habits(data: CoachData, steps: Int?): List<HabitStatus> {
+    private fun habits(data: CoachData, steps: Int?): List<HabitRow> {
         // Wpisy automatyczne (kroki, mobilność) wyliczamy z danych, żeby nie dublować ich w bazie.
         val mobilityByDay = data.activities.filter { it.type == ActivityType.MOBILITY }
             .groupBy { it.localDate() }.mapValues { (_, list) -> list.sumOf { it.durationMin } }
@@ -262,12 +264,29 @@ class CoachEngine(
             }
         }
         val logs: List<HabitLog> = data.habitLogs + autoLogs
-        return data.habits.filter { HabitTracker.isDueOn(it, data.today, logs) }.map { habit ->
+        val monday = data.today.with(java.time.DayOfWeek.MONDAY)
+        return data.habits.map { habit ->
             val value = if (habit.autoSource == HabitAutoSource.STEPS) steps else
                 logs.filter { it.habitId == habit.id && it.date == data.today }.maxOfOrNull { it.value }
-            HabitStatus(habit, value, HabitTracker.isDone(habit, value), HabitTracker.streak(habit, logs, data.today))
+            val week = (0L until 7L).map { monday.plusDays(it) }.map { d ->
+                when {
+                    d.isAfter(data.today) || !HabitTracker.isScheduledOn(habit, d) -> null
+                    d == data.today -> HabitTracker.isDone(habit, value)
+                    else -> HabitTracker.isDone(habit, logs.filter { it.habitId == habit.id && it.date == d }.maxOfOrNull { it.value })
+                }
+            }
+            val ws = HabitTracker.weekStatus(habit, data.today, logs)
+            HabitRow(
+                status = HabitStatus(
+                    habit, value, HabitTracker.isDone(habit, value), HabitTracker.streak(habit, logs, data.today),
+                    week = week, weekDone = ws.done, weekRequired = ws.required,
+                ),
+                due = HabitTracker.isDueOn(habit, data.today, logs),
+            )
         }
     }
+
+    private data class HabitRow(val status: HabitStatus, val due: Boolean)
 
     private fun restingHrHistory(data: CoachData): List<Int> =
         data.metrics.filter { it.date < data.today && it.date >= data.today.minusDays(CALIBRATION_DAYS.toLong()) }

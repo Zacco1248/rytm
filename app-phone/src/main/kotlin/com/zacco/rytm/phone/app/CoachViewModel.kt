@@ -267,9 +267,11 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { data.coach.setHabit(habit.id, date, value) }
     }
 
-    fun saveCheckIn(energy: Int, mood: Int, sore: Set<BodyArea>) {
+    fun saveCheckIn(energy: Int, mood: Int, sore: Set<BodyArea>, drinksYesterday: Int? = null) {
         val date = LocalDate.now(RytmTime.zone)
         viewModelScope.launch {
+            // Alkohol z wczoraj najpierw, żeby poranna notka i gotowość już go uwzględniły.
+            drinksYesterday?.let { data.coach.setAlcohol(date.minusDays(1), it) }
             val existing = state.value?.today?.checkIn
             data.coach.saveCheckIn(DailyCheckIn(date, energy, mood, sore, existing?.hrvRmssd))
             runCatching { data.ai.morning(date) }
@@ -400,6 +402,34 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
     fun updateGoal(g: com.zacco.rytm.domain.goals.UserGoal) {
         val p = data.profiles.profile.value ?: return
         data.profiles.save(p.copy(goals = p.goals.map { if (it.id == g.id) g else it }))
+    }
+
+    /** Dodaje albo zmienia nawyk (także domyślny). Cel kroków trafia do profilu. */
+    fun saveHabit(spec: com.zacco.rytm.domain.habits.HabitSpec) {
+        val p = data.profiles.profile.value ?: return
+        val list = p.habitSpecs()
+        val next = if (list.any { it.id == spec.id }) list.map { if (it.id == spec.id) spec else it } else list + spec
+        val steps = if (spec.auto == com.zacco.rytm.domain.habits.HabitAutoSource.STEPS) spec.target ?: p.stepsTarget else p.stepsTarget
+        data.profiles.save(p.copy(habitList = next, stepsTarget = steps))
+        viewModelScope.launch { WatchBridge.publish(getApplication()) }
+    }
+
+    /** Usuwa nawyk; zwraca pozycję i nawyk do „Cofnij”. Wpisy z dziennika zostają w bazie. */
+    fun removeHabit(id: String): Pair<Int, com.zacco.rytm.domain.habits.HabitSpec>? {
+        val p = data.profiles.profile.value ?: return null
+        val list = p.habitSpecs()
+        val i = list.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: return null
+        data.profiles.save(p.copy(habitList = list.filterIndexed { j, _ -> j != i }))
+        viewModelScope.launch { WatchBridge.publish(getApplication()) }
+        return i to list[i]
+    }
+
+    fun restoreHabit(index: Int, spec: com.zacco.rytm.domain.habits.HabitSpec) {
+        val p = data.profiles.profile.value ?: return
+        val list = p.habitSpecs().filterNot { it.id == spec.id }.toMutableList()
+        list.add(index.coerceIn(0, list.size), spec)
+        data.profiles.save(p.copy(habitList = list))
+        viewModelScope.launch { WatchBridge.publish(getApplication()) }
     }
 
     fun removeGoal(id: String) {

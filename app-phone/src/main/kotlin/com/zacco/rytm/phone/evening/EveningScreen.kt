@@ -70,8 +70,21 @@ fun EveningScreen(
         }
     }
     ReviewCard(ai, onRun)
-    NudgesCard(ai.settings, onSaveSettings)
-    AiSettingsCard(ai, onSaveSettings, onSaveKey, onClearKey)
+    // Ustawienia rzadko zmieniane: schowane w wierszach, rozwijane po dotknięciu.
+    com.zacco.rytm.phone.ui.components.MoreList(
+        key = "evening",
+        items = listOf(
+            com.zacco.rytm.phone.ui.components.MoreItem("Podpowiedzi w ciągu dnia", if (ai.settings.nudgesEnabled) "włączone" else "wyłączone") {
+                NudgesCard(ai.settings, onSaveSettings)
+            },
+            com.zacco.rytm.phone.ui.components.MoreItem(
+                "Asystent AI",
+                if (!ai.hasKey) "bez klucza" else ai.spentUsd?.let { Format.dec(it, 2) + " z " + Format.dec(ai.settings.monthlyBudgetUsd, 2) + " USD" },
+            ) {
+                AiSettingsCard(ai, onSaveSettings, onSaveKey, onClearKey)
+            },
+        ),
+    )
 }
 
 /** Podpowiedzi w ciągu dnia: włącznik całości i każdego rodzaju. Z reguł, więc bez klucza AI i bez kosztu. */
