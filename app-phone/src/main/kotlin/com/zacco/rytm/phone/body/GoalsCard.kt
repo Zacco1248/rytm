@@ -105,7 +105,7 @@ private fun GoalRow(p: GoalProgress, onRemove: (String) -> Unit, onUpdate: (User
 }
 
 /** Gotowe cele z listy: rodzaj, nazwa i podpowiedź wartości. */
-private enum class GoalPreset(val label: String, val kind: GoalKind, val name: String?, val exercise: String? = null) {
+private enum class GoalPreset(val label: String, val kind: GoalKind, val goalName: String?, val exercise: String? = null) {
     REPS("Powtórzenia", GoalKind.REPS, null),
     LIFT("Ciężar", GoalKind.LIFT, null),
     WEIGHT("Waga ciała", GoalKind.WEIGHT, null),
@@ -190,7 +190,7 @@ private fun AddGoal(exercises: List<String>, currentWeight: Double?, onAdd: (Use
                         target = value!!,
                         deadline = months?.let { today.plusMonths(it.toLong()).toString() },
                         createdOn = today.toString(),
-                        label = if (kind == GoalKind.CUSTOM) text.trim() else preset.name,
+                        label = if (kind == GoalKind.CUSTOM) text.trim() else preset.goalName,
                     ),
                 )
             }
