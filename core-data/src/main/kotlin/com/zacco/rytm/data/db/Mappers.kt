@@ -25,7 +25,7 @@ fun Activity.toEntity(origin: String?, title: String? = null) = ActivityEntity(
     loadedAreas = loadedAreas,
 )
 
-fun DailyMetricsEntity.toDomain() = DailyMetrics(date, sleepMin, sleepStart, sleepEnd, nightRestingHr, steps, totalKcal, dayRestingHr)
+fun DailyMetricsEntity.toDomain() = DailyMetrics(date, sleepMin, sleepStart, sleepEnd, nightRestingHr, steps, totalKcal, dayRestingHr, sleepManual)
 
 fun NutritionDayEntity.toDomain() = NutritionDay(date, kcal, proteinG, fatG, carbsG)
 

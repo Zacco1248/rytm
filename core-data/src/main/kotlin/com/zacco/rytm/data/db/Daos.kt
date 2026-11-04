@@ -50,6 +50,9 @@ interface DailyMetricsDao {
 
     @Upsert
     suspend fun upsert(metrics: DailyMetricsEntity)
+
+    @Query("SELECT * FROM daily_metrics WHERE date = :date")
+    suspend fun get(date: LocalDate): DailyMetricsEntity?
 }
 
 @Dao
@@ -86,6 +89,9 @@ interface CheckInDao {
 
     @Upsert
     suspend fun upsert(checkIn: CheckInEntity)
+
+    @Query("DELETE FROM check_in WHERE date = :date")
+    suspend fun delete(date: LocalDate)
 }
 
 @Dao

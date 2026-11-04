@@ -67,6 +67,7 @@ fun TodayScreen(
     onConnect: () -> Unit,
     onSync: () -> Unit,
     onProfile: () -> Unit,
+    onEntries: () -> Unit = {},
     onToggleHabit: (HabitStatus) -> Unit,
     onCheckIn: () -> Unit,
     onNutrition: () -> Unit,
@@ -78,6 +79,7 @@ fun TodayScreen(
     morning: MorningNote? = null,
     onCoach: () -> Unit = {},
     onResetPlan: () -> Unit = {},
+    onAddSleep: () -> Unit = {},
 ) {
     ScreenHeader(sub = Format.dayLong(s.date), title = greeting()) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -87,6 +89,7 @@ fun TodayScreen(
                 else -> "↻ synchronizuj"
             }
             Chip(syncLabel, ChipTone.MUTED, onClick = onSync)
+            Chip("Wpisy", ChipTone.MUTED, onClick = onEntries)
             Chip("Profil", ChipTone.MUTED, onClick = onProfile)
         }
     }
@@ -94,7 +97,7 @@ fun TodayScreen(
     if (hc != HcStatus.READY && hc != HcStatus.CHECKING) HealthConnectCard(hc, onConnect)
     sync.error?.let { RytmCard { SmallText(it, color = Rytm.colors.bad) } }
 
-    ReadinessCard(s, onCheckIn)
+    ReadinessCard(s, onCheckIn, onAddSleep)
     if (morning != null && s.checkIn != null) MorningCard(morning)
     PlanCard(s, onDayOff, onLogWorkout, phoneRunActive, onPhoneWorkout, onCoach, onResetPlan)
     NutritionCard(s, sync, onSync, onNutrition)
@@ -125,7 +128,7 @@ private fun HealthConnectCard(hc: HcStatus, onConnect: () -> Unit) {
 }
 
 @Composable
-private fun ReadinessCard(s: TodaySnapshot, onCheckIn: () -> Unit) {
+private fun ReadinessCard(s: TodaySnapshot, onCheckIn: () -> Unit, onAddSleep: () -> Unit) {
     val c = Rytm.colors
     val r = s.readiness
     val ringColor = when (r.level) {
@@ -153,7 +156,11 @@ private fun ReadinessCard(s: TodaySnapshot, onCheckIn: () -> Unit) {
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val comp = r.components
-                ComponentRow("Sen", s.night?.sleepMin?.let { Format.minutes(it) } ?: "brak zapisu", comp[ReadinessComponent.SLEEP])
+                ComponentRow(
+                    "Sen",
+                    s.night?.sleepMin?.let { Format.minutes(it) + if (s.night?.sleepManual == true) " (ręcznie)" else "" } ?: "brak zapisu",
+                    comp[ReadinessComponent.SLEEP],
+                )
                 ComponentRow(
                     "Tętno spocz.",
                     s.restingHr?.let { hr ->
@@ -188,6 +195,17 @@ private fun ReadinessCard(s: TodaySnapshot, onCheckIn: () -> Unit) {
                 "Wczoraj alkohol: ${s.alcoholYesterday} porc. (−${com.zacco.rytm.domain.readiness.ReadinessCalculator.alcoholPenalty(s.alcoholYesterday)} pkt).",
                 color = Rytm.colors.warn,
             )
+        }
+        if (s.night?.sleepMin == null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SmallText("Zegarek nie zapisał snu z tej nocy.", Modifier.weight(1f))
+                Chip("Wpisz sen", ChipTone.ACCENT, onClick = onAddSleep)
+            }
+        } else if (s.night?.sleepManual == true) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SmallText("Sen wpisany ręcznie.", Modifier.weight(1f))
+                Chip("Popraw", ChipTone.MUTED, onClick = onAddSleep)
+            }
         }
         if (s.restingHrFromDay) SmallText("Brak snu z zegarka, więc tętno spoczynkowe liczę z najspokojniejszych 30 min dnia.")
     }

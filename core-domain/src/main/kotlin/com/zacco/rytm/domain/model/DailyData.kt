@@ -32,6 +32,8 @@ data class DailyMetrics(
      * Wyższe niż nocne, więc porównujemy je tylko z innymi wartościami dziennymi.
      */
     val dayRestingHr: Int? = null,
+    /** Sen wpisany ręcznie, bo zegarek go nie zarejestrował. */
+    val sleepManual: Boolean = false,
 )
 
 data class NutritionDay(val date: LocalDate, val kcal: Int, val proteinG: Double, val fatG: Double, val carbsG: Double)

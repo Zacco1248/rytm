@@ -96,6 +96,12 @@ data class PersonalProfile(
     val indoorBike: Boolean = false,
     /** Dzień założenia profilu w kreatorze (ISO); od niego liczy się plan. */
     val startedOn: String? = null,
+    /** Korekta celu kcal z pętli jedzenie–waga (co 2 tygodnie), dodawana do celu z wzoru albo z Fitatu. */
+    val kcalAdjust: Int = 0,
+    /** Ostatni przegląd celu kcal (ISO); null: od [startedOn]. */
+    val kcalReviewedOn: String? = null,
+    /** Cele z kamieniami milowymi (waga, powtórzenia, ciężar). */
+    val goals: List<com.zacco.rytm.domain.goals.UserGoal> = emptyList(),
 ) {
     val hasDumbbells: Boolean get() = ownsDumbbells ?: (equipment == EquipmentKind.DUMBBELLS)
     val hasGym: Boolean get() = equipment == EquipmentKind.GYM
@@ -124,7 +130,10 @@ data class PersonalProfile(
     fun toUserProfile(today: LocalDate): UserProfile = UserProfile(
         weightKg = weightKg,
         heightCm = heightCm,
-        nutrition = customTargets?.toTargets() ?: NutritionCalculator.targets(this, today),
+        nutrition = (customTargets?.toTargets() ?: NutritionCalculator.targets(this, today)).adjusted(kcalAdjust),
+        kcalAdjust = kcalAdjust,
+        goals = goals,
+        kcalReviewedOn = (kcalReviewedOn ?: startedOn)?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
         sleep = SleepTarget(
             onsetFrom = timeOf(sleepOnsetFromMin),
             onsetTo = timeOf(sleepOnsetToMin),

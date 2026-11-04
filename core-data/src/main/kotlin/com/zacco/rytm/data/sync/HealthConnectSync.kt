@@ -29,6 +29,7 @@ import com.zacco.rytm.domain.heart.DayRestingHr
 import com.zacco.rytm.domain.planner.PlannerConfig
 import com.zacco.rytm.domain.heart.NightRestingHr
 import com.zacco.rytm.domain.ingest.Ingest
+import com.zacco.rytm.domain.ingest.SleepNight
 import com.zacco.rytm.domain.ingest.SleepSession
 import com.zacco.rytm.domain.model.Source
 import com.zacco.rytm.domain.time.RytmTime
@@ -127,7 +128,11 @@ class HealthConnectSync(
 
     private suspend fun refreshMetrics(date: LocalDate, types: Set<KClass<out Record>>) {
         val (start, end) = dayBounds(date)
-        val night = if (SleepSessionRecord::class in types) {
+        // Sen wpisany ręcznie wygrywa z Health Connect (zegarek nie zarejestrował albo pomylił noc).
+        val manual = db.dailyMetrics().get(date)?.takeIf { it.sleepManual && it.sleepStart != null && it.sleepEnd != null }
+        val night = if (manual != null) {
+            SleepNight(date, manual.sleepStart!!, manual.sleepEnd!!, manual.sleepMin ?: 0)
+        } else if (SleepSessionRecord::class in types) {
             // Noc kończąca się danego dnia zaczyna się dzień wcześniej.
             val sessions = read(SleepSessionRecord::class, start.minus(Duration.ofHours(12)), end).map { it.toSleepSession() }
             Ingest.nightFor(date, sessions)
@@ -176,6 +181,7 @@ class HealthConnectSync(
                 totalKcal = agg?.get(TotalCaloriesBurnedRecord.ENERGY_TOTAL)?.inKilocalories?.toInt(),
                 updatedAt = now(),
                 dayRestingHr = dayRestingHr,
+                sleepManual = manual != null,
             ),
         )
     }

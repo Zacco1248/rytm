@@ -63,6 +63,8 @@ data class TodaySnapshot(
     val estimatedKcalIds: Set<String> = emptySet(),
     /** Plan dnia zmieniony w rozmowie z trenerem. */
     val planChanged: Boolean = false,
+    /** Ten tydzień lżej (deload) i dlaczego. */
+    val deload: Deload? = null,
 ) {
     /** Kcal z aktywności dnia (bez doliczania mnożnika). */
     val activityKcal: Int get() = activitiesToday.sumOf { it.kcal ?: 0 }
@@ -78,6 +80,7 @@ data class WeekSnapshot(
     val load: LoadSummary,
     val strengthDone: Int,
     val strengthRequired: Int,
+    val deload: Deload? = null,
 )
 
 data class WeekDay(
@@ -123,6 +126,10 @@ data class BodySnapshot(
     val macros: List<MacroDay> = emptyList(),
     /** Cel osoby: od niego zależy ocena tempa i opisy na ekranie. */
     val goal: Goal = Goal.RECOMP,
+    /** Korekta celu kcal z pętli jedzenie–waga i kiedy następny przegląd. */
+    val kcalAdjust: Int = 0,
+    val kcalNextReview: java.time.LocalDate? = null,
+    val goals: List<com.zacco.rytm.domain.goals.GoalProgress> = emptyList(),
 )
 
 data class MacroDay(val nutrition: NutritionDay, val target: NutritionTargets) {

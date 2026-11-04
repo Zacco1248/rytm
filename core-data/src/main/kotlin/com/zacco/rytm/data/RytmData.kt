@@ -19,6 +19,7 @@ class RytmData private constructor(context: Context) {
     val profiles = ProfileStore(context, db)
     val dayOverrides = com.zacco.rytm.data.repo.DayOverrideStore(appContext)
     val coach = CoachRepository(db, profiles, dayOverrides)
+    val entries = com.zacco.rytm.data.repo.EntriesRepository(db, profiles)
     val usageStore = RoomUsageStore(db.llmUsage())
     val ai = AiCoach(appContext, coach, usageStore, dayOverrides)
     val phoneWorkout = com.zacco.rytm.data.workout.PhoneWorkoutStore(appContext)

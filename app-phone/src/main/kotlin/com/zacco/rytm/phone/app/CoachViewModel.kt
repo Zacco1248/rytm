@@ -340,6 +340,61 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
 
     fun cancelPhoneWorkout() = data.phoneWorkout.set(null)
 
+    // --- wpisy: przegląd, usuwanie, eksport ---
+    val entries: StateFlow<List<com.zacco.rytm.data.repo.Entry>> = today
+        .flatMapLatest { day -> data.entries.observe(day) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    private val _exportStatus = MutableStateFlow<String?>(null)
+    val exportStatus: StateFlow<String?> = _exportStatus.asStateFlow()
+
+    fun deleteEntry(e: com.zacco.rytm.data.repo.Entry) {
+        viewModelScope.launch {
+            data.entries.delete(e)
+            WatchBridge.publish(getApplication())
+        }
+    }
+
+    /** „Cofnij korektę” celu kcal z pętli jedzenie–waga; kolejny przegląd za 2 tygodnie. */
+    fun resetKcalAdjust() {
+        val p = data.profiles.profile.value ?: return
+        data.profiles.save(p.copy(kcalAdjust = 0, kcalReviewedOn = LocalDate.now(RytmTime.zone).toString()))
+    }
+
+    fun addGoal(g: com.zacco.rytm.domain.goals.UserGoal) {
+        val p = data.profiles.profile.value ?: return
+        // Start celu = dzisiejsza wartość (żeby kamienie milowe liczyły się od teraz).
+        val start = state.value?.body?.let { b ->
+            when (g.kind) {
+                com.zacco.rytm.domain.goals.GoalKind.WEIGHT -> b.currentAvg7
+                else -> null
+            }
+        }
+        data.profiles.save(p.copy(goals = p.goals + g.copy(start = start)))
+    }
+
+    fun removeGoal(id: String) {
+        val p = data.profiles.profile.value ?: return
+        data.profiles.save(p.copy(goals = p.goals.filterNot { it.id == id }))
+    }
+
+    fun deleteWeighIn(id: String) {
+        viewModelScope.launch { data.entries.deleteWeighIn(id) }
+    }
+
+    fun exportTo(uri: android.net.Uri) {
+        _exportStatus.value = "Zapisuję…"
+        viewModelScope.launch {
+            _exportStatus.value = runCatching {
+                val json = data.entries.exportJson()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    getApplication<Application>().contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) }
+                        ?: error("nie można otworzyć pliku")
+                }
+                "Zapisano (${json.length / 1024} KB)."
+            }.getOrElse { "Eksport nieudany: ${it.message}" }
+        }
+    }
+
     // --- rozmowa z trenerem ---
     val chat: StateFlow<List<com.zacco.rytm.ai.chat.ChatMessage>> = data.ai.chat
     private val _chatRunning = MutableStateFlow(false)
@@ -381,6 +436,14 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         val date = LocalDate.now(RytmTime.zone)
         val off = state.value?.today?.dayOff ?: false
         viewModelScope.launch { data.coach.setDayOff(date, !off) }
+    }
+
+    /** Sen wpisany ręcznie: noc kończąca się w dniu [date]. */
+    fun saveSleep(date: LocalDate, start: Instant, end: Instant) {
+        viewModelScope.launch {
+            runCatching { data.coach.saveSleep(date, start, end) }
+            WatchBridge.publish(getApplication())
+        }
     }
 
     fun setAlcohol(date: LocalDate, drinks: Int) {
