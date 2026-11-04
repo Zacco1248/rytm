@@ -62,10 +62,11 @@ fun HabitsScreen(
     onToggle: (HabitStatus) -> Unit,
     onSave: (HabitSpec) -> Unit,
     onDelete: (HabitSpec) -> Unit,
+    onQuickAdd: () -> Unit = {},
 ) {
     var editing by remember { mutableStateOf<HabitSpec?>(null) }
     var adding by remember { mutableStateOf(false) }
-    ScreenHeader(sub = "Tydzień od poniedziałku", title = "Nawyki")
+    ScreenHeader(sub = "Tydzień od poniedziałku", title = "Nawyki") { com.zacco.rytm.phone.ui.components.IconCircleButton(com.zacco.rytm.phone.ui.components.RytmIcons.plus, "Dodaj wpis", primary = true, onClick = onQuickAdd) }
 
     if (habits.isEmpty()) {
         RytmCard { SmallText("Nie masz żadnych nawyków. Dodaj pierwszy przyciskiem poniżej.") }

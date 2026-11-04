@@ -58,9 +58,10 @@ fun EveningScreen(
     onSaveSettings: (AiSettings) -> Unit,
     onSaveKey: (LlmProvider, String) -> Unit,
     onClearKey: (LlmProvider) -> Unit,
+    onQuickAdd: () -> Unit = {},
 ) {
     val t = s.today
-    ScreenHeader(sub = Format.dayLong(t.date), title = "Wieczór")
+    ScreenHeader(sub = Format.dayLong(t.date), title = "Wieczór") { com.zacco.rytm.phone.ui.components.IconCircleButton(com.zacco.rytm.phone.ui.components.RytmIcons.plus, "Dodaj wpis", primary = true, onClick = onQuickAdd) }
     RytmCard {
         CardHeader("Pora snu")
         Text(t.bedtime.format(DateTimeFormatter.ofPattern("HH:mm")), style = Rytm.type.bigNumber, color = Rytm.colors.ink)

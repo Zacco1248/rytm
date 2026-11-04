@@ -56,6 +56,7 @@ fun BodyScreen(
     onAddGoal: (com.zacco.rytm.domain.goals.UserGoal) -> Unit = {},
     onRemoveGoal: (String) -> Unit = {},
     onUpdateGoal: (com.zacco.rytm.domain.goals.UserGoal) -> Unit = {},
+    onQuickAdd: () -> Unit = {},
 ) {
     val (paceLabel, paceTone) = when (b.pace) {
         WeightPace.UNKNOWN -> "za mało ważeń" to ChipTone.MUTED
@@ -65,7 +66,11 @@ fun BodyScreen(
         WeightPace.STALLED -> "Waga stoi" to ChipTone.WARN
         WeightPace.TOO_FAST_UP -> "Za szybko w górę" to ChipTone.WARN
     }
-    ScreenHeader(sub = Format.goal(b.goal) + " · ostatnie 4 tygodnie", title = "Sylwetka") { Chip(paceLabel, paceTone) }
+    ScreenHeader(sub = Format.goal(b.goal) + " · ostatnie 4 tygodnie", title = "Sylwetka") {
+        Chip(paceLabel, paceTone)
+        androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+        com.zacco.rytm.phone.ui.components.IconCircleButton(com.zacco.rytm.phone.ui.components.RytmIcons.plus, "Dodaj wpis", primary = true, onClick = onQuickAdd)
+    }
     WeightCard(b, onAddWeighIn)
     GoalsCard(b.goals, b.strength.map { it.exercise }, b.currentAvg7, onAddGoal, onRemoveGoal, onUpdateGoal)
     // Reszta po dotknięciu: jedna rozwinięta karta naraz, żeby ekran nie był ścianą liczb.

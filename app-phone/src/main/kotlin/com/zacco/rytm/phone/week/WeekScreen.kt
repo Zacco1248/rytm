@@ -67,12 +67,15 @@ fun WeekScreen(
     onAcceptPlan: (String, Boolean) -> Unit = { _, _ -> },
     onDropPlan: (String) -> Unit = {},
     onOpenDay: (LocalDate) -> Unit = {},
+    onQuickAdd: () -> Unit = {},
     onRate: (WeekDay) -> Unit,
 ) {
     val w = state.week
     ScreenHeader(sub = Format.range(w.monday, w.monday.plusDays(6)), title = "Tydzień") {
         Chip("${w.strengthDone} / ${w.strengthRequired} siła" + if (w.strengthDone >= w.strengthRequired) " ✓" else "",
             if (w.strengthDone >= w.strengthRequired) ChipTone.GOOD else ChipTone.MUTED)
+        androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+        com.zacco.rytm.phone.ui.components.IconCircleButton(com.zacco.rytm.phone.ui.components.RytmIcons.plus, "Dodaj wpis", primary = true, onClick = onQuickAdd)
     }
     w.deload?.let { d ->
         RytmCard {

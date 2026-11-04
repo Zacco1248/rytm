@@ -387,6 +387,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onAcceptPlan = vm::acceptWeekPlan,
                         onDropPlan = vm::dropWeekPlan,
                         onOpenDay = { previewDate = it.toString() },
+                        onQuickAdd = { entryDate = null; sheet = Sheet.QUICK_ADD },
                     ) { day ->
                         rpeDate = day.date.toString()
                         sheet = Sheet.RPE
@@ -402,6 +403,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onAddGoal = vm::addGoal,
                         onRemoveGoal = vm::removeGoal,
                         onUpdateGoal = vm::updateGoal,
+                        onQuickAdd = { entryDate = null; sheet = Sheet.QUICK_ADD },
                     )
                     Tab.HABITS -> com.zacco.rytm.phone.habits.HabitsScreen(
                         habits = s.today.habitsAll,
@@ -409,6 +411,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         today = s.today.date,
                         onToggle = { vm.toggleHabit(it.habit, it.done) },
                         onSave = vm::saveHabit,
+                        onQuickAdd = { entryDate = null; sheet = Sheet.QUICK_ADD },
                         onDelete = { spec ->
                             vm.removeHabit(spec.id)?.let { (index, removed) ->
                                 scope.launch {
@@ -432,6 +435,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onSaveSettings = vm::saveAiSettings,
                         onSaveKey = vm::saveAiKey,
                         onClearKey = vm::clearAiKey,
+                        onQuickAdd = { entryDate = null; sheet = Sheet.QUICK_ADD },
                     )
                 }
             }
