@@ -55,6 +55,7 @@ import com.zacco.rytm.phone.today.CheckInSheet
 import com.zacco.rytm.phone.today.HabitsCard
 import com.zacco.rytm.phone.today.NutritionSheet
 import com.zacco.rytm.phone.today.RpeSheet
+import com.zacco.rytm.phone.today.SleepSheet
 import com.zacco.rytm.phone.today.ActivitySheet
 import com.zacco.rytm.phone.today.PhoneWorkoutScreen
 import com.zacco.rytm.phone.chat.ChatScreen
@@ -65,6 +66,8 @@ import com.zacco.rytm.phone.today.QuickEntry
 import com.zacco.rytm.phone.today.TodayScreen
 import com.zacco.rytm.phone.today.WeighInSheet
 import com.zacco.rytm.phone.today.WorkoutLogSheet
+import com.zacco.rytm.phone.ui.components.Chip
+import com.zacco.rytm.phone.ui.components.ChipTone
 import com.zacco.rytm.phone.ui.components.CardHeader
 import com.zacco.rytm.phone.ui.components.RytmCard
 import com.zacco.rytm.phone.ui.components.RytmIcons
@@ -84,7 +87,7 @@ enum class Tab(val label: String, val icon: ImageVector) {
     EVENING("Wieczór", RytmIcons.evening),
 }
 
-private enum class Sheet { NONE, QUICK_ADD, CHECK_IN, ACTIVITY, NUTRITION, RPE, WEIGH_IN, ALCOHOL, WORKOUT }
+private enum class Sheet { NONE, QUICK_ADD, CHECK_IN, ACTIVITY, NUTRITION, RPE, WEIGH_IN, ALCOHOL, WORKOUT, SLEEP }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -234,6 +237,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         EntryKind.ALCOHOL -> sheet = Sheet.ALCOHOL
                         EntryKind.ACTIVITY -> { rpeDate = e.date.toString(); sheet = Sheet.RPE }
                         EntryKind.CHECK_IN -> sheet = Sheet.CHECK_IN
+                        EntryKind.SLEEP -> sheet = Sheet.SLEEP
                     }
                 },
                 onDelete = vm::deleteEntry,
@@ -319,6 +323,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         morning = morningNotes.firstOrNull { it.date == s.today.date.toString() }?.note,
                         onCoach = { chatOpen = true },
                         onResetPlan = vm::resetTodayPlan,
+                        onAddSleep = { entryDate = null; sheet = Sheet.SLEEP },
                     )
                     Tab.WEEK -> WeekScreen(
                         s,
@@ -341,7 +346,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onAddGoal = vm::addGoal,
                         onRemoveGoal = vm::removeGoal,
                     )
-                    Tab.HABITS -> HabitsTab(s, onToggle = { vm.toggleHabit(it.habit, it.done) })
+                    Tab.HABITS -> HabitsTab(s, onToggle = { vm.toggleHabit(it.habit, it.done) }, onAddSleep = { entryDate = null; sheet = Sheet.SLEEP })
                     Tab.EVENING -> EveningScreen(
                         s = s,
                         ai = AiUi(
@@ -387,6 +392,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                 QuickEntry.WEIGH_IN -> Sheet.WEIGH_IN
                 QuickEntry.ALCOHOL -> Sheet.ALCOHOL
                 QuickEntry.CHECK_IN -> Sheet.CHECK_IN
+                QuickEntry.SLEEP -> Sheet.SLEEP
             }
         }
         Sheet.CHECK_IN -> CheckInSheet(state?.today?.checkIn, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveCheckIn)
@@ -409,6 +415,18 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
             replaceWeighIn?.let { vm.deleteWeighIn(it) }
             replaceWeighIn = null
             vm.addWeighIn(kg, fat, time, comp, date)
+        }
+        Sheet.SLEEP -> {
+            // Do poprawki: ręczny wpis z listy albo sen z zegarka z dzisiejszej nocy.
+            val manual = entries.firstOrNull { it.kind == EntryKind.SLEEP && it.date == date }
+            val night = state?.today?.night?.takeIf { it.date == date }
+            SleepSheet(
+                date,
+                initialStart = manual?.time ?: night?.sleepStart,
+                initialEnd = manual?.end ?: night?.sleepEnd,
+                onDismiss = { sheet = Sheet.NONE },
+                onSave = vm::saveSleep,
+            )
         }
         Sheet.NONE -> Unit
     }
@@ -451,7 +469,7 @@ private fun TabBar(selected: Tab, onSelect: (Tab) -> Unit) {
 }
 
 @Composable
-private fun HabitsTab(s: CoachUiState, onToggle: (com.zacco.rytm.domain.coach.HabitStatus) -> Unit) {
+private fun HabitsTab(s: CoachUiState, onToggle: (com.zacco.rytm.domain.coach.HabitStatus) -> Unit, onAddSleep: () -> Unit) {
     ScreenHeader(sub = "Tydzień od poniedziałku", title = "Nawyki")
     HabitsCard(s.today.habits, onToggle, showStreak = true)
     RytmCard {
@@ -460,11 +478,12 @@ private fun HabitsTab(s: CoachUiState, onToggle: (com.zacco.rytm.domain.coach.Ha
         SmallText(
             if (n?.sleepStart != null && n.sleepMin != null) {
                 "Ostatnia noc: zaśnięcie " + n.sleepStart!!.atZone(com.zacco.rytm.domain.time.RytmTime.zone).format(DateTimeFormatter.ofPattern("HH:mm")) +
-                    ", " + Format.minutes(n.sleepMin!!) + "."
+                    ", " + Format.minutes(n.sleepMin!!) + (if (n.sleepManual) " (wpisane ręcznie)." else ".")
             } else {
                 "Brak snu z ostatniej nocy w Health Connect."
             },
         )
+        Chip(if (n?.sleepMin == null) "Wpisz sen" else "Popraw sen", ChipTone.ACCENT, onClick = onAddSleep)
     }
     SmallText("Dodawanie własnych nawyków i kafelek na zegarku: faza 2.")
 }

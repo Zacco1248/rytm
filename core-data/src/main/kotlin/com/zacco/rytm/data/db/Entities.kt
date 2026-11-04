@@ -47,6 +47,8 @@ data class DailyMetricsEntity(
     val updatedAt: Instant,
     /** Wersja 2: zapasowe tętno spoczynkowe z dnia. */
     val dayRestingHr: Int? = null,
+    /** Wersja 4: sen wpisany ręcznie (zegarek nie zarejestrował). Synchronizacja go nie nadpisuje. */
+    val sleepManual: Boolean = false,
 )
 
 @Entity(tableName = "nutrition_day")

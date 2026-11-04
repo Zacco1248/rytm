@@ -2,6 +2,7 @@ package com.zacco.rytm.data.repo
 
 import com.zacco.rytm.data.db.ActivityEntity
 import com.zacco.rytm.data.db.CancellationEntity
+import com.zacco.rytm.data.db.DailyMetricsEntity
 import com.zacco.rytm.data.db.DayNoteEntity
 import com.zacco.rytm.data.db.HabitLogEntity
 import com.zacco.rytm.data.db.NutritionDayEntity
@@ -115,6 +116,25 @@ class CoachRepository(
                 ),
             ),
         )
+    }
+
+    /**
+     * Sen wpisany ręcznie, gdy zegarek go nie zarejestrował: noc kończąca się w dniu [date] (pobudka).
+     * Kroki i kalorie dnia zostają; synchronizacja nie nadpisze snu, dopóki wpis istnieje.
+     */
+    suspend fun saveSleep(date: LocalDate, start: Instant, end: Instant) {
+        val min = java.time.Duration.between(start, end).toMinutes().toInt()
+        require(min in 30..16 * 60) { "sen 30 min–16 h" }
+        val current = db.dailyMetrics().get(date)
+        val base = current ?: DailyMetricsEntity(date, null, null, null, null, null, null, Instant.now())
+        db.dailyMetrics().upsert(base.copy(sleepMin = min, sleepStart = start, sleepEnd = end, sleepManual = true, updatedAt = Instant.now()))
+    }
+
+    /** Usuwa ręczny sen; przy następnej synchronizacji dnia wróci sen z zegarka, jeśli jest. */
+    suspend fun clearManualSleep(date: LocalDate) {
+        val current = db.dailyMetrics().get(date) ?: return
+        if (!current.sleepManual) return
+        db.dailyMetrics().upsert(current.copy(sleepMin = null, sleepStart = null, sleepEnd = null, nightRestingHr = null, sleepManual = false, updatedAt = Instant.now()))
     }
 
     /** „Dziś wolne”: plan przesuwa trening, bez kary. */

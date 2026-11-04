@@ -2,6 +2,7 @@ package com.zacco.rytm.phone.entries
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -55,11 +56,15 @@ fun EntriesScreen(
         exportStatus?.let { SmallText(it) }
     }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         Pill("Wszystko", filter == null) { filter = null }
         Pill("Waga", filter == EntryKind.WEIGH_IN.name) { filter = EntryKind.WEIGH_IN.name }
         Pill("Jedzenie", filter == EntryKind.NUTRITION.name) { filter = EntryKind.NUTRITION.name }
         Pill("Ruch", filter == EntryKind.ACTIVITY.name) { filter = EntryKind.ACTIVITY.name }
+        Pill("Sen", filter == EntryKind.SLEEP.name) { filter = EntryKind.SLEEP.name }
     }
 
     val shown = entries.filter { filter == null || it.kind.name == filter }

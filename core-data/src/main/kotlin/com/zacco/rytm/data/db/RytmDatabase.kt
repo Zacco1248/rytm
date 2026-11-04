@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LlmUsageEntity::class,
         SyncStateEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -42,7 +42,7 @@ abstract class RytmDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context): RytmDatabase =
             Room.databaseBuilder(context.applicationContext, RytmDatabase::class.java, "rytm.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
 
         /** Ręczne wpisy (check-in, żywienie, ważenia) muszą przetrwać aktualizację, więc migracja zamiast czyszczenia bazy. */
@@ -68,6 +68,13 @@ abstract class RytmDatabase : RoomDatabase() {
                         "`date` TEXT NOT NULL, PRIMARY KEY(`workoutId`, `exercise`, `setIndex`))",
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_workout_set_date` ON `workout_set` (`date`)")
+            }
+        }
+
+        /** Sen wpisany ręcznie. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `daily_metrics` ADD COLUMN `sleepManual` INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

@@ -438,6 +438,14 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { data.coach.setDayOff(date, !off) }
     }
 
+    /** Sen wpisany ręcznie: noc kończąca się w dniu [date]. */
+    fun saveSleep(date: LocalDate, start: Instant, end: Instant) {
+        viewModelScope.launch {
+            runCatching { data.coach.saveSleep(date, start, end) }
+            WatchBridge.publish(getApplication())
+        }
+    }
+
     fun setAlcohol(date: LocalDate, drinks: Int) {
         viewModelScope.launch { data.coach.setAlcohol(date, drinks) }
     }

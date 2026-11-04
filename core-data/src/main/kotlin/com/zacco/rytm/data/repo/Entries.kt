@@ -16,7 +16,7 @@ import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.time.LocalDate
 
-enum class EntryKind { WEIGH_IN, NUTRITION, ACTIVITY, CHECK_IN, ALCOHOL }
+enum class EntryKind { WEIGH_IN, NUTRITION, ACTIVITY, CHECK_IN, ALCOHOL, SLEEP }
 
 /** Jeden wpis na liście „Wpisy” (do poprawienia albo usunięcia). */
 data class Entry(
@@ -32,6 +32,8 @@ data class Entry(
     /** Trening z dziennikiem serii (usuwa też serie). */
     val hasSets: Boolean = false,
     val rpe: Int? = null,
+    /** Koniec (sen: pobudka). */
+    val end: Instant? = null,
 )
 
 /** Przegląd, usuwanie i eksport wpisów. */
@@ -45,8 +47,19 @@ class EntriesRepository(private val db: RytmDatabase, private val profiles: Prof
             db.activities().observe(from, today),
             db.checkIns().observe(from, today),
             db.dayNotes().observe(from, today),
-        ) { w, n, a, c, notes ->
+        ) { w, n, a, c, notes -> Parts(w, n, a, c, notes) }.combine(db.dailyMetrics().observe(from, today)) { p, metrics ->
+            val (w, n, a, c, notes) = p
             val list = mutableListOf<Entry>()
+            metrics.filter { it.sleepManual && it.sleepStart != null && it.sleepEnd != null }.forEach { e ->
+                val hm = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+                val from = e.sleepStart!!.atZone(RytmTime.zone).format(hm)
+                val to = e.sleepEnd!!.atZone(RytmTime.zone).format(hm)
+                val min = e.sleepMin ?: 0
+                list += Entry(
+                    EntryKind.SLEEP, e.date.toString(), e.date, e.sleepStart, "Sen (ręcznie)",
+                    "$from–$to · ${min / 60} h ${min % 60} min", fromHealthConnect = false, end = e.sleepEnd,
+                )
+            }
             w.forEach { e ->
                 list += Entry(
                     EntryKind.WEIGH_IN, e.id, e.date, e.time, "Ważenie",
@@ -90,6 +103,10 @@ class EntriesRepository(private val db: RytmDatabase, private val profiles: Prof
                 db.activities().delete(e.id)
             }
             EntryKind.CHECK_IN -> db.checkIns().delete(e.date)
+            EntryKind.SLEEP -> {
+                val m = db.dailyMetrics().get(e.date) ?: return
+                db.dailyMetrics().upsert(m.copy(sleepMin = null, sleepStart = null, sleepEnd = null, nightRestingHr = null, sleepManual = false, updatedAt = Instant.now()))
+            }
             EntryKind.ALCOHOL -> {
                 val note = db.dayNotes().get(e.date) ?: return
                 if (!note.dayOff) db.dayNotes().delete(e.date) else db.dayNotes().upsert(note.copy(alcoholDrinks = 0, updatedAt = Instant.now()))
@@ -123,7 +140,8 @@ class EntriesRepository(private val db: RytmDatabase, private val profiles: Prof
             }
             putJsonArray("dailyMetrics") {
                 metrics.forEach { e ->
-                    add(obj("date" to e.date.toString(), "sleepMin" to e.sleepMin, "nightRestingHr" to e.nightRestingHr,
+                    add(obj("date" to e.date.toString(), "sleepMin" to e.sleepMin, "sleepStart" to e.sleepStart?.toString(),
+                        "sleepEnd" to e.sleepEnd?.toString(), "sleepManual" to e.sleepManual, "nightRestingHr" to e.nightRestingHr,
                         "dayRestingHr" to e.dayRestingHr, "steps" to e.steps, "totalKcal" to e.totalKcal))
                 }
             }
@@ -155,6 +173,14 @@ class EntriesRepository(private val db: RytmDatabase, private val profiles: Prof
         }
         return Json { prettyPrint = true }.encodeToString(JsonObject.serializer(), root)
     }
+
+    private data class Parts(
+        val w: List<com.zacco.rytm.data.db.WeighInEntity>,
+        val n: List<com.zacco.rytm.data.db.NutritionDayEntity>,
+        val a: List<com.zacco.rytm.data.db.ActivityEntity>,
+        val c: List<com.zacco.rytm.data.db.CheckInEntity>,
+        val notes: List<com.zacco.rytm.data.db.DayNoteEntity>,
+    )
 
     private fun obj(vararg pairs: Pair<String, Any?>): JsonObject = JsonObject(
         pairs.associate { (k, v) ->

@@ -46,6 +46,7 @@ import com.zacco.rytm.domain.model.DailyCheckIn
 import com.zacco.rytm.domain.model.LoadedArea
 import com.zacco.rytm.domain.model.ActivityType
 import com.zacco.rytm.domain.time.RytmTime
+import com.zacco.rytm.domain.sleep.ManualSleep
 import androidx.compose.foundation.verticalScroll
 import com.zacco.rytm.phone.app.ActivityEntry
 import com.zacco.rytm.phone.app.Format
@@ -293,6 +294,61 @@ fun AlcoholSheet(date: LocalDate, current: Int, onDismiss: () -> Unit, onSave: (
     }
 }
 
+/**
+ * Sen wpisany ręcznie, gdy zegarek go nie zarejestrował (np. ładował się w nocy).
+ * [date] to dzień pobudki; zaśnięcie po pobudce na zegarze oznacza dzień wcześniej.
+ */
+@Composable
+fun SleepSheet(
+    date: LocalDate,
+    initialStart: Instant?,
+    initialEnd: Instant?,
+    onDismiss: () -> Unit,
+    onSave: (LocalDate, Instant, Instant) -> Unit,
+) {
+    val zone = RytmTime.zone
+    val hm = DateTimeFormatter.ofPattern("HH:mm")
+    var onset by remember { mutableStateOf(initialStart?.atZone(zone)?.format(hm) ?: "23:30") }
+    var wake by remember { mutableStateOf(initialEnd?.atZone(zone)?.format(hm) ?: "07:00") }
+    val window = ManualSleep.window(date, ManualSleep.parseTime(onset), ManualSleep.parseTime(wake))
+    val minutes = window?.let { java.time.Duration.between(it.first, it.second).toMinutes().toInt() }
+    val inFuture = window != null && window.second.isAfter(Instant.now())
+    val valid = minutes != null && minutes in 30..16 * 60 && !inFuture
+    RytmSheet("Sen · pobudka " + Format.dayShortLabel(date, LocalDate.now(zone)), onDismiss) {
+        SmallText("Gdy zegarek nie zapisał snu, wpisz godzinę zaśnięcia i pobudki. Wpis liczy się do gotowości i nie zostanie nadpisany przez synchronizację.")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TimeField("Zaśnięcie", onset, Modifier.weight(1f)) { onset = it }
+            TimeField("Pobudka", wake, Modifier.weight(1f)) { wake = it }
+        }
+        SmallText(
+            when {
+                window == null -> "Wpisz godziny jako gg:mm, np. 23:45."
+                inFuture -> "Pobudka nie może być w przyszłości."
+                minutes!! < 30 || minutes > 16 * 60 -> "Sen musi trwać od 30 min do 16 h."
+                else -> "Od " + window.first.atZone(zone).format(DateTimeFormatter.ofPattern("EEE HH:mm", java.util.Locale.forLanguageTag("pl"))) +
+                    " do " + window.second.atZone(zone).format(hm) + " · " + Format.minutes(minutes)
+            },
+            color = if (window != null && !valid) Rytm.colors.warn else Rytm.colors.muted,
+        )
+        RytmButton("Zapisz", Modifier.fillMaxWidth(), primary = true, enabled = valid) {
+            onSave(date, window!!.first, window.second)
+            onDismiss()
+        }
+    }
+}
+
+@Composable
+private fun TimeField(label: String, value: String, modifier: Modifier, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = { v -> onChange(v.filter { it.isDigit() || it == ':' }.take(5)) },
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+        modifier = modifier,
+    )
+}
+
 @Composable
 private fun NumberField(label: String, value: String, modifier: Modifier, onChange: (String) -> Unit) {
     OutlinedTextField(
@@ -417,7 +473,7 @@ fun WorkoutLogSheet(
     var rpe by remember { mutableStateOf<Int?>(null) }
 
     RytmSheet("Zapisz trening", onDismiss) {
-        SmallText("Wpisane są cele z planu. Popraw powtórzenia i ciężar tam, gdzie zrobiłeś inaczej. Na tej podstawie Rytm dobierze ciężar na następny raz.")
+        SmallText("Wpisane są cele z planu. Popraw powtórzenia i ciężar tam, gdzie było inaczej. Na tej podstawie Rytm dobierze ciężar na następny raz.")
         workout.exercises.forEachIndexed { i, e ->
             val off = i in skipped
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -474,7 +530,7 @@ fun ExerciseSheet(info: com.zacco.rytm.domain.exercise.ExerciseInfo, onDismiss: 
 }
 
 /** Co można dodać z przycisku „+”. */
-enum class QuickEntry { ACTIVITY, WORKOUT, NUTRITION, WEIGH_IN, ALCOHOL, CHECK_IN }
+enum class QuickEntry { ACTIVITY, WORKOUT, NUTRITION, WEIGH_IN, ALCOHOL, CHECK_IN, SLEEP }
 
 /**
  * Jeden przycisk „+” zamiast rzędu przycisków. Dzień wybierasz raz u góry i dotyczy każdego wpisu;
@@ -506,6 +562,7 @@ fun QuickAddSheet(
             add(Triple(QuickEntry.NUTRITION, "Żywienie", "kcal i makro z Fitatu"))
             add(Triple(QuickEntry.WEIGH_IN, "Ważenie", "ręcznie albo zrzut"))
             add(Triple(QuickEntry.ALCOHOL, "Alkohol", "liczba porcji"))
+            add(Triple(QuickEntry.SLEEP, "Sen", "gdy zegarek nie zapisał"))
             if (isToday) add(Triple(QuickEntry.CHECK_IN, "Check-in", "energia i co boli"))
         }
         tiles.chunked(2).forEach { row ->
