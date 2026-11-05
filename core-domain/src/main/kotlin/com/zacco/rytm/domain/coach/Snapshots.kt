@@ -53,6 +53,8 @@ data class TodaySnapshot(
     val alcoholYesterday: Int,
     val alcoholToday: Int,
     val habits: List<HabitStatus>,
+    /** Wszystkie nawyki z tygodniem (zakładka Nawyki), także te już zaliczone w tym tygodniu. */
+    val habitsAll: List<HabitStatus> = emptyList(),
     val steps: Int?,
     val lastSync: Instant?,
     /** Serie zapisane dziś (trening z zegarka albo z telefonu). */
@@ -70,7 +72,16 @@ data class TodaySnapshot(
     val activityKcal: Int get() = activitiesToday.sumOf { it.kcal ?: 0 }
 }
 
-data class HabitStatus(val habit: Habit, val value: Int?, val done: Boolean, val streak: Int)
+data class HabitStatus(
+    val habit: Habit,
+    val value: Int?,
+    val done: Boolean,
+    val streak: Int,
+    /** Bieżący tydzień od poniedziałku: true zrobione, false nie, null dzień przyszły albo poza planem nawyku. */
+    val week: List<Boolean?> = emptyList(),
+    val weekDone: Int = 0,
+    val weekRequired: Int = 0,
+)
 
 /** Ekran „Tydzień”. */
 data class WeekSnapshot(

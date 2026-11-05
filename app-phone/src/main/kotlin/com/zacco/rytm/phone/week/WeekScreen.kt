@@ -2,6 +2,8 @@ package com.zacco.rytm.phone.week
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,12 +66,16 @@ fun WeekScreen(
     weekPlans: List<com.zacco.rytm.domain.coach.WeekPlan> = emptyList(),
     onAcceptPlan: (String, Boolean) -> Unit = { _, _ -> },
     onDropPlan: (String) -> Unit = {},
+    onOpenDay: (LocalDate) -> Unit = {},
+    onQuickAdd: () -> Unit = {},
     onRate: (WeekDay) -> Unit,
 ) {
     val w = state.week
     ScreenHeader(sub = Format.range(w.monday, w.monday.plusDays(6)), title = "Tydzień") {
         Chip("${w.strengthDone} / ${w.strengthRequired} siła" + if (w.strengthDone >= w.strengthRequired) " ✓" else "",
             if (w.strengthDone >= w.strengthRequired) ChipTone.GOOD else ChipTone.MUTED)
+        androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+        com.zacco.rytm.phone.ui.components.IconCircleButton(com.zacco.rytm.phone.ui.components.RytmIcons.plus, "Dodaj wpis", primary = true, onClick = onQuickAdd)
     }
     w.deload?.let { d ->
         RytmCard {
@@ -81,13 +87,25 @@ fun WeekScreen(
             SmallText(d.text)
         }
     }
-    WeeklyReportCard(state.today.date, weekly, weeklyRunning, onRunWeekly)
-    // Plan na ten albo kolejny tydzień (w niedzielę propozycja dotyczy następnego).
-    weekPlans.firstOrNull { p -> runCatching { !LocalDate.parse(p.weekStart).plusDays(6).isBefore(state.today.date) }.getOrDefault(false) }
-        ?.let { WeekPlanCard(it, state.today.date, onAcceptPlan, onDropPlan) }
+    PlanCard(state, onToggleCancelled, onRate, onOpenDay)
+    // Notatka od trenera: plan na ten albo kolejny tydzień (w niedzielę propozycja dotyczy następnego), inaczej wniosek z raportu.
+    val plan = weekPlans.firstOrNull { p -> runCatching { !LocalDate.parse(p.weekStart).plusDays(6).isBefore(state.today.date) }.getOrDefault(false) }
+    if (plan != null) WeekPlanCard(plan, state.today.date, onAcceptPlan, onDropPlan)
+    else weekly?.report?.nextWeek?.takeIf { it.isNotBlank() }?.let { CoachNote(it) }
     LoadCard(w)
-    AcwrCard(w)
-    PlanCard(state, onToggleCancelled, onRate)
+    WeeklyReportCard(state.today.date, weekly, weeklyRunning, onRunWeekly)
+}
+
+@Composable
+private fun CoachNote(text: String) {
+    val c = Rytm.colors
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.accentSoft).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        com.zacco.rytm.phone.ui.components.CardLabel("Od trenera · ten tydzień")
+        Text(text, style = Rytm.type.body, color = c.ink)
+    }
 }
 
 // --- plan siłowy od trenera ---
@@ -100,35 +118,43 @@ private fun WeekPlanCard(
     onDrop: (String) -> Unit,
 ) {
     val c = Rytm.colors
-    var expanded by remember(p.createdAt) { mutableStateOf(!p.accepted) }
+    var expanded by remember(p.createdAt) { mutableStateOf(false) }
     val start = LocalDate.parse(p.weekStart)
-    RytmCard {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.accentSoft).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         CardHeader(
-            "Plan siłowy od trenera",
+            if (start.isAfter(today)) "Od trenera · kolejny tydzień" else "Od trenera · ten tydzień",
             help = "W niedzielę trener AI proponuje sesje siłowe na kolejny tydzień: dobiera ćwiczenia i liczbę serii pod Twoje cele, zastoje " +
                 "i to, jak minął tydzień. Ćwiczenia wybiera tylko z tych, na które masz sprzęt, a ciężar i tak liczy progresja z dziennika serii. " +
                 "Plan obowiązuje dopiero po przyjęciu; bez tego zostaje plan z reguł.",
         ) {
-            Chip(
-                (if (p.accepted) "przyjęty" else "propozycja") + if (expanded) " ▴" else " ▾",
-                if (p.accepted) ChipTone.GOOD else ChipTone.ACCENT,
-            ) { expanded = !expanded }
+            Chip(if (p.accepted) "przyjęty" else "propozycja", if (p.accepted) ChipTone.GOOD else ChipTone.ACCENT)
         }
-        SmallText(Format.range(start, start.plusDays(6)) + ". " + p.reason)
+        Text(p.reason, style = Rytm.type.body, color = c.ink)
+        Text(
+            (if (expanded) "Ukryj sesje" else "Pokaż sesje (${p.days.size})"),
+            style = Rytm.type.bodyStrong,
+            color = c.accent,
+            modifier = Modifier.heightIn(min = 40.dp).clickable(role = androidx.compose.ui.semantics.Role.Button) { expanded = !expanded }.padding(top = 8.dp),
+        )
         if (expanded) {
             p.days.forEach { d ->
                 val date = runCatching { LocalDate.parse(d.date) }.getOrNull()
                 Text((date?.let { Format.dayShortLabel(it, today) + " · " } ?: "") + d.title, style = Rytm.type.bodyStrong, color = c.ink)
-                if (d.note.isNotBlank()) SmallText(d.note)
-                d.exercises.forEach { e -> SmallText("• ${e.name}: ${e.sets} × ${e.repsMin}–${e.repsMax}" + (e.note?.let { " · $it" } ?: "")) }
+                if (d.note.isNotBlank()) SmallText(d.note, color = c.ink)
+                d.exercises.forEach { e -> SmallText("• ${e.name}: ${e.sets} × ${e.repsMin}–${e.repsMax}" + (e.note?.let { " · $it" } ?: ""), color = c.ink) }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (p.accepted) {
-                RytmButton("Wróć do planu z reguł", Modifier.weight(1f)) { onAccept(p.weekStart, false) }
-            } else {
-                RytmButton("Przyjmij", Modifier.weight(1f), primary = true) { onAccept(p.weekStart, true) }
-                RytmButton("Odrzuć", Modifier.weight(1f)) { onDrop(p.weekStart) }
+        if (!p.accepted || expanded) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (p.accepted) {
+                    RytmButton("Wróć do planu z reguł", Modifier.weight(1f)) { onAccept(p.weekStart, false) }
+                } else {
+                    RytmButton("Przyjmij", Modifier.weight(1f), primary = true) { onAccept(p.weekStart, true) }
+                    RytmButton("Odrzuć", Modifier.weight(1f)) { onDrop(p.weekStart) }
+                }
             }
         }
     }
@@ -141,7 +167,7 @@ private fun WeeklyReportCard(today: LocalDate, saved: SavedWeeklyReport?, runnin
     val c = Rytm.colors
     // Raport sprzed ponad tygodnia jest już nieaktualny; zostaje tylko przycisk.
     val fresh = saved?.takeIf { runCatching { LocalDate.parse(it.weekEnd) }.getOrNull()?.let { d -> !d.isBefore(today.minusDays(6)) } == true }
-    var expanded by remember(fresh?.createdAt) { mutableStateOf(today.dayOfWeek == java.time.DayOfWeek.SUNDAY || today.dayOfWeek == java.time.DayOfWeek.MONDAY) }
+    var expanded by remember(fresh?.createdAt) { mutableStateOf(false) }
     RytmCard {
         CardHeader("Raport tygodnia") {
             if (fresh != null) {
@@ -152,7 +178,7 @@ private fun WeeklyReportCard(today: LocalDate, saved: SavedWeeklyReport?, runnin
             }
         }
         if (fresh == null) {
-            SmallText("Raport liczy się sam w niedzielę o 20:00: co poszło, co nie, trendy, zależności (np. sen po dniach ze sportem), sylwetka i plan na kolejny tydzień.")
+            SmallText("Gotowy w niedzielę o 20:00.")
         } else {
             val r = fresh.report
             Text(r.summary, style = Rytm.type.small, color = c.ink)
@@ -170,7 +196,7 @@ private fun WeeklyReportCard(today: LocalDate, saved: SavedWeeklyReport?, runnin
                 if (fresh.costUsd > 0) SmallText("Koszt: %.3f USD".format(java.util.Locale.ROOT, fresh.costUsd))
             }
         }
-        RytmButton(
+        if (fresh == null || expanded) RytmButton(
             if (running) "Liczę raport…" else if (fresh == null) "Zrób raport teraz" else "Przelicz raport",
             Modifier.fillMaxWidth(),
             enabled = !running,
@@ -212,20 +238,39 @@ private fun RytmColors.forKind(k: DayKind): Color = when (k) {
 private fun LoadCard(w: WeekSnapshot) {
     val c = Rytm.colors
     val max = (w.days.maxOfOrNull { maxOf(it.actualLoad, it.plannedLoad) } ?: 0).coerceAtLeast(300).toFloat()
-    RytmCard {
-        CardHeader("Obciążenie", help = "Obciążenie (sRPE) = RPE × minuty. Godzina na RPE 8 to 480, a 30 min spokojnego spaceru na RPE 2 to 60. Słupki pokazują dni tygodnia; jaśniejsze z „~” to plan, pełne to to, co już zrobione. RPE to ocena wysiłku 1–10 po treningu.") { SmallText("sRPE = RPE × min") }
+    var expanded by remember { mutableStateOf(false) }
+    val load = w.load
+    val (label, tone) = when (load.zone) {
+        AcwrZone.UNKNOWN -> "za mało danych" to ChipTone.MUTED
+        AcwrZone.LOW -> "lekko" to ChipTone.ACCENT
+        AcwrZone.SAFE -> "w normie" to ChipTone.GOOD
+        AcwrZone.ELEVATED -> "podwyższone" to ChipTone.WARN
+        AcwrZone.HIGH -> "za dużo" to ChipTone.BAD
+    }
+    RytmCard(onClick = { expanded = !expanded }) {
+        CardHeader("Obciążenie", help = "Obciążenie (sRPE) = RPE × minuty. Godzina na RPE 8 to 480, a 30 min spokojnego spaceru na RPE 2 to 60. Słupki to dni tygodnia: blade z „~” to plan, pełne to to, co już zrobione. Dotknij karty, żeby zobaczyć ACWR, czyli porównanie tego tygodnia z ostatnim miesiącem.") {
+            Chip(label, tone)
+        }
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(Format.int(load.acute7d), style = Rytm.type.bigNumber.copy(fontSize = Rytm.type.bigNumber.fontSize * 0.9f), color = c.ink)
+            if (load.chronicWeeklyAvg > 0) SmallText("z ok. ${Format.int(load.chronicWeeklyAvg)} na tydzień", Modifier.padding(bottom = 4.dp))
+        }
         Row(
             Modifier.fillMaxWidth().semantics { contentDescription = "Obciążenie dzienne sRPE w tym tygodniu" },
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             w.days.forEach { d -> LoadBar(d, max, d.date == w.today) }
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Legend(c.kindStrength, "siła")
-            Legend(c.kindSport, "sport")
-            Legend(c.kindPt, "z trenerem")
-            Legend(c.kindMobility, "mobilność")
-            Legend(c.kindOther, "inne")
+        if (expanded) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Legend(c.kindStrength, "siła")
+                Legend(c.kindSport, "sport")
+                Legend(c.kindPt, "z trenerem")
+                Legend(c.kindMobility, "mobilność")
+                Legend(c.kindOther, "inne")
+            }
+            Divider()
+            AcwrDetails(w)
         }
     }
 }
@@ -235,7 +280,7 @@ private fun LoadBar(d: WeekDay, max: Float, today: Boolean) {
     val c = Rytm.colors
     val planned = d.actualLoad == 0 && d.plannedLoad > 0
     val value = if (planned) d.plannedLoad else d.actualLoad
-    val barHeight = 92.dp
+    val barHeight = 56.dp
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(if (value > 0) (if (planned) "~" else "") + Format.int(value) else "", style = Rytm.type.tiny, color = c.muted)
         Canvas(Modifier.width(30.dp).height(barHeight)) {
@@ -273,7 +318,7 @@ private fun Legend(color: Color, text: String) {
 // --- ACWR ---
 
 @Composable
-private fun AcwrCard(w: WeekSnapshot) {
+private fun AcwrDetails(w: WeekSnapshot) {
     val c = Rytm.colors
     val load = w.load
     val (label, tone) = when (load.zone) {
@@ -283,7 +328,7 @@ private fun AcwrCard(w: WeekSnapshot) {
         AcwrZone.ELEVATED -> "podwyższone" to ChipTone.WARN
         AcwrZone.HIGH -> "wysokie" to ChipTone.BAD
     }
-    RytmCard {
+    run {
         CardHeader("ACWR", help = "ACWR porównuje obciążenie z ostatnich 7 dni ze średnim tygodniem z 28 dni. 0,8–1,3 to strefa bezpieczna: organizm jest przyzwyczajony do takiej pracy. Powyżej 1,5 obciążenie rośnie za szybko i rośnie ryzyko przeciążenia, więc plan wymusza lżejsze dni. Poniżej 0,8 forma może spadać.") {
             Chip((load.acwr?.let { Format.dec(it, 2) + " · " } ?: "") + label, tone)
         }
@@ -319,22 +364,48 @@ private fun AcwrCard(w: WeekSnapshot) {
 // --- plan ---
 
 @Composable
-private fun PlanCard(state: CoachUiState, onToggleCancelled: (LocalDate) -> Unit, onRate: (WeekDay) -> Unit) {
+private fun PlanCard(state: CoachUiState, onToggleCancelled: (LocalDate) -> Unit, onRate: (WeekDay) -> Unit, onOpenDay: (LocalDate) -> Unit) {
     val w = state.week
-    RytmCard {
-        val weekKcal = w.days.sumOf { d -> d.activities.sumOf { it.kcal ?: 0 } }
-        CardHeader("Plan") { if (weekKcal > 0) SmallText("spalone w aktywnościach: ${Format.int(weekKcal)} kcal") }
-        Column {
-            w.days.forEachIndexed { i, d ->
-                if (i > 0 && d.date != w.today && w.days[i - 1].date != w.today) Divider()
-                DayRow(d, d.date == w.today, d.date < w.today, onRate)
+    val c = Rytm.colors
+    var selected by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(w.today.toString()) }
+    val sel = w.days.firstOrNull { it.date.toString() == selected } ?: w.days.firstOrNull { it.date == w.today } ?: w.days.first()
+    RytmCard(padding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
+        // Pasek dni: kropka w kolorze rodzaju dnia, ✓ gdy zrobione. Dotknij dnia, żeby zobaczyć szczegóły.
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            w.days.forEach { d ->
+                val on = d == sel
+                val isToday = d.date == w.today
+                val done = d.activities.any { it.type != ActivityType.WALK }
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (on) c.accentSoft else androidx.compose.ui.graphics.Color.Transparent)
+                        .then(if (isToday) Modifier.border(2.dp, c.accent, RoundedCornerShape(14.dp)) else Modifier)
+                        .clickable(role = androidx.compose.ui.semantics.Role.Tab, onClickLabel = "Pokaż dzień") { selected = d.date.toString() }
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(Format.weekdayShort(d.date.dayOfWeek), style = Rytm.type.tiny, color = if (on || isToday) c.ink else c.muted)
+                    Text("${d.date.dayOfMonth}", style = Rytm.type.dayNumber, color = c.ink)
+                    if (done) Text("✓", style = Rytm.type.tiny, color = c.good)
+                    else Box(Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(if (d.cancelled || d.dayOff) c.kindRest else c.forKind(d.plan.kind)))
+                }
             }
         }
+        Divider()
+        DayRow(sel, false, sel.date < w.today, onRate)
+        if (!sel.date.isBefore(w.today) && (sel.plan.workout != null || sel.plan.cardio != null)) {
+            RytmButton(if (sel.date == w.today) "Zobacz trening" else "Zobacz plan treningu", Modifier.fillMaxWidth()) { onOpenDay(sel.date) }
+        }
+        val weekKcal = w.days.sumOf { d -> d.activities.sumOf { it.kcal ?: 0 } }
+        if (weekKcal > 0) SmallText("Spalone w aktywnościach w tym tygodniu: ${Format.int(weekKcal)} kcal")
         // Przyciski tylko wtedy, gdy w profilu jest stały sport albo trening z trenerem; z nazwą i dniem.
-        val match = state.nextMatch
-        val pt = state.nextPersonal
+        // Tylko przy wybranym dniu ze stałym sportem albo treningiem z trenerem.
+        val match = state.nextMatch?.takeIf { it == sel.date }
+        val pt = state.nextPersonal?.takeIf { it == sel.date }
         if (match != null || pt != null) {
-            SmallText("Coś wypadło? Plan przeliczy dzień i dobierze zamiennik.")
             ButtonRow {
                 if (match != null) {
                     val what = (state.nextMatchName ?: "sport") + " · " + Format.weekdayShort(match.dayOfWeek)

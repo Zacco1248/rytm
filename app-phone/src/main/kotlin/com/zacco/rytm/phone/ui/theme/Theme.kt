@@ -44,6 +44,8 @@ data class RytmColors(
     val kindMobility: Color = Color(0xFF19935F),
     val kindRest: Color = Color(0xFF9AA6B1),
     val kindOther: Color = Color(0xFF7B8794),
+    /** Obrys przycisków i pól: min. 3:1 do tła karty (WCAG 1.4.11). */
+    val outline: Color = Color(0xFF8A96A2),
 )
 
 val LightRytmColors = RytmColors(
@@ -88,6 +90,7 @@ val DarkRytmColors = RytmColors(
     kindSport = Color(0xFFF0B44A),
     kindPt = Color(0xFFB98AF0),
     kindMobility = Color(0xFF43C98D),
+    outline = Color(0xFF6B7783),
 )
 
 val SoraFamily = FontFamily(
@@ -111,12 +114,12 @@ data class RytmType(
     val ringNumber: TextStyle = TextStyle(fontFamily = SoraFamily, fontWeight = FontWeight.SemiBold, fontSize = 34.sp, lineHeight = 34.sp),
     val dayNumber: TextStyle = TextStyle(fontFamily = SoraFamily, fontWeight = FontWeight.SemiBold, fontSize = 17.sp),
     val cardTitle: TextStyle = TextStyle(fontFamily = PlexFamily, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, letterSpacing = 0.5.sp),
-    val body: TextStyle = TextStyle(fontFamily = PlexFamily, fontWeight = FontWeight.Normal, fontSize = 14.sp),
-    val bodyStrong: TextStyle = TextStyle(fontFamily = PlexFamily, fontWeight = FontWeight.SemiBold, fontSize = 14.5.sp),
-    val small: TextStyle = TextStyle(fontFamily = PlexFamily, fontWeight = FontWeight.Normal, fontSize = 13.sp),
-    val tiny: TextStyle = TextStyle(fontFamily = PlexFamily, fontWeight = FontWeight.Normal, fontSize = 11.sp),
+    val body: TextStyle = TextStyle(fontFamily = PlexFamily, fontWeight = FontWeight.Normal, fontSize = 15.sp),
+    val bodyStrong: TextStyle = TextStyle(fontFamily = PlexFamily, fontWeight = FontWeight.SemiBold, fontSize = 15.sp),
+    val small: TextStyle = TextStyle(fontFamily = PlexFamily, fontWeight = FontWeight.Normal, fontSize = 14.sp),
+    val tiny: TextStyle = TextStyle(fontFamily = PlexFamily, fontWeight = FontWeight.Normal, fontSize = 12.sp),
     val chip: TextStyle = TextStyle(fontFamily = PlexFamily, fontWeight = FontWeight.SemiBold, fontSize = 12.sp),
-    val button: TextStyle = TextStyle(fontFamily = PlexFamily, fontWeight = FontWeight.Medium, fontSize = 14.sp),
+    val button: TextStyle = TextStyle(fontFamily = PlexFamily, fontWeight = FontWeight.SemiBold, fontSize = 15.sp),
 )
 
 val LocalRytmColors = staticCompositionLocalOf { LightRytmColors }

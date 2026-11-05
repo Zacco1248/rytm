@@ -56,6 +56,7 @@ fun BodyScreen(
     onAddGoal: (com.zacco.rytm.domain.goals.UserGoal) -> Unit = {},
     onRemoveGoal: (String) -> Unit = {},
     onUpdateGoal: (com.zacco.rytm.domain.goals.UserGoal) -> Unit = {},
+    onQuickAdd: () -> Unit = {},
 ) {
     val (paceLabel, paceTone) = when (b.pace) {
         WeightPace.UNKNOWN -> "za mało ważeń" to ChipTone.MUTED
@@ -65,50 +66,70 @@ fun BodyScreen(
         WeightPace.STALLED -> "Waga stoi" to ChipTone.WARN
         WeightPace.TOO_FAST_UP -> "Za szybko w górę" to ChipTone.WARN
     }
-    ScreenHeader(sub = Format.goal(b.goal) + " · ostatnie 4 tygodnie", title = "Sylwetka") { Chip(paceLabel, paceTone) }
+    ScreenHeader(sub = Format.goal(b.goal) + " · ostatnie 4 tygodnie", title = "Sylwetka") {
+        Chip(paceLabel, paceTone)
+        androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+        com.zacco.rytm.phone.ui.components.IconCircleButton(com.zacco.rytm.phone.ui.components.RytmIcons.plus, "Dodaj wpis", primary = true, onClick = onQuickAdd)
+    }
     WeightCard(b, onAddWeighIn)
     GoalsCard(b.goals, b.strength.map { it.exercise }, b.currentAvg7, onAddGoal, onRemoveGoal, onUpdateGoal)
-    KcalLoopCard(b, kcalTarget, onResetKcal)
-    MacroCard(b)
-    RytmCard {
-        CardHeader("Siła")
-        if (b.strength.isEmpty()) {
-            SmallText("Zapisz pierwszy trening (na zegarku albo „Zapisz trening” w planie na dziś). Rytm dobierze z tego ciężar na kolejny raz" + strengthHint(b.goal) + ".")
-        } else {
-            b.strength.forEach { e ->
-                Column {
-                    Text(e.exercise, style = Rytm.type.body, color = Rytm.colors.ink)
-                    val arrow = when (e.improved) {
-                        true -> " ↑"
-                        false -> " ="
-                        null -> ""
+    // Reszta po dotknięciu: jedna rozwinięta karta naraz, żeby ekran nie był ścianą liczb.
+    com.zacco.rytm.phone.ui.components.MoreList(
+        key = "body",
+        items = listOf(
+            com.zacco.rytm.phone.ui.components.MoreItem(
+                "Siła",
+                b.strength.count { it.improved == true }.takeIf { it > 0 }?.let { "$it ćwiczeń w górę" } ?: "${b.strength.size} ćwiczeń",
+                valueColor = if (b.strength.any { it.improved == true }) Rytm.colors.good else null,
+            ) {
+            RytmCard {
+                CardHeader("Siła")
+                if (b.strength.isEmpty()) {
+                    SmallText("Zapisz pierwszy trening (na zegarku albo „Zapisz trening” w planie na dziś). Rytm dobierze z tego ciężar na kolejny raz" + strengthHint(b.goal) + ".")
+                } else {
+                    b.strength.forEach { e ->
+                        Column {
+                            Text(e.exercise, style = Rytm.type.body, color = Rytm.colors.ink)
+                            val arrow = when (e.improved) {
+                                true -> " ↑"
+                                false -> " ="
+                                null -> ""
+                            }
+                            SmallText(
+                                Format.dayMonth(e.lastDate) + ": " + e.last + arrow + (e.previous?.let { " (wcześniej $it)" } ?: ""),
+                            )
+                        }
                     }
-                    SmallText(
-                        Format.dayMonth(e.lastDate) + ": " + e.last + arrow + (e.previous?.let { " (wcześniej $it)" } ?: ""),
-                    )
                 }
             }
-        }
-    }
-    RytmCard {
-        CardHeader("Skład ciała") {
-            if (b.latestBodyFatPct == null && b.latestComposition == null) Chip("brak pomiaru", ChipTone.MUTED)
-        }
-        b.latestBodyFatPct?.let { SmallText("Tkanka tłuszczowa: ${Format.dec(it)}%.") }
-        val comp = b.latestComposition
-        val c = comp?.composition
-        if (comp != null && c != null) {
-            SmallText("Pomiar z ${Format.dayMonth(comp.date)}: " + com.zacco.rytm.phone.today.compositionSummary(c) + ".")
-        }
-        SmallText(
-            if (b.latestBodyFatPct == null && comp == null) {
-                "Dodaj ważenie i wczytaj zrzut ekranu z Xiaomi Home, żeby zapisać mięśnie, wodę, tłuszcz trzewny i resztę pomiarów."
-            } else {
-                "Pomiary z wagi łazienkowej mocno się wahają, więc patrzymy na trend z miesięcy, nie na pojedynczy wynik."
             },
-        )
-    }
-    MonthlyReportCard(monthly, monthlyRunning, onRunMonthly)
+            com.zacco.rytm.phone.ui.components.MoreItem("Skład ciała", b.latestBodyFatPct?.let { Format.dec(it) + "% tłuszczu" } ?: "brak pomiaru") {
+            RytmCard {
+                CardHeader("Skład ciała") {
+                    if (b.latestBodyFatPct == null && b.latestComposition == null) Chip("brak pomiaru", ChipTone.MUTED)
+                }
+                b.latestBodyFatPct?.let { SmallText("Tkanka tłuszczowa: ${Format.dec(it)}%.") }
+                val comp = b.latestComposition
+                val c = comp?.composition
+                if (comp != null && c != null) {
+                    SmallText("Pomiar z ${Format.dayMonth(comp.date)}: " + com.zacco.rytm.phone.today.compositionSummary(c) + ".")
+                }
+                SmallText(
+                    if (b.latestBodyFatPct == null && comp == null) {
+                        "Dodaj ważenie i wczytaj zrzut ekranu z Xiaomi Home, żeby zapisać mięśnie, wodę, tłuszcz trzewny i resztę pomiarów."
+                    } else {
+                        "Pomiary z wagi łazienkowej mocno się wahają, więc patrzymy na trend z miesięcy, nie na pojedynczy wynik."
+                    },
+                )
+            }
+            },
+            com.zacco.rytm.phone.ui.components.MoreItem("Cel kcal i trend wagi", "${Format.int(kcalTarget)} kcal") { KcalLoopCard(b, kcalTarget, onResetKcal) },
+            com.zacco.rytm.phone.ui.components.MoreItem("Makro z 7 dni") { MacroCard(b) },
+            com.zacco.rytm.phone.ui.components.MoreItem("Analiza miesiąca", monthly?.let { "gotowa" } ?: "1. dnia miesiąca") {
+                MonthlyReportCard(monthly, monthlyRunning, onRunMonthly)
+            },
+        ),
+    )
 }
 
 @Composable

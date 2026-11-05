@@ -52,7 +52,6 @@ import com.zacco.rytm.phone.onboarding.OnboardingWizard
 import com.zacco.rytm.phone.profile.ProfileScreen
 import com.zacco.rytm.phone.today.AlcoholSheet
 import com.zacco.rytm.phone.today.CheckInSheet
-import com.zacco.rytm.phone.today.HabitsCard
 import com.zacco.rytm.phone.today.NutritionSheet
 import com.zacco.rytm.phone.today.RpeSheet
 import com.zacco.rytm.phone.today.SleepSheet
@@ -77,6 +76,7 @@ import com.zacco.rytm.phone.ui.theme.Rytm
 import com.zacco.rytm.phone.week.WeekScreen
 import com.zacco.rytm.domain.time.RytmTime
 import java.time.LocalDate
+import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 
 enum class Tab(val label: String, val icon: ImageVector) {
@@ -87,7 +87,7 @@ enum class Tab(val label: String, val icon: ImageVector) {
     EVENING("Wieczór", RytmIcons.evening),
 }
 
-private enum class Sheet { NONE, QUICK_ADD, CHECK_IN, ACTIVITY, NUTRITION, RPE, WEIGH_IN, ALCOHOL, WORKOUT, SLEEP }
+private enum class Sheet { NONE, QUICK_ADD, CHECK_IN, ACTIVITY, NUTRITION, RPE, WEIGH_IN, ALCOHOL, WORKOUT, SLEEP, READINESS }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,6 +101,10 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     // Po włączeniu aplikacji zawsze ekran główny; trwający trening otwiera się z karty planu.
     var workoutOpen by rememberSaveable { mutableStateOf(false) }
     var chatOpen by rememberSaveable { mutableStateOf(false) }
+    // Ekran treningu (podgląd planu dnia) z „Dziś” albo z „Tydzień”.
+    var previewDate by rememberSaveable { mutableStateOf<String?>(null) }
+    val snackbar = androidx.compose.runtime.remember { androidx.compose.material3.SnackbarHostState() }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var entriesOpen by rememberSaveable { mutableStateOf(false) }
     var replaceWeighIn by rememberSaveable { mutableStateOf<String?>(null) }
     var rpeDate by rememberSaveable { mutableStateOf<String?>(null) }
@@ -250,6 +254,52 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
         return
     }
 
+    state?.takeIf { previewDate != null && !chatOpen }?.let { st ->
+        val date = LocalDate.parse(previewDate)
+        val isToday = date == st.today.date
+        val plan = if (isToday) st.today.plan else st.week.days.firstOrNull { it.date == date }?.plan
+        if (plan == null) {
+            previewDate = null
+            return@let
+        }
+        BackHandler { previewDate = null }
+        val morning = morningNotes.firstOrNull { it.date == st.today.date.toString() }?.note?.takeIf { isToday }
+        val weekNote = weekPlans.asSequence().filter { it.accepted }.flatMap { it.days.asSequence() }
+            .firstOrNull { it.date == date.toString() }?.note?.takeIf { it.isNotBlank() }
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(c.bg)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            com.zacco.rytm.phone.today.PlanPreviewScreen(
+                ui = com.zacco.rytm.phone.today.PlanPreviewUi(
+                    plan = plan,
+                    today = st.today.date,
+                    coachNote = listOfNotNull(morning?.why, weekNote).joinToString(" ").ifBlank { null },
+                    tip = morning?.tip,
+                    dayOff = st.today.dayOff,
+                    planChanged = st.today.planChanged,
+                    setsToday = st.today.setsToday.size,
+                    phoneRunActive = phoneRun != null,
+                ),
+                onClose = { previewDate = null },
+                onStart = { vm.startPhoneWorkout(); workoutOpen = true },
+                onLogWorkout = { sheet = Sheet.WORKOUT },
+                onDayOff = vm::toggleDayOff,
+                onCoach = { chatOpen = true },
+                onResetPlan = vm::resetTodayPlan,
+            )
+        }
+        WorkoutSheetIfOpen(sheet, st, vm) { sheet = Sheet.NONE }
+        return
+    }
+
     state?.takeIf { chatOpen }?.let { st ->
         BackHandler { chatOpen = false }
         val chatScroll = rememberScrollState()
@@ -314,9 +364,9 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onToggleHabit = { vm.toggleHabit(it.habit, it.done) },
                         onCheckIn = { sheet = Sheet.CHECK_IN },
                         onNutrition = { entryDate = null; sheet = Sheet.NUTRITION },
-                        onDayOff = vm::toggleDayOff,
-                        onAdd = { entryDate = null; sheet = Sheet.ACTIVITY },
-                        onLogWorkout = { sheet = Sheet.WORKOUT },
+                        onQuickAdd = { entryDate = null; sheet = Sheet.QUICK_ADD },
+                        onReadiness = { sheet = Sheet.READINESS },
+                        onOpenPlan = { previewDate = s.today.date.toString() },
                         phoneRunActive = phoneRun != null,
                         onPhoneWorkout = {
                             vm.startPhoneWorkout()
@@ -325,7 +375,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         morning = morningNotes.firstOrNull { it.date == s.today.date.toString() }?.note,
                         onCoach = { chatOpen = true },
                         onResetPlan = vm::resetTodayPlan,
-                        onAddSleep = { entryDate = null; sheet = Sheet.SLEEP },
+                        initial = profile?.name?.trim()?.firstOrNull()?.uppercase().orEmpty(),
                     )
                     Tab.WEEK -> WeekScreen(
                         s,
@@ -336,6 +386,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         weekPlans = weekPlans,
                         onAcceptPlan = vm::acceptWeekPlan,
                         onDropPlan = vm::dropWeekPlan,
+                        onOpenDay = { previewDate = it.toString() },
+                        onQuickAdd = { entryDate = null; sheet = Sheet.QUICK_ADD },
                     ) { day ->
                         rpeDate = day.date.toString()
                         sheet = Sheet.RPE
@@ -351,8 +403,25 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onAddGoal = vm::addGoal,
                         onRemoveGoal = vm::removeGoal,
                         onUpdateGoal = vm::updateGoal,
+                        onQuickAdd = { entryDate = null; sheet = Sheet.QUICK_ADD },
                     )
-                    Tab.HABITS -> HabitsTab(s, onToggle = { vm.toggleHabit(it.habit, it.done) }, onAddSleep = { entryDate = null; sheet = Sheet.SLEEP })
+                    Tab.HABITS -> com.zacco.rytm.phone.habits.HabitsScreen(
+                        habits = s.today.habitsAll,
+                        specs = profile?.habitSpecs().orEmpty(),
+                        today = s.today.date,
+                        onToggle = { vm.toggleHabit(it.habit, it.done) },
+                        onSave = vm::saveHabit,
+                        onQuickAdd = { entryDate = null; sheet = Sheet.QUICK_ADD },
+                        onDelete = { spec ->
+                            vm.removeHabit(spec.id)?.let { (index, removed) ->
+                                scope.launch {
+                                    snackbar.currentSnackbarData?.dismiss()
+                                    val r = snackbar.showSnackbar("Usunięto „${removed.name}”", actionLabel = "Cofnij", duration = androidx.compose.material3.SnackbarDuration.Short)
+                                    if (r == androidx.compose.material3.SnackbarResult.ActionPerformed) vm.restoreHabit(index, removed)
+                                }
+                            }
+                        },
+                    )
                     Tab.EVENING -> EveningScreen(
                         s = s,
                         ai = AiUi(
@@ -366,16 +435,12 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onSaveSettings = vm::saveAiSettings,
                         onSaveKey = vm::saveAiKey,
                         onClearKey = vm::clearAiKey,
+                        onQuickAdd = { entryDate = null; sheet = Sheet.QUICK_ADD },
                     )
                 }
             }
         }
-            if (state != null && tab != Tab.EVENING) {
-                AddButton(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
-                    entryDate = null
-                    sheet = Sheet.QUICK_ADD
-                }
-            }
+            androidx.compose.material3.SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(12.dp))
         }
         TabBar(tab) { tab = it }
     }
@@ -401,7 +466,20 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                 QuickEntry.SLEEP -> Sheet.SLEEP
             }
         }
-        Sheet.CHECK_IN -> CheckInSheet(state?.today?.checkIn, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveCheckIn)
+        Sheet.CHECK_IN -> CheckInSheet(
+            state?.today?.checkIn,
+            alcoholYesterday = state?.today?.alcoholYesterday ?: 0,
+            onDismiss = { sheet = Sheet.NONE },
+            onSave = { e, m, sore, drinks -> vm.saveCheckIn(e, m, sore, drinks) },
+        )
+        Sheet.READINESS -> state?.let { s ->
+            com.zacco.rytm.phone.today.ReadinessSheet(
+                s.today,
+                onDismiss = { sheet = Sheet.NONE },
+                onCheckIn = { sheet = Sheet.CHECK_IN },
+                onAddSleep = { entryDate = null; sheet = Sheet.SLEEP },
+            )
+        }
         Sheet.ACTIVITY -> ActivitySheet(date, onDismiss = { sheet = Sheet.NONE }, onSave = vm::logActivity)
         Sheet.NUTRITION -> state?.let { s ->
             NutritionSheet(s.today.date, s.recentNutrition, onDismiss = { sheet = Sheet.NONE }, onSave = vm::saveNutrition, initial = date)
@@ -474,40 +552,9 @@ private fun TabBar(selected: Tab, onSelect: (Tab) -> Unit) {
     }
 }
 
+/** Arkusz „Wpisz trening po fakcie” także nad ekranem treningu. */
 @Composable
-private fun HabitsTab(s: CoachUiState, onToggle: (com.zacco.rytm.domain.coach.HabitStatus) -> Unit, onAddSleep: () -> Unit) {
-    ScreenHeader(sub = "Tydzień od poniedziałku", title = "Nawyki")
-    HabitsCard(s.today.habits, onToggle, showStreak = true)
-    RytmCard {
-        CardHeader("Sen") { SmallText("cel: zaśnięcie 24–01, 7–8 h") }
-        val n = s.today.night
-        SmallText(
-            if (n?.sleepStart != null && n.sleepMin != null) {
-                "Ostatnia noc: zaśnięcie " + n.sleepStart!!.atZone(com.zacco.rytm.domain.time.RytmTime.zone).format(DateTimeFormatter.ofPattern("HH:mm")) +
-                    ", " + Format.minutes(n.sleepMin!!) + (if (n.sleepManual) " (wpisane ręcznie)." else ".")
-            } else {
-                "Brak snu z ostatniej nocy w Health Connect."
-            },
-        )
-        Chip(if (n?.sleepMin == null) "Wpisz sen" else "Popraw sen", ChipTone.ACCENT, onClick = onAddSleep)
-    }
-    SmallText("Dodawanie własnych nawyków i kafelek na zegarku: faza 2.")
-}
-
-
-/** Pływający przycisk „+”: jedno miejsce na wszystkie wpisy. */
-@Composable
-private fun AddButton(modifier: Modifier, onClick: () -> Unit) {
-    val c = Rytm.colors
-    Box(
-        modifier
-            .size(56.dp)
-            .clip(androidx.compose.foundation.shape.CircleShape)
-            .background(c.accent)
-            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
-            .semantics { contentDescription = "Dodaj wpis" },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text("+", style = Rytm.type.screenTitle.copy(fontSize = 28.sp), color = c.onAccent)
-    }
+private fun WorkoutSheetIfOpen(sheet: Sheet, st: CoachUiState, vm: CoachViewModel, onDismiss: () -> Unit) {
+    if (sheet != Sheet.WORKOUT) return
+    st.today.plan.workout?.let { w -> WorkoutLogSheet(w, onDismiss = onDismiss, onSave = vm::saveManualWorkout) }
 }

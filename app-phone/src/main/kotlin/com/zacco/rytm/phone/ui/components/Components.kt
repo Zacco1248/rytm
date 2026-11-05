@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -24,6 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -37,16 +41,23 @@ import com.zacco.rytm.phone.ui.theme.Rytm
 
 /** Karta z makiety: tło surface, obramowanie line, promień 18. */
 @Composable
-fun RytmCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+fun RytmCard(
+    modifier: Modifier = Modifier,
+    padding: androidx.compose.foundation.layout.PaddingValues = androidx.compose.foundation.layout.PaddingValues(16.dp),
+    spacing: Dp = 12.dp,
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     val c = Rytm.colors
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(c.surface)
-            .border(1.dp, c.line, RoundedCornerShape(18.dp))
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .border(1.dp, c.line, RoundedCornerShape(20.dp))
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .padding(padding),
+        verticalArrangement = Arrangement.spacedBy(spacing),
         content = content,
     )
 }
@@ -71,7 +82,7 @@ fun HelpDot(open: Boolean, onClick: () -> Unit) {
     val c = Rytm.colors
     Box(
         Modifier
-            .size(22.dp)
+            .size(26.dp)
             .clip(androidx.compose.foundation.shape.CircleShape)
             .background(if (open) c.accent else c.soft)
             .clickable(onClickLabel = "Wyjaśnienie", onClick = onClick),
@@ -126,14 +137,16 @@ fun Chip(text: String, tone: ChipTone = ChipTone.ACCENT, onClick: (() -> Unit)? 
 @Composable
 fun RytmButton(text: String, modifier: Modifier = Modifier, primary: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
     val c = Rytm.colors
-    val shape = RoundedCornerShape(12.dp)
+    // Pigułka min. 48 dp: wypełniona akcentem z ciemnym tekstem albo obrys z jasnym tekstem (kontrast WCAG w obu motywach).
+    val shape = RoundedCornerShape(24.dp)
     Box(
         modifier = modifier
+            .heightIn(min = 48.dp)
             .clip(shape)
-            .background(if (primary) c.accent else c.surface)
-            .border(1.dp, if (primary) c.accent else c.line, shape)
+            .background(if (primary && enabled) c.accent else c.surface)
+            .border(1.dp, if (primary && enabled) c.accent else c.outline, shape)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -147,6 +160,74 @@ fun RytmButton(text: String, modifier: Modifier = Modifier, primary: Boolean = f
             textAlign = TextAlign.Center,
         )
     }
+}
+
+/** Okrągły przycisk z ikoną (44 dp), np. „+” w nagłówku. */
+@Composable
+fun IconCircleButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    primary: Boolean = false,
+    tint: Color? = null,
+    onClick: () -> Unit,
+) {
+    val c = Rytm.colors
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(if (primary) c.accent else Color.Transparent)
+            .then(if (primary) Modifier else Modifier.border(1.dp, c.outline, CircleShape))
+            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.material3.Icon(icon, contentDescription = null, tint = tint ?: if (primary) c.onAccent else c.ink, modifier = Modifier.size(22.dp))
+    }
+}
+
+/** Mały napis nad treścią karty, wersalikami. */
+@Composable
+fun CardLabel(text: String, modifier: Modifier = Modifier) {
+    Text(text.uppercase(), style = Rytm.type.cardTitle, color = Rytm.colors.muted, modifier = modifier)
+}
+
+/** Wiersz do dotknięcia: tytuł, wartość po prawej i strzałka (albo ▴/▾ przy rozwijaniu). */
+@Composable
+fun TapRow(title: String, value: String? = null, expanded: Boolean? = null, valueColor: Color? = null, onClick: () -> Unit) {
+    val c = Rytm.colors
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable(role = Role.Button, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(title, style = Rytm.type.body, color = c.ink, modifier = Modifier.weight(1f))
+        if (value != null) Text(value, style = Rytm.type.small, color = valueColor ?: c.muted, maxLines = 1)
+        val rot = when (expanded) { true -> 270f; false -> 90f; null -> 0f }
+        androidx.compose.material3.Icon(
+            RytmIcons.chevron, contentDescription = null, tint = c.muted,
+            modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = rot },
+        )
+    }
+}
+
+/** Element listy „Więcej”: wiersz, który po dotknięciu pokazuje pełną kartę pod listą. */
+class MoreItem(val title: String, val value: String? = null, val valueColor: Color? = null, val content: @Composable () -> Unit)
+
+/** Progresywne ujawnianie: lista wierszy w jednej karcie, pod nią rozwinięta karta wybranego (jedna naraz). */
+@Composable
+fun MoreList(items: List<MoreItem>, key: String) {
+    var open by androidx.compose.runtime.saveable.rememberSaveable(key) { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    if (items.isEmpty()) return
+    RytmCard(padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 2.dp), spacing = 0.dp) {
+        items.forEachIndexed { i, it ->
+            if (i > 0) Divider()
+            TapRow(it.title, it.value, expanded = open == it.title, valueColor = it.valueColor) {
+                open = if (open == it.title) null else it.title
+            }
+        }
+    }
+    items.firstOrNull { it.title == open }?.content?.invoke()
 }
 
 /** Dwa przyciski obok siebie, po połowie szerokości. */
