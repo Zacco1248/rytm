@@ -107,7 +107,8 @@ fun Chip(text: String, tone: ChipTone = ChipTone.ACCENT, onClick: (() -> Unit)? 
         ChipTone.GOOD -> c.goodSoft to c.good
         ChipTone.WARN -> c.warnSoft to c.warn
         ChipTone.BAD -> c.warnSoft to c.bad
-        ChipTone.MUTED -> c.chipMuted to c.muted
+        // Tekst jasny jak treść: szary na szarym był w ciemnym motywie nieczytelny.
+        ChipTone.MUTED -> c.chipMuted to c.ink
     }
     Text(
         text,

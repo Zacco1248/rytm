@@ -10,8 +10,12 @@ import java.time.temporal.ChronoUnit
 import kotlin.math.abs
 import kotlin.math.ceil
 
-/** WEIGHT: waga (średnia 7 dni), REPS: powtórzenia w jednej serii ćwiczenia, LIFT: ciężar w ćwiczeniu. */
-enum class GoalKind { WEIGHT, REPS, LIFT }
+/**
+ * WEIGHT: waga (średnia 7 dni), REPS: powtórzenia w jednej serii ćwiczenia, LIFT: ciężar w ćwiczeniu,
+ * FAT_PCT: tłuszcz z ważeń (np. „płaski brzuch”), CARDIO_MIN: najdłuższe cardio bez przerwy (np. bieg),
+ * CUSTOM: własny cel tekstem, postęp zaznaczany ręcznie.
+ */
+enum class GoalKind { WEIGHT, REPS, LIFT, FAT_PCT, CARDIO_MIN, CUSTOM }
 
 /** Cel osoby, np. „10 podciągnięć do marca” albo „78 kg”. */
 @Serializable
@@ -28,8 +32,21 @@ data class UserGoal(
     val start: Double? = null,
     /** Ile kamieni milowych już świętowaliśmy powiadomieniem (0–4). */
     val celebrated: Int = 0,
+    /** Własna nazwa (cel własny albo z listy, np. „Płaski brzuch”). */
+    val label: String? = null,
+    /** CUSTOM: postęp zaznaczony ręcznie, 0–1. */
+    val manualShare: Double = 0.0,
 ) {
-    val title: String get() = when (kind) {
+    val title: String get() = label?.takeIf { it.isNotBlank() }?.let { l ->
+        when (kind) {
+            GoalKind.FAT_PCT -> "$l (${Progression.kg(target)}% tłuszczu)"
+            GoalKind.CARDIO_MIN -> "$l (${target.toInt()} min)"
+            else -> l
+        }
+    } ?: when (kind) {
+        GoalKind.FAT_PCT -> "Tłuszcz ${Progression.kg(target)}%"
+        GoalKind.CARDIO_MIN -> "${exercise ?: "Cardio"} ${target.toInt()} min bez przerwy"
+        GoalKind.CUSTOM -> "Cel własny"
         GoalKind.WEIGHT -> "Waga ${Progression.kg(target)} kg"
         GoalKind.REPS -> "${target.toInt()} × ${exercise.orEmpty()}"
         GoalKind.LIFT -> "${exercise.orEmpty()}: ${Progression.kg(target)} kg"
@@ -57,13 +74,31 @@ object Goals {
     private const val TREND_DAYS = 42L
     private const val MILESTONES = 4
 
-    fun progress(goal: UserGoal, today: LocalDate, weighIns: List<BodyMetrics>, sets: List<SetLog>): GoalProgress {
+    fun progress(
+        goal: UserGoal,
+        today: LocalDate,
+        weighIns: List<BodyMetrics>,
+        sets: List<SetLog>,
+        activities: List<com.zacco.rytm.domain.model.Activity> = emptyList(),
+    ): GoalProgress {
+        if (goal.kind == GoalKind.CUSTOM) {
+            val share = goal.manualShare.coerceIn(0.0, 1.0)
+            val done = share >= 1.0 - 1e-6
+            val reached = (share * MILESTONES + 1e-6).toInt().coerceIn(0, MILESTONES)
+            return GoalProgress(goal, null, null, share, reached, emptyList(), done, null, if (done) "Cel osiągnięty!" else "Postęp zaznaczasz sam.")
+        }
         val created = runCatching { LocalDate.parse(goal.createdOn) }.getOrDefault(today)
         val series: List<Pair<LocalDate, Double>> = when (goal.kind) {
             GoalKind.WEIGHT -> weighIns.filter { it.weightKg != null }.map { it.date }.distinct().sorted()
                 .mapNotNull { d -> NutritionAnalyzer.weightAvg7(weighIns, d)?.let { d to it } }
             GoalKind.REPS -> bestPerDay(sets, goal.exercise) { it.reps.toDouble() }
             GoalKind.LIFT -> bestPerDay(sets, goal.exercise) { it.weightKg ?: 0.0 }.filter { it.second > 0 }
+            GoalKind.FAT_PCT -> weighIns.filter { it.bodyFatPct != null }.groupBy { it.date }.toSortedMap()
+                .map { (d, list) -> d to list.mapNotNull { it.bodyFatPct }.average() }
+            GoalKind.CARDIO_MIN -> activities.filter { it.type == com.zacco.rytm.domain.model.ActivityType.CARDIO }
+                .groupBy { it.start.atZone(com.zacco.rytm.domain.time.RytmTime.zone).toLocalDate() }.toSortedMap()
+                .map { (d, list) -> d to list.maxOf { it.durationMin }.toDouble() }
+            GoalKind.CUSTOM -> emptyList()
         }
         val current = series.lastOrNull()?.second
         val start = goal.start ?: series.lastOrNull { it.first <= created }?.second ?: series.firstOrNull()?.second
@@ -88,7 +123,12 @@ object Goals {
         val deadline = goal.deadline?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
         val note = when {
             done -> "Cel osiągnięty!"
-            current == null -> "Brak danych: " + if (goal.kind == GoalKind.WEIGHT) "dodaj ważenie." else "zapisz trening z tym ćwiczeniem."
+            current == null -> "Brak danych: " + when (goal.kind) {
+                GoalKind.WEIGHT -> "dodaj ważenie."
+                GoalKind.FAT_PCT -> "dodaj ważenie z % tłuszczu."
+                GoalKind.CARDIO_MIN -> "zapisz cardio (bieg, rower) z zegarka albo ręcznie."
+                else -> "zapisz trening z tym ćwiczeniem."
+            }
             forecast == null -> "W obecnym tempie brak prognozy" + if (recent.size < 2) " (za mało pomiarów)." else ": wynik stoi albo idzie w drugą stronę."
             deadline == null -> "W tym tempie ok. ${pl(forecast)}."
             !forecast.isAfter(deadline) -> "W tym tempie ok. ${pl(forecast)}, przed terminem (${pl(deadline)})."

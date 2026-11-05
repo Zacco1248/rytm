@@ -48,4 +48,21 @@ class GoalsTest {
         val empty = Goals.progress(goal, today, emptyList(), emptyList())
         assertNull(empty.current)
     }
+
+    @Test
+    fun `flat belly tracks body fat down and custom goal uses manual share`() {
+        val w = (0..5).map { i -> BodyMetrics(today.minusDays(7L * (5 - i)), 80.0, 20.0 - i * 0.5) }
+        val belly = UserGoal("b", GoalKind.FAT_PCT, null, 15.0, createdOn = today.minusDays(35).toString(), label = "Płaski brzuch")
+        val p = Goals.progress(belly, today, w, emptyList())
+        assertEquals(17.5, p.current)
+        assertTrue(p.share in 0.4..0.6, p.share.toString())
+        assertNotNull(p.forecast)
+        assertTrue(belly.title.startsWith("Płaski brzuch"))
+
+        val own = UserGoal("c", GoalKind.CUSTOM, null, 1.0, createdOn = today.toString(), label = "Przebiec 10 km", manualShare = 0.5)
+        val c = Goals.progress(own, today, emptyList(), emptyList())
+        assertEquals(0.5, c.share)
+        assertEquals(2, c.milestonesReached)
+        assertEquals("Przebiec 10 km", own.title)
+    }
 }

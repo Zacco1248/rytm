@@ -151,7 +151,7 @@ data class ChatContext(
                 proteinTarget = s.nutritionTargets.proteinG,
                 knownExercises = ExerciseGuide.all().map { e -> e.name + " [" + e.muscles.joinToString(",") { it.name } + "]" },
                 goals = data.profile.goals.map { g ->
-                    val p = com.zacco.rytm.domain.goals.Goals.progress(g, data.today, data.weighIns, data.sets)
+                    val p = com.zacco.rytm.domain.goals.Goals.progress(g, data.today, data.weighIns, data.sets, data.activities)
                     "${g.title}: ${(p.share * 100).toInt()}%, ${p.note}"
                 },
                 deload = s.deload?.text,

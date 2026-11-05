@@ -120,7 +120,7 @@ object WeeklyInputs {
             nextWeekPlan = nextWeek.days.map { it.date.dayOfWeek.getDisplayName(TextStyle.SHORT, pl) + ": " + it.plan.title },
             nextWeekDeload = nextWeek.deload?.text,
             goals = data.profile.goals.map { g ->
-                val p = com.zacco.rytm.domain.goals.Goals.progress(g, weekEnd, data.weighIns, data.sets)
+                val p = com.zacco.rytm.domain.goals.Goals.progress(g, weekEnd, data.weighIns, data.sets, data.activities)
                 "${g.title}: ${(p.share * 100).roundToInt()}%. ${p.note}"
             },
         )

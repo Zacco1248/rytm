@@ -209,7 +209,7 @@ private fun AiSettingsCard(
             )
             SmallText("Wieczorna analiza o:")
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(20 * 60 + 30, 21 * 60 + 30, 22 * 60 + 30).forEach { m ->
+                listOf(21 * 60 + 30, 22 * 60 + 30, 23 * 60 + 30).forEach { m ->
                     Chip(hhmm(m), if (st.eveningAtMin == m) ChipTone.ACCENT else ChipTone.MUTED) { onSaveSettings(st.copy(eveningAtMin = m)) }
                 }
                 Chip(if (st.eveningEnabled) "włączona" else "wyłączona", if (st.eveningEnabled) ChipTone.GOOD else ChipTone.MUTED) {

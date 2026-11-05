@@ -95,7 +95,7 @@ class NudgeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(
             val coach = data.coach.observe(today).first()
             var changed = false
             val goals = p.goals.mapIndexed { i, g ->
-                val progress = Goals.progress(g, today, coach.weighIns, coach.sets)
+                val progress = Goals.progress(g, today, coach.weighIns, coach.sets, coach.activities)
                 if (progress.milestonesReached > g.celebrated) {
                     val title = if (progress.done) "Cel osiągnięty!" else "Kamień milowy: ${progress.milestonesReached * 25}%"
                     show(context, Nudge(NudgeKind.WORKOUT, title, "${g.title}. ${progress.note}"), id = 200 + i)
