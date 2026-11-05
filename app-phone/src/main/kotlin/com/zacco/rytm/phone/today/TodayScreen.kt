@@ -568,7 +568,7 @@ private fun ActivityTodayCard(s: TodaySnapshot, onAdd: () -> Unit) {
         CardHeader(
             "Szczegóły",
             help = "Do celu jedzenia doliczam ${(s.trainingKcalFactor * 100).toInt()}% kcal z treningów (zegarki zwykle zawyżają spalanie), bez spacerów, bo te są już w ruchu z profilu. " +
-                "Kcal z „~” to szacunek z czasu i RPE, gdy zegarek ich nie podał. „Cały dzień” to całe spalanie dnia, razem z przemianą spoczynkową.",
+                "„kcal z zegarka” to aktywne kalorie treningu z Samsung Health (bez spoczynku). Kcal z „~” to szacunek z czasu i RPE, gdy zegarek ich nie podał. Procent zależy od celu: redukcja 50%, masa 100%, siła i wytrzymałość 90%, cele z Fitatu i pozostałe 75%. „Cały dzień” to całe spalanie dnia, razem z przemianą spoczynkową.",
         ) { Chip("+ dodaj", ChipTone.ACCENT, onClick = onAdd) }
         if (acts.isEmpty()) {
             SmallText("Jeszcze nic. Spacery i treningi z zegarka albo opaski pojawią się po synchronizacji; resztę dodasz przyciskiem „+”.")
@@ -588,6 +588,11 @@ private fun ActivityTodayCard(s: TodaySnapshot, onAdd: () -> Unit) {
                                 a.avgHr?.let { "śr. tętno $it" },
                                 a.rpe?.let { "RPE $it" },
                                 if (a.source == com.zacco.rytm.domain.model.Source.MANUAL) "wpis ręczny" else null,
+                                when {
+                                    a.id in s.estimatedKcalIds -> "kcal szacowane"
+                                    a.kcal != null && a.source == com.zacco.rytm.domain.model.Source.HEALTH_CONNECT -> "kcal z zegarka"
+                                    else -> null
+                                },
                             ).joinToString(" · "),
                         )
                     }

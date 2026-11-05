@@ -5,6 +5,7 @@ import com.zacco.rytm.domain.time.RytmTime
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 /** Sesja snu z Health Connect sprowadzona do tego, czego potrzebujemy. */
 data class SleepSession(
@@ -83,6 +84,19 @@ object Ingest {
         }
         return kept.sortedBy { it.start }
     }
+
+    /**
+     * Kcal treningu z Health Connect: aktywne, a gdy aplikacja ich nie zapisuje, całkowite minus spoczynek
+     * ([RESTING_KCAL_PER_MIN] na minutę). Null, gdy brak obu (wtedy Rytm szacuje).
+     */
+    fun sessionKcal(active: Double?, total: Double?, minutes: Long): Int? = when {
+        active != null && active > 0 -> active.roundToInt()
+        total != null && total > 0 -> (total - RESTING_KCAL_PER_MIN * minutes).coerceAtLeast(0.0).roundToInt().takeIf { it > 0 }
+        else -> null
+    }
+
+    /** Spoczynek ok. 1800 kcal/dobę, czyli 1,25 kcal/min. */
+    const val RESTING_KCAL_PER_MIN = 1.25
 
     fun bestOrigin(origins: Collection<String>): String = origins.minBy { originRank(it) }
 

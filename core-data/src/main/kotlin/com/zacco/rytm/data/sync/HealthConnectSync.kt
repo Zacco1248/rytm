@@ -5,6 +5,7 @@ import androidx.health.connect.client.aggregate.AggregateMetric
 import androidx.health.connect.client.changes.DeletionChange
 import androidx.health.connect.client.changes.UpsertionChange
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.BodyFatRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
@@ -14,6 +15,7 @@ import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
+import androidx.health.connect.client.records.metadata.DataOrigin
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ChangesTokenRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
@@ -235,6 +237,7 @@ class HealthConnectSync(
             } else {
                 null
             }
+            val kcal = sessionKcal(s, types)
             db.activities().upsertFromHealthConnect(
                 ActivityEntity(
                     id = s.metadata.id,
@@ -244,7 +247,7 @@ class HealthConnectSync(
                     durationMin = Duration.between(s.startTime, s.endTime).toMinutes().toInt().coerceAtLeast(0),
                     rpe = null,
                     avgHr = avgHr,
-                    kcal = null,
+                    kcal = kcal,
                     source = Source.HEALTH_CONNECT,
                     origin = s.metadata.dataOrigin.packageName,
                     title = s.title,
@@ -253,6 +256,34 @@ class HealthConnectSync(
                 ),
             )
         }
+    }
+
+    /**
+     * Kcal treningu z zegarka: aktywne kalorie z okna sesji, z tej samej aplikacji co sesja (Samsung Health).
+     * Gdy aplikacja zapisuje tylko kalorie całkowite, odejmujemy spoczynek (ok. [RESTING_KCAL_PER_MIN] kcal/min).
+     * Null: brak danych, wtedy Rytm szacuje i pokazuje „~”.
+     */
+    private suspend fun sessionKcal(s: ExerciseSessionRecord, types: Set<KClass<out Record>>): Int? {
+        val metrics = buildSet<AggregateMetric<*>> {
+            if (ActiveCaloriesBurnedRecord::class in types) add(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL)
+            if (TotalCaloriesBurnedRecord::class in types) add(TotalCaloriesBurnedRecord.ENERGY_TOTAL)
+        }
+        if (metrics.isEmpty()) return null
+        val agg = runCatching {
+            client.aggregate(
+                AggregateRequest(
+                    metrics = metrics,
+                    timeRangeFilter = TimeRangeFilter.between(s.startTime, s.endTime),
+                    dataOriginFilter = setOf(DataOrigin(s.metadata.dataOrigin.packageName)),
+                ),
+            )
+        }.getOrNull() ?: return null
+        val minutes = Duration.between(s.startTime, s.endTime).toMinutes()
+        return Ingest.sessionKcal(
+            active = agg[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories,
+            total = agg[TotalCaloriesBurnedRecord.ENERGY_TOTAL]?.inKilocalories,
+            minutes = minutes,
+        )
     }
 
     private suspend fun refreshWeighIns(date: LocalDate, types: Set<KClass<out Record>>) {
@@ -283,6 +314,7 @@ class HealthConnectSync(
             is ExerciseSessionRecord -> setOf(d(record.startTime))
             is StepsRecord -> setOf(d(record.startTime))
             is TotalCaloriesBurnedRecord -> setOf(d(record.startTime))
+            is ActiveCaloriesBurnedRecord -> setOf(d(record.startTime))
             is NutritionRecord -> setOf(d(record.startTime))
             is WeightRecord -> setOf(d(record.time))
             is BodyFatRecord -> setOf(d(record.time))
@@ -338,6 +370,7 @@ class HealthConnectSync(
             ExerciseSessionRecord::class,
             StepsRecord::class,
             TotalCaloriesBurnedRecord::class,
+            ActiveCaloriesBurnedRecord::class,
             NutritionRecord::class,
             WeightRecord::class,
             BodyFatRecord::class,
