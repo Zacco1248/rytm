@@ -51,4 +51,12 @@ class IngestTest {
 
     private fun activity(id: String, start: String, min: Int, rpe: Int?) =
         Activity(id, ActivityType.VOLLEYBALL, Instant.parse(start), min, rpe, null, null, Source.HEALTH_CONNECT)
+
+    @Test
+    fun `kcal treningu z zegarka biorą aktywne, a bez nich całkowite minus spoczynek`() {
+        assertEquals(808, Ingest.sessionKcal(active = 808.4, total = 930.0, minutes = 96))
+        assertEquals(810, Ingest.sessionKcal(active = null, total = 930.0, minutes = 96))
+        assertNull(Ingest.sessionKcal(active = null, total = null, minutes = 96))
+        assertNull(Ingest.sessionKcal(active = 0.0, total = 50.0, minutes = 96))
+    }
 }
