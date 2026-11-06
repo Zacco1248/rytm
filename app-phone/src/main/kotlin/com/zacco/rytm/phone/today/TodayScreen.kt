@@ -98,19 +98,23 @@ fun TodayScreen(
     onCoach: () -> Unit = {},
     onResetPlan: () -> Unit = {},
     initial: String = "",
-    past: Boolean = false,
-    onSwitchDay: (() -> Unit)? = null,
+    daysBack: Int = 0,
+    onShiftDay: ((Int) -> Unit)? = null,
 ) {
-    if (past) {
-        // Podgląd wczoraj: jedzenie, nawyki i aktywność; wpisy trafiają na ten dzień.
-        ScreenHeader(sub = Format.dayLong(s.date), title = "Wczoraj") {
+    if (daysBack > 0) {
+        // Podgląd poprzedniego dnia: jedzenie, nawyki i aktywność; wpisy trafiają na ten dzień.
+        ScreenHeader(sub = Format.dayLong(s.date), title = if (daysBack == 1) "Wczoraj" else "$daysBack dni temu") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconCircleButton(RytmIcons.plus, "Dodaj wpis na wczoraj", primary = true, onClick = onQuickAdd)
+                IconCircleButton(RytmIcons.plus, "Dodaj wpis na ten dzień", primary = true, onClick = onQuickAdd)
             }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallText("Gotowość ${s.readiness.score} · plan: ${s.plan.title}", Modifier.weight(1f))
-            onSwitchDay?.let { Chip("Dziś ›", ChipTone.ACCENT, onClick = it) }
+            SmallText("Gotowość ${s.readiness.score} · ${s.plan.title}", Modifier.weight(1f))
+            onShiftDay?.let { shift ->
+                Chip("‹", ChipTone.MUTED, onClick = { shift(1) })
+                if (daysBack > 1) Chip("›", ChipTone.MUTED, onClick = { shift(-1) })
+                Chip("Dziś", ChipTone.ACCENT, onClick = { shift(-daysBack) })
+            }
         }
         NutritionCard(s, sync, onSync, onNutrition)
         if (s.habits.isNotEmpty()) HabitsCard(s.habits, onToggleHabit)
@@ -124,8 +128,8 @@ fun TodayScreen(
             ProfileMenu(initial, s, sync, onProfile, onEntries, onSync)
         }
     }
-    onSwitchDay?.let {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { Chip("‹ Wczoraj", ChipTone.MUTED, onClick = it) }
+    onShiftDay?.let { shift ->
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { Chip("‹ Wczoraj", ChipTone.MUTED, onClick = { shift(1) }) }
     }
 
     if (hc != HcStatus.READY && hc != HcStatus.CHECKING) HealthConnectCard(hc, onConnect)

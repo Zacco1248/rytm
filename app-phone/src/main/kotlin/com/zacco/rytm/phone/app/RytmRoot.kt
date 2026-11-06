@@ -132,8 +132,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     val entries by vm.entries.collectAsStateWithLifecycle()
     val exportStatus by vm.exportStatus.collectAsStateWithLifecycle()
     val chatRunning by vm.chatRunning.collectAsStateWithLifecycle()
-    val showYesterday by vm.showYesterday.collectAsStateWithLifecycle()
-    val yesterday by vm.yesterday.collectAsStateWithLifecycle()
+    val dayOffset by vm.dayOffset.collectAsStateWithLifecycle()
+    val pastDay by vm.pastDay.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
         vm.refreshHealthConnect()
@@ -355,8 +355,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                 SmallText("Wczytuję…", Modifier.padding(top = 24.dp))
             } else {
                 when (tab) {
-                    Tab.TODAY -> if (showYesterday && yesterday != null) {
-                        val y = yesterday!!
+                    Tab.TODAY -> if (dayOffset > 0 && pastDay != null) {
+                        val y = pastDay!!
                         TodayScreen(
                             s = y,
                             hc = hc,
@@ -370,8 +370,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                             onQuickAdd = { entryDate = y.date.toString(); sheet = Sheet.QUICK_ADD },
                             onReadiness = {},
                             onOpenPlan = {},
-                            past = true,
-                            onSwitchDay = { vm.showYesterday(false) },
+                            daysBack = dayOffset,
+                            onShiftDay = vm::shiftDay,
                         )
                     } else TodayScreen(
                         s = s.today,
@@ -396,7 +396,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onCoach = { chatOpen = true },
                         onResetPlan = vm::resetTodayPlan,
                         initial = profile?.name?.trim()?.firstOrNull()?.uppercase().orEmpty(),
-                        onSwitchDay = { vm.showYesterday(true) },
+                        onShiftDay = vm::shiftDay,
                     )
                     Tab.WEEK -> WeekScreen(
                         s,

@@ -95,7 +95,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
     /** Dzień zmienia się o północy także przy otwartej aplikacji. */
     private val today = flow {
         while (true) {
-            emit(LocalDate.now(RytmTime.zone))
+            emit(RytmTime.appDay())
             delay(60_000)
         }
     }.distinctUntilChanged()
@@ -123,17 +123,17 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    /** Podgląd wczoraj na ekranie Dziś (np. po północy, gdy dopiero jest czas na sprawdzenie dnia). */
-    private val _showYesterday = MutableStateFlow(false)
-    val showYesterday: StateFlow<Boolean> = _showYesterday.asStateFlow()
+    /** Podgląd poprzednich dni na ekranie Dziś: 0 = dziś, 1 = wczoraj… (np. po północy, gdy jest czas na sprawdzenie). */
+    private val _dayOffset = MutableStateFlow(0)
+    val dayOffset: StateFlow<Int> = _dayOffset.asStateFlow()
 
-    fun showYesterday(on: Boolean) {
-        _showYesterday.value = on
+    fun shiftDay(by: Int) {
+        _dayOffset.update { (it + by).coerceIn(0, MAX_DAYS_BACK) }
     }
 
-    val yesterday: StateFlow<TodaySnapshot?> = combine(today, _showYesterday) { day, on -> day to on }
-        .flatMapLatest { (day, on) ->
-            if (!on) flowOf(null) else data.coach.observe(day.minusDays(1)).map { engine.today(it) }
+    val pastDay: StateFlow<TodaySnapshot?> = combine(today, _dayOffset) { day, off -> day to off }
+        .flatMapLatest { (day, off) ->
+            if (off == 0) flowOf(null) else data.coach.observe(day.minusDays(off.toLong())).map { engine.today(it) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -216,7 +216,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
         _aiRunning.value = true
         viewModelScope.launch {
             try {
-                data.ai.evening(LocalDate.now(RytmTime.zone), reflection, force = true)
+                data.ai.evening(RytmTime.appDay(), reflection, force = true)
                 WatchBridge.publish(getApplication())
             } finally {
                 _aiRunning.value = false
@@ -273,7 +273,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- wpisy użytkownika ---
 
-    fun toggleHabit(habit: Habit, currentlyDone: Boolean, date: LocalDate = LocalDate.now(RytmTime.zone)) {
+    fun toggleHabit(habit: Habit, currentlyDone: Boolean, date: LocalDate = RytmTime.appDay()) {
         val value = when {
             currentlyDone -> null
             habit.kind == HabitKind.YES_NO -> 1
@@ -283,7 +283,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun saveCheckIn(energy: Int, mood: Int, sore: Set<BodyArea>, drinksYesterday: Int? = null) {
-        val date = LocalDate.now(RytmTime.zone)
+        val date = RytmTime.appDay()
         viewModelScope.launch {
             // Alkohol z wczoraj najpierw, żeby poranna notka i gotowość już go uwzględniły.
             drinksYesterday?.let { data.coach.setAlcohol(date.minusDays(1), it) }
@@ -508,7 +508,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun toggleDayOff() {
-        val date = LocalDate.now(RytmTime.zone)
+        val date = RytmTime.appDay()
         val off = state.value?.today?.dayOff ?: false
         viewModelScope.launch { data.coach.setDayOff(date, !off) }
     }
@@ -548,3 +548,4 @@ data class ActivityEntry(
 
 /** Od tylu punktów zmiany gotowości notka „Na dziś” liczy się od nowa. */
 private const val MORNING_REFRESH_POINTS = 8
+private const val MAX_DAYS_BACK = 30
