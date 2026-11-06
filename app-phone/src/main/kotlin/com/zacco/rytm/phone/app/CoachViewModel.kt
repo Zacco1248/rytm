@@ -41,6 +41,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -118,6 +120,20 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
                 recentAlcohol = d.dayNotes.filter { it.date >= d.today.minusDays(13) }
                     .groupBy { it.date }.mapValues { (_, l) -> l.sumOf { it.alcoholDrinks } },
             )
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** Podgląd wczoraj na ekranie Dziś (np. po północy, gdy dopiero jest czas na sprawdzenie dnia). */
+    private val _showYesterday = MutableStateFlow(false)
+    val showYesterday: StateFlow<Boolean> = _showYesterday.asStateFlow()
+
+    fun showYesterday(on: Boolean) {
+        _showYesterday.value = on
+    }
+
+    val yesterday: StateFlow<TodaySnapshot?> = combine(today, _showYesterday) { day, on -> day to on }
+        .flatMapLatest { (day, on) ->
+            if (!on) flowOf(null) else data.coach.observe(day.minusDays(1)).map { engine.today(it) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -257,8 +273,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
 
     // --- wpisy użytkownika ---
 
-    fun toggleHabit(habit: Habit, currentlyDone: Boolean) {
-        val date = LocalDate.now(RytmTime.zone)
+    fun toggleHabit(habit: Habit, currentlyDone: Boolean, date: LocalDate = LocalDate.now(RytmTime.zone)) {
         val value = when {
             currentlyDone -> null
             habit.kind == HabitKind.YES_NO -> 1

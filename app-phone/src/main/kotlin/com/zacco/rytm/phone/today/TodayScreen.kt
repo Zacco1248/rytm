@@ -98,13 +98,34 @@ fun TodayScreen(
     onCoach: () -> Unit = {},
     onResetPlan: () -> Unit = {},
     initial: String = "",
+    past: Boolean = false,
+    onSwitchDay: (() -> Unit)? = null,
 ) {
+    if (past) {
+        // Podgląd wczoraj: jedzenie, nawyki i aktywność; wpisy trafiają na ten dzień.
+        ScreenHeader(sub = Format.dayLong(s.date), title = "Wczoraj") {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconCircleButton(RytmIcons.plus, "Dodaj wpis na wczoraj", primary = true, onClick = onQuickAdd)
+            }
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SmallText("Gotowość ${s.readiness.score} · plan: ${s.plan.title}", Modifier.weight(1f))
+            onSwitchDay?.let { Chip("Dziś ›", ChipTone.ACCENT, onClick = it) }
+        }
+        NutritionCard(s, sync, onSync, onNutrition)
+        if (s.habits.isNotEmpty()) HabitsCard(s.habits, onToggleHabit)
+        ActivityTodayCard(s, onQuickAdd)
+        return
+    }
     // Nagłówek: „+” (wszystkie wpisy) i menu profilu. Pływający „+” zasłaniał treść, a chipy się ucinały.
     ScreenHeader(sub = Format.dayLong(s.date), title = greeting()) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconCircleButton(RytmIcons.plus, "Dodaj wpis", primary = true, onClick = onQuickAdd)
             ProfileMenu(initial, s, sync, onProfile, onEntries, onSync)
         }
+    }
+    onSwitchDay?.let {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { Chip("‹ Wczoraj", ChipTone.MUTED, onClick = it) }
     }
 
     if (hc != HcStatus.READY && hc != HcStatus.CHECKING) HealthConnectCard(hc, onConnect)
