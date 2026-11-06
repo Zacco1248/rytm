@@ -132,6 +132,8 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
     val entries by vm.entries.collectAsStateWithLifecycle()
     val exportStatus by vm.exportStatus.collectAsStateWithLifecycle()
     val chatRunning by vm.chatRunning.collectAsStateWithLifecycle()
+    val dayOffset by vm.dayOffset.collectAsStateWithLifecycle()
+    val pastDay by vm.pastDay.collectAsStateWithLifecycle()
 
     val permissionLauncher = rememberLauncherForActivityResult(PermissionController.createRequestPermissionResultContract()) {
         vm.refreshHealthConnect()
@@ -353,7 +355,25 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                 SmallText("Wczytuję…", Modifier.padding(top = 24.dp))
             } else {
                 when (tab) {
-                    Tab.TODAY -> TodayScreen(
+                    Tab.TODAY -> if (dayOffset > 0 && pastDay != null) {
+                        val y = pastDay!!
+                        TodayScreen(
+                            s = y,
+                            hc = hc,
+                            sync = sync,
+                            onConnect = { permissionLauncher.launch(vm.permissions) },
+                            onSync = vm::syncNow,
+                            onProfile = { profileOpen = true },
+                            onToggleHabit = { vm.toggleHabit(it.habit, it.done, y.date) },
+                            onCheckIn = {},
+                            onNutrition = { entryDate = y.date.toString(); sheet = Sheet.NUTRITION },
+                            onQuickAdd = { entryDate = y.date.toString(); sheet = Sheet.QUICK_ADD },
+                            onReadiness = {},
+                            onOpenPlan = {},
+                            daysBack = dayOffset,
+                            onShiftDay = vm::shiftDay,
+                        )
+                    } else TodayScreen(
                         s = s.today,
                         hc = hc,
                         sync = sync,
@@ -376,6 +396,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                         onCoach = { chatOpen = true },
                         onResetPlan = vm::resetTodayPlan,
                         initial = profile?.name?.trim()?.firstOrNull()?.uppercase().orEmpty(),
+                        onShiftDay = vm::shiftDay,
                     )
                     Tab.WEEK -> WeekScreen(
                         s,
