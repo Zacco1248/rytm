@@ -36,7 +36,7 @@ data class DailyMetrics(
     val sleepManual: Boolean = false,
 )
 
-data class NutritionDay(val date: LocalDate, val kcal: Int, val proteinG: Double, val fatG: Double, val carbsG: Double)
+data class NutritionDay(val date: LocalDate, val kcal: Int, val proteinG: Double, val fatG: Double, val carbsG: Double, val manual: Boolean = false)
 
 data class BodyMetrics(
     val date: LocalDate,

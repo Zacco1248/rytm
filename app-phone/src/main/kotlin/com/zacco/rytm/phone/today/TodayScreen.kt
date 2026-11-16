@@ -2,7 +2,12 @@ package com.zacco.rytm.phone.today
 
 import com.zacco.rytm.ai.morning.MorningNote
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.background
+import androidx.compose.ui.platform.LocalContext
+import androidx.health.connect.client.HealthConnectClient
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -98,6 +103,7 @@ fun TodayScreen(
     onCoach: () -> Unit = {},
     onResetPlan: () -> Unit = {},
     initial: String = "",
+    hcMissing: List<String> = emptyList(),
 ) {
     // Nagłówek: „+” (wszystkie wpisy) i menu profilu. Pływający „+” zasłaniał treść, a chipy się ucinały.
     ScreenHeader(sub = Format.dayLong(s.date), title = greeting()) {
@@ -108,6 +114,7 @@ fun TodayScreen(
     }
 
     if (hc != HcStatus.READY && hc != HcStatus.CHECKING) HealthConnectCard(hc, onConnect)
+    if (hc == HcStatus.READY && hcMissing.isNotEmpty()) MissingPermissionsCard(hcMissing, onConnect)
     sync.error?.let { RytmCard { SmallText(it, color = Rytm.colors.bad) } }
 
     PlanCard(s, morning, onReadiness, onCheckIn, onOpenPlan, phoneRunActive, onPhoneWorkout, onCoach, onResetPlan)
@@ -164,6 +171,35 @@ private fun HealthConnectCard(hc: HcStatus, onConnect: () -> Unit) {
             else "Rytm potrzebuje dostępu do snu, tętna, treningów, żywienia i wagi. Zaznacz wszystko, także odczyt w tle.",
         )
         RytmButton("Połącz z Health Connect", Modifier.fillMaxWidth(), primary = true, onClick = onConnect)
+    }
+}
+
+/** Połączony, ale bez części zgód (np. żywienie nie było zaznaczone, gdy Fitatu jeszcze nie wysyłało danych). */
+@Composable
+private fun MissingPermissionsCard(missing: List<String>, onConnect: () -> Unit) {
+    val context = LocalContext.current
+    RytmCard {
+        CardHeader("Health Connect") { Chip("brak zgód", ChipTone.WARN) }
+        SmallText("Rytm nie ma zgody na: ${missing.joinToString()}. Bez tego tych danych nie zobaczy.")
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            RytmButton("Nadaj zgody", Modifier.weight(1f), primary = true, onClick = onConnect)
+            // Gdy Android już nie pokazuje okna zgód (odmowa dwa razy), zostają ustawienia Health Connect.
+            RytmButton("Ustawienia HC", Modifier.weight(1f), onClick = { openHealthConnectPermissions(context) })
+        }
+    }
+}
+
+private fun openHealthConnectPermissions(context: Context) {
+    val app = Intent("android.health.connect.action.MANAGE_HEALTH_PERMISSIONS")
+        .putExtra(Intent.EXTRA_PACKAGE_NAME, context.packageName)
+    val fallback = Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)
+    for (intent in listOf(app, fallback)) {
+        try {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (_: ActivityNotFoundException) {
+        } catch (_: SecurityException) {
+        }
     }
 }
 
@@ -394,6 +430,7 @@ private fun NutritionCard(s: TodaySnapshot, sync: SyncUi, onSync: () -> Unit, on
             MacroText("Tłuszcz", Format.roundInt(n.fatG), t.fatG, Modifier.weight(1f))
             MacroText("Węgle", Format.roundInt(n.carbsG), t.carbsG, Modifier.weight(1f))
         }
+        if (n.manual) SmallText("Wpisane ręcznie. Gdy Fitatu wyśle nowsze dane, zastąpią ten wpis.", color = c.muted)
     }
 }
 
