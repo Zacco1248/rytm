@@ -87,6 +87,10 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
     private val _hc = MutableStateFlow(HcStatus.CHECKING)
     val hc: StateFlow<HcStatus> = _hc.asStateFlow()
 
+    /** Zgody, których brakuje mimo połączenia (np. żywienie dodane w Fitatu później). Nazwy dla użytkownika. */
+    private val _hcMissing = MutableStateFlow<List<String>>(emptyList())
+    val hcMissing: StateFlow<List<String>> = _hcMissing.asStateFlow()
+
     private val _sync = MutableStateFlow(SyncUi())
     val sync: StateFlow<SyncUi> = _sync.asStateFlow()
 
@@ -240,6 +244,7 @@ class CoachViewModel(app: Application) : AndroidViewModel(app) {
             val granted = HealthConnectClient.getOrCreate(getApplication()).permissionController.getGrantedPermissions()
             val core = HealthConnectSync.recordTypes.map { androidx.health.connect.client.permission.HealthPermission.getReadPermission(it) }
             _hc.value = if (core.any { it in granted }) HcStatus.READY else HcStatus.NEEDS_PERMISSIONS
+            _hcMissing.value = HealthConnectPermissions.missingLabels(granted)
             if (_hc.value == HcStatus.READY) syncNow()
         }
     }

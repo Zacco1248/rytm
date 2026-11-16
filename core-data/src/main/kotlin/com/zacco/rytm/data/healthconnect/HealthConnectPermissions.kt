@@ -51,4 +51,17 @@ object HealthConnectPermissions {
     )
 
     val all: Set<String> = read + extra
+
+    /** Zgody ważne dla Rytmu, po polsku. Pozostałe typy są tylko do diagnostyki. */
+    private val important: List<Pair<String, String>> = listOf(
+        HealthPermission.getReadPermission(SleepSessionRecord::class) to "sen",
+        HealthPermission.getReadPermission(HeartRateRecord::class) to "tętno",
+        HealthPermission.getReadPermission(ExerciseSessionRecord::class) to "treningi",
+        HealthPermission.getReadPermission(StepsRecord::class) to "kroki",
+        HealthPermission.getReadPermission(NutritionRecord::class) to "żywienie (Fitatu)",
+        HealthPermission.getReadPermission(WeightRecord::class) to "waga",
+        HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND to "odczyt w tle",
+    )
+
+    fun missingLabels(granted: Set<String>): List<String> = important.filter { it.first !in granted }.map { it.second }
 }

@@ -189,8 +189,13 @@ class HealthConnectSync(
     }
 
     private suspend fun refreshNutrition(date: LocalDate) {
-        if (db.nutrition().get(date)?.manual == true) return
         val (start, end) = dayBounds(date)
+        // Wpis ręczny wygrywa, chyba że Fitatu zapisało coś później (np. wpisane ręcznie, zanim Fitatu wysłało dane).
+        val manual = db.nutrition().get(date)?.takeIf { it.manual }
+        if (manual != null) {
+            val newest = read(NutritionRecord::class, start, end).maxOfOrNull { it.metadata.lastModifiedTime }
+            if (newest == null || !newest.isAfter(manual.updatedAt)) return
+        }
         val agg = client.aggregate(
             AggregateRequest(
                 metrics = setOf(
@@ -204,7 +209,7 @@ class HealthConnectSync(
         )
         val kcal = agg[NutritionRecord.ENERGY_TOTAL]?.inKilocalories
         if (kcal == null || kcal <= 0.0) {
-            db.nutrition().delete(date)
+            if (manual == null) db.nutrition().delete(date)
             return
         }
         db.nutrition().upsert(

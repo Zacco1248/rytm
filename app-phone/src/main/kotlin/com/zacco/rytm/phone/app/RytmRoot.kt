@@ -113,6 +113,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
 
     val state by vm.state.collectAsStateWithLifecycle()
     val hc by vm.hc.collectAsStateWithLifecycle()
+    val hcMissing by vm.hcMissing.collectAsStateWithLifecycle()
     val sync by vm.sync.collectAsStateWithLifecycle()
     val profile by vm.profile.collectAsStateWithLifecycle()
     val profileReady by vm.profileReady.collectAsStateWithLifecycle()
@@ -356,6 +357,7 @@ fun RytmRoot(vm: CoachViewModel = viewModel()) {
                     Tab.TODAY -> TodayScreen(
                         s = s.today,
                         hc = hc,
+                        hcMissing = hcMissing,
                         sync = sync,
                         onConnect = { permissionLauncher.launch(vm.permissions) },
                         onSync = vm::syncNow,

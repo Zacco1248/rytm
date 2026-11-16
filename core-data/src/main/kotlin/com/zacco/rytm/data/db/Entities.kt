@@ -59,7 +59,7 @@ data class NutritionDayEntity(
     val fatG: Double,
     val carbsG: Double,
     val updatedAt: Instant,
-    /** Wpisane ręcznie (Fitatu bez Premium nie wysyła do HC). Synchronizacja nie nadpisuje takich dni. */
+    /** Wpisane ręcznie. Synchronizacja nadpisze dzień tylko wtedy, gdy Fitatu zapisze do HC coś nowszego niż ten wpis. */
     val manual: Boolean = false,
 )
 
